@@ -238,8 +238,8 @@ pub struct GameState {
     pub fade_white: f32,
 }
 
-/// The flag bytes `0x1395b8..0x139658` ([`GameState::flags`]).
-pub const FLAGS_LEN: usize = 0xa0;
+/// The flag bytes `0x1395b8..0x139685` ([`GameState::flags`]): the save's global chunk 5 (0xcd bytes).
+pub const FLAGS_LEN: usize = 0xcd;
 
 /// `0x2621e0`: the health levels, the XP / 32 to the next (each gives one health), −1 ends.
 const HP_LEVELS: [i16; 66] = [

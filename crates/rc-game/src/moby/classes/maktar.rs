@@ -29,8 +29,7 @@
 //! Not ported (the lock puzzle): the catapult's draw `0x3eae18` and its aiming camera.
 //!
 //! Not ported (the rides): 0x0bf6's hero word `0x18a032` = 2 on the prompt (no reader found), its `0x152c26` = 1 on the
-//! return from the Jamming Array (a ship-mode byte), the flag `0x13965d` that shows Barlow's banner only once (past the
-//! save's flag bytes), the scenes' end callback `0x405ec0` on the Jamming Array; 0x0c8f's debug prints and
+//! return from the Jamming Array (a ship-mode byte), the scenes' end callback `0x405ec0` on the Jamming Array; 0x0c8f's debug prints and
 //! `0x18c0d6` = 1 as Ratchet boards.
 //!
 //! The Electrolyzer's puzzle 0x0896 (`0x3c3b80`, two here) is crate::moby::classes::electrolyzer: its group's
@@ -1881,8 +1880,11 @@ pub fn update_0bf6(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 }
                 let (p, r) = (ctx.hero.pos, ctx.hero.rot);
                 ctx.game.save_checkpoint(p, r);
-                // The flag `0x13965d` (past the save's flag bytes, not kept): the banner each return.
-                if ctx.game.planets.get(4).is_some_and(|&b| b != 0) { crate::travel::new_planet_banner(ctx.game, 4); }
+                // Barlow unlocked (`0x1a7bd4`) and the flag `0x13965d` not set: the banner, once.
+                if ctx.game.planets.get(4).is_some_and(|&b| b != 0) && flag(ctx.game, 0xa5) == 0 {
+                    set_flag(ctx.game, 0xa5, 1);
+                    crate::travel::new_planet_banner(ctx.game, 4);
+                }
             }
         }
         1 => {}
