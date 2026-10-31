@@ -405,6 +405,28 @@ impl MobyHost for Host<'_> {
         usize::try_from(handle).ok().and_then(|i| s.system.slots.slots.get(i)).is_some_and(|x| x.state != rc_game::audio::voices::state::FREE)
     }
 
+    /// `0x3082e0`'s sound part (rc_game::audio::chunk).
+    fn switch_chunk_sound(&mut self, k: i32, track: i32) {
+        let Some(s) = self.sound.as_mut() else { return };
+        s.system.chunk_switch(k, track);
+        let d = &s.system.data;
+        let b = &d.chunk_banks;
+        let classes: Vec<String> = b.loaded_classes(&d.sounds).iter().map(|(o, n)| format!("{o:#06x}×{n}")).collect();
+        println!(
+            "chunk switch: sound bank {} {}, its class sounds {}; music track {track}",
+            k + 1,
+            b.loaded.and_then(|l| b.base[l]).map_or("not loaded".to_string(), |base| format!("loaded (sounds from {base})")),
+            classes.join(" ")
+        );
+    }
+
+    /// `0x335928`: the music request.
+    fn music_request(&mut self, track: i32, stinger: i32) {
+        if let Some(s) = self.sound.as_mut() { s.system.music_request(track, stinger); }
+    }
+
+    fn music_tracks(&self) -> Option<(u8, u8)> { self.sound.as_ref().map(|s| s.system.music_tracks()) }
+
     fn sequence_sphere(&self, m: &Moby) -> Option<[f32; 4]> {
         let (class, s, _) = self.state_of(m)?;
         let seqs = &self.lv.anim.get(class)?.sequences;

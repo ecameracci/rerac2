@@ -22,7 +22,7 @@
 //!   back at 1 with its beam full and its arms in; with a chunk, 5.
 //! * **4** the beam (drawn) grows back to 1.95 by 1/15, then the arms tilt down and come in (eased to 0), 1.
 //! * **5** (into a chunk) the white `+0x3c` from 1 down by 0.02 a tick; past −0.2 the partner arrives (6), the chunk
-//!   switch (`0x3082e0`, crate::game::GameState::switch_chunk), Ratchet on the partner 0.2 up standing still (0x6f),
+//!   switch (`0x3082e0(+0x38, +0x40)`, crate::moby::Ctx::switch_chunk: its music track `+0x40`, 0 when negative), Ratchet on the partner 0.2 up standing still (0x6f),
 //!   1. **6** (arriving from a chunk) its arms out, the white up by 0.02 to 1.2, then Ratchet idle (`0x2cc330`), its
 //!   sound 1, 4.
 //!
@@ -33,7 +33,7 @@
 //! Not ported: the beam's draw itself (`0x4126b0`: four bands of light over the pad, with Ratchet's shrink
 //! `0x18be40..` / `0x18c320` and his pull to its middle `0x189f20`), the white's draw `0x412c78` of the states 5 and
 //! 6, the arms' lighting (`+0x38` from Ratchet's moby), the cutscene lock `0x18c0d5` while the beam is out, the
-//! chunk switch's second argument (`+0x40`), the prompt texts of the other levels' copies (L02's switch is used).
+//! prompt texts of the other levels' copies (L02's switch is used).
 
 use crate::hero::physics::{add, add_rot, approach, ease, set_len};
 use crate::moby::attach::rows_of;
@@ -65,6 +65,8 @@ mod pv {
     pub const BEAM: usize = 0x34;
     pub const CHUNK: usize = 0x38;
     pub const WHITE: usize = 0x3c;
+    /// The music track the chunk switch starts.
+    pub const TRACK: usize = 0x40;
 }
 
 /// `0x412be8`: the prompt by `+0x10` (L02's switch).
@@ -270,7 +272,9 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 m.state = 1;
                 m.set_pv_f(pv::BEAM, BEAM_FULL);
                 for o in [pv::REACH, pv::TILT, pv::REACH_V, pv::TILT_V] { m.set_pv_i(o, 0); }
-                ctx.game.switch_chunk(chunk);
+                // `0x3082e0(+0x38, +0x40)`: the music track 0 when negative.
+                let track = w.mobys[id].pv_i(pv::TRACK).max(0);
+                ctx.switch_chunk(chunk, track);
                 if let Some(p) = to {
                     let (at, rot) = (w.mobys[p].pos, w.mobys[p].rot);
                     ctx.hero.teleport([at[0], at[1], at[2] + 0.2], rot);

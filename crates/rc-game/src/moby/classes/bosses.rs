@@ -188,7 +188,8 @@ fn send(w: &mut MobyWorld, ms: usize, ctx: &mut Ctx, class: i16, arg: bool) -> O
 /// The master's boss wave (`0x3fb1b0` at `0x3fc148..0x3fc364`, each tick it sends): with both bosses called for and
 /// neither sent, 0x09f8 out and 0x0a44 waiting in its pen, each the other's partner, 0x09f8 the master's boss (`+0xd0`)
 /// and called back once (its first third); else the one called for and not sent yet. Returns the announcer's line to
-/// say (0xf both, 0xe 0x09f8, 0x14 0x0a44). Not ported: the music the master asks for then (`0x335928(+0x230, +0x234)`).
+/// say (0xf both, 0xe 0x09f8, 0x14 0x0a44); the master then asks for its bosses' music (`0x335928(+0x230, +0x234)`,
+/// crate::moby::classes::arena).
 pub fn send_wave_bosses(w: &mut MobyWorld, ms: usize, ctx: &mut Ctx, bosses: [u8; 2]) -> Option<usize> {
     let (a, b) = (w.mobys[ms].pv_i(M_SENT_9F8), w.mobys[ms].pv_i(M_SENT_A44));
     if a == 0 && bosses[0] != 0 && b == 0 && bosses[1] != 0 {

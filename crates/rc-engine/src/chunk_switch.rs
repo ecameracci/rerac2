@@ -11,8 +11,11 @@
 //! Then [`hide_other_chunk`] (`0x3081c8(k)`, which the level load `0x308740` runs too on a level in chunks) hides what
 //! lies outside chunk k's region and shows what lies in it: the ties, the shrubs and the mobys.
 //!
-//! Not ported: the chunk's sound bank (bank k + 1, `0x334fe0`; crate::level_wad::chunk_sounds loads chunk 0's only)
-//! and its ambient (`0x335630`); the other resets (`0x368320`, `0x335998`, `0x383fd8`, `0x373960`).
+//! The switch's sound part — the reverb off (`0x368320`), every sound stopped (`0x368398`), the music stopped
+//! (`0x335998`), chunk k's sound bank (bank k + 1, `0x334fe0`) and the caller's music track (`0x335630`) — runs in the
+//! tick where the game asks for the switch (rc_game::moby::Ctx::switch_chunk → rc_game::audio::chunk).
+//!
+//! Not ported: the other resets (`0x383fd8`, `0x373960`).
 
 use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;

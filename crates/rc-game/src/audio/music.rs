@@ -10,7 +10,13 @@
 //! request 0x1516f2/f3, phase 0x1516f0, fade T/F 0x1516f4/f8, request timer 0x1516fc.
 //!
 //! Level start: track 0 plays once (stream flags 0x20); the first `music_Update` after its handle comes back
-//! queues track 1 behind it with flags 0x24 (looping), so Start runs into Loop seamlessly.
+//! queues the track's body behind it with flags 0x24 (looping), so Start runs into Loop seamlessly.
+//!
+//! Going Commando's track table (L02 `0x150840`, the level's `G/AUDIOn.WAD` header from +8, [`MusicTrack::table`])
+//! lists mono VAG streams, and a track is the index of its left stream: `music_start_track` (`0x335630`) plays streams
+//! t and t + 1 (left, right), the body (`0x335728`) streams t + 2 / t + 3, a stinger (`music_Transition` `0x335840`)
+//! stream t alone. The table holds the scenes' and the announcer's speech too (`0x335110`: ids 3000.. are its
+//! streams), so the tracks the objects ask for lie anywhere in it (Maktar's arena: 4, 0, 228, 230).
 //!
 //! IOP side (989snd's stream player is not reversed, all inferred): one SPU voice per stream at pitch
 //! `rate·0x1000/48000`, parts queued behind the running one continue with the decoder history, a looping
@@ -24,6 +30,9 @@ use rc_formats::sound_bank::SoundInstance;
 use rc_formats::vag;
 use std::collections::BTreeMap;
 use std::sync::Arc;
+
+/// The track table's entries loaded ([`MusicTrack::table`]): the requests' tracks are bytes (`0x335928`).
+pub const TRACKS: usize = 0x100;
 
 /// One music VAG: its body up to and including the end frame (the 0x7 pad frame is never played). A stereo track
 /// (Going Commando's left / right pairs) has a right channel too: `body` is then the left one.
@@ -42,12 +51,26 @@ impl MusicTrack {
         Ok(MusicTrack { name: h.name, rate: h.sample_rate, body: Arc::from(&body[..ext.bytes()]), right: None })
     }
 
-    /// A stereo track from its left and right VAGs (the same rate).
-    pub fn from_vag_pair(left: &[u8], right: &[u8]) -> rc_formats::buf::Result<Self> {
-        let mut t = Self::from_vag(left)?;
-        let r = Self::from_vag(right)?;
-        t.right = Some(r.body);
-        Ok(t)
+    /// The level's track table from its streams (`None`: an empty entry; at most [`TRACKS`]): track t is stream t
+    /// with stream t + 1 as its right channel when there is one (module docs). Each stream is read once; a stream
+    /// that does not read is an empty entry (with a warning).
+    pub fn table(streams: &[Option<&[u8]>]) -> Vec<Option<Arc<MusicTrack>>> {
+        let mono: Vec<Option<MusicTrack>> = streams
+            .iter()
+            .take(TRACKS)
+            .enumerate()
+            .map(|(k, s)| {
+                let s = (*s)?;
+                Self::from_vag(s).map_err(|e| eprintln!("audio: music stream {k} not read ({e})")).ok()
+            })
+            .collect();
+        (0..mono.len())
+            .map(|t| {
+                let left = mono[t].as_ref()?;
+                let right = mono.get(t + 1).and_then(Option::as_ref).map(|r| Arc::clone(&r.body));
+                Some(Arc::new(MusicTrack { right, ..left.clone() }))
+            })
+            .collect()
     }
 }
 
@@ -116,13 +139,13 @@ pub struct Player {
 /// The music EE state.
 #[derive(Clone, Debug, Default)]
 pub struct Music {
-    /// Tracks present in the level header table (`music[15]` non-zero).
-    pub(crate) present: [bool; 15],
+    /// Tracks present in the level's table (their stream non-zero).
+    pub(crate) present: Vec<bool>,
     pub main: Player,
     pub(crate) transition: Player,
-    /// 0x1516f2 / 0x1516f3.
-    pub(crate) pending_track: i8,
-    pub(crate) pending_stinger: i8,
+    /// The request (L02 `0x1a63e4` / `0x1a63e6`, 16 bits; R&C1 0x1516f2 / 0x1516f3, bytes); −1 none.
+    pub(crate) pending_track: i16,
+    pub(crate) pending_stinger: i16,
     /// 0x1516f0.
     pub(crate) phase: i16,
     /// 0x1516f4 / 0x1516f8: stinger length and quarter.
@@ -145,7 +168,7 @@ fn fast_dec_timer(t: &mut i32) -> bool {
 pub(crate) const REQUEST_DEBOUNCE: i32 = 420;
 
 impl Music {
-    pub(crate) fn new(present: [bool; 15]) -> Self { Music { present, pending_track: -1, pending_stinger: -1, ..Default::default() } }
+    pub(crate) fn new(present: Vec<bool>) -> Self { Music { present, pending_track: -1, pending_stinger: -1, ..Default::default() } }
 
     fn player(&mut self, p: PlayerId) -> &mut Player {
         match p {
@@ -170,13 +193,15 @@ impl Music {
         cmds.push(StreamCommand::Play { player: PlayerId::Main, track: track as usize, vol: vol as i32, group: 1, queue: 0, flags: 0x21, cb: StreamCallback::Preseek });
     }
 
-    /// `music_StartTrackBody` (0x27a080): queue `track + 1` behind the running stream.
+    /// `music_StartTrackBody` (0x27a080; L02 `0x335728`): queue the body, track `track + 2` (streams t + 2 / t + 3),
+    /// behind the running stream. The game tests stream t + 1 and passes the body's streams right first [L: the
+    /// port keeps them left / right].
     fn start_track_body(&mut self, track: i16, flags: u16, vol: i16, cmds: &mut Vec<StreamCommand>) {
         let m = self.main;
-        if m.state == 9 || m.handle == 0 || m.handle == -1 || !self.has(track as i32 + 1) { return; }
+        if m.state == 9 || m.handle == 0 || m.handle == -1 || !self.has(track as i32 + 2) { return; }
         self.main = Player { track, flags, state: 9, vol, ..m };
         let f = if flags & 1 != 0 { 0x24 } else { 0x20 };
-        cmds.push(StreamCommand::Play { player: PlayerId::Main, track: track as usize + 1, vol: vol as i32, group: 1, queue: m.handle, flags: f, cb: StreamCallback::Body });
+        cmds.push(StreamCommand::Play { player: PlayerId::Main, track: track as usize + 2, vol: vol as i32, group: 1, queue: m.handle, flags: f, cb: StreamCallback::Body });
     }
 
     /// `music_Transition(track, stinger, flags, vol)` (0x27a168).
@@ -196,9 +221,25 @@ impl Music {
             return;
         }
         if differs {
-            self.pending_track = track as i8;
-            self.pending_stinger = stinger as i8;
+            self.pending_track = track;
+            self.pending_stinger = stinger;
         }
+    }
+
+    /// music_Stop's EE part (L02 `0x335998`, after the streams stopped, crate::audio::chunk): every player idle
+    /// (handle 0, state 0, flags 0), a pending track the current one, nothing pending. The phase is reset with them
+    /// [L: a stop ends any transition; R&C2's `0x1a63d4` = 0 is taken for it].
+    pub(crate) fn stop(&mut self) {
+        if self.pending_track != -1 { self.main.track = self.pending_track; }
+        for p in [&mut self.main, &mut self.transition] {
+            p.handle = 0;
+            p.state = 0;
+            p.flags = 0;
+        }
+        self.pending_track = -1;
+        self.pending_stinger = -1;
+        self.phase = 0;
+        self.deferred.clear();
     }
 
     /// Apply one callback.
@@ -302,10 +343,10 @@ impl Music {
             }
         }
         if fast_dec_timer(&mut self.timer) && self.pending_track != -1 && self.phase == 0 {
-            if self.main.track == self.pending_track as i16 {
+            if self.main.track == self.pending_track {
                 self.pending_track = -1;
             } else {
-                let (t, s, f, v) = (self.pending_track as i16, self.pending_stinger as i16, self.main.flags, self.main.vol);
+                let (t, s, f, v) = (self.pending_track, self.pending_stinger, self.main.flags, self.main.vol);
                 // Without a stinger nothing is started here (the new track waits for the main player to go idle).
                 if s == -1 || self.transition_to(t, s, f, v, cmds) { self.timer = REQUEST_DEBOUNCE; }
             }
@@ -326,7 +367,7 @@ impl Music {
                 }
                 3 => {
                     if m.state == 0 && (t.stinger != 0 || t.handle == 0) {
-                        let track = self.pending_track as i16;
+                        let track = self.pending_track;
                         self.preseek_track(track, m.flags, m.vol, cmds);
                         self.phase = 4;
                         self.pending_track = -1;
@@ -458,8 +499,15 @@ impl Streams {
         self.streams.get(&h).is_some_and(|s| s.pending.is_some() || (spu.voices[s.voice].generation == s.generation && spu.voices[s.voice].active()))
     }
 
+    /// Every stream stopped (music_Stop's `0x133310`, [`StreamCommand::Stop`] on each).
+    pub(crate) fn stop_all(&mut self, vm: &mut VoiceManager, spu: &mut Spu) {
+        let none: [Option<Arc<MusicTrack>>; 0] = [];
+        let handles: Vec<i32> = self.streams.keys().copied().collect();
+        for handle in handles { self.execute(&StreamCommand::Stop { handle }, &none, vm, spu); }
+    }
+
     /// Runs one stream command; returns the callback value.
-    pub(crate) fn execute(&mut self, cmd: &StreamCommand, tracks: &[Option<Arc<MusicTrack>>; 15], vm: &mut VoiceManager, spu: &mut Spu) -> Option<StreamReply> {
+    pub(crate) fn execute(&mut self, cmd: &StreamCommand, tracks: &[Option<Arc<MusicTrack>>], vm: &mut VoiceManager, spu: &mut Spu) -> Option<StreamReply> {
         match *cmd {
             StreamCommand::Play { player, track, vol, group, queue, flags, cb } => {
                 let Some(t) = tracks.get(track).and_then(|t| t.as_ref()) else { return Some(StreamReply { player, cb, value: 0 }) };
@@ -487,9 +535,10 @@ impl Streams {
                 let h = self.next;
                 let pitch = vag::rate_to_pitch(t.rate);
                 let (mut regs, mut base) = Self::volume(vm, vol, group);
-                // A stereo track: a second voice for the right channel (none free: the left plays alone, centred).
+                // A stereo track: a second voice for the right channel (none free: the left plays alone, centred). A
+                // stinger plays its stream alone (`0x335840` passes no right one).
                 let mut right = None;
-                if let Some(body) = t.right.as_ref() {
+                if let Some(body) = t.right.as_ref().filter(|_| player != PlayerId::Transition) {
                     vm.voices[i].owner = VoiceUse::Stream { handle: h as u32 };
                     if let Some(j) = vm.allocate(spu, group as usize, 127, 0) {
                         let ((lr, lb), (rr, rb)) = Self::sides(vm, base, group);
@@ -601,7 +650,7 @@ mod tests {
     use super::*;
     use crate::audio::SPU_VOICES;
 
-    fn present() -> [bool; 15] { std::array::from_fn(|k| k < 9) }
+    fn present() -> Vec<bool> { (0..15).map(|k| k < 9).collect() }
 
     #[test]
     fn level_start_queues_the_loop() {
@@ -617,7 +666,7 @@ mod tests {
         assert_eq!(m.main.state, 8);
         let mut c3 = Vec::new();
         m.update(&mut c3);
-        assert_eq!(c3, vec![StreamCommand::Play { player: PlayerId::Main, track: 1, vol: 0x400, group: 1, queue: 7, flags: 0x24, cb: StreamCallback::Body }]);
+        assert_eq!(c3, vec![StreamCommand::Play { player: PlayerId::Main, track: 2, vol: 0x400, group: 1, queue: 7, flags: 0x24, cb: StreamCallback::Body }]);
         assert_eq!(m.main.state, 9);
         m.reply(StreamReply { player: PlayerId::Main, cb: StreamCallback::Body, value: 7 });
         assert_eq!((m.main.state, m.main.handle), (4, 7));
@@ -722,7 +771,7 @@ mod tests {
         assert_eq!(r.value, 0);
         assert_eq!(music(&spu), 0);
         // The EE side: body failed → idle → the track restarts (one new stream).
-        let mut m = Music::new(std::array::from_fn(|k| k < 2));
+        let mut m = Music::new(vec![true; 2]);
         m.main = Player { handle: 1, track: 0, vol: 0x400, flags: 1, state: 9, ..Default::default() };
         m.reply(r);
         let mut cmds = Vec::new();

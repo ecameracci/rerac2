@@ -36,10 +36,16 @@
 //!
 //! The bosses 0x09f8 / 0x0a44 are crate::moby::classes::bosses (sent by [`fight`] through `send_wave_bosses`).
 //!
-//! Not ported: the Spiderbot Glove bots' end at a challenge's end and on Ratchet's warps (`0x3fb028(1, −1)` /
-//! `0x42e670(1, −1)`: classes 0x0b58 / 0x0e79, no glove in the port, G-WPN-009), the announcer's speech (`0x401d98`, its
+//! The music (`0x335928(track, stinger)`, crate::audio::chunk through the host): the chunk switches carry the arena's
+//! track `+0x220` in and the resort's `+0x224` out, and the master asks for them after (stingers `+0x228` / `+0x22c`);
+//! the bosses' `+0x230` / `+0x234` as a wave's boss is sent, the arena's again at a wave without bosses.
+//!
+//! The Spiderbot Glove's bot ends at a challenge's end (`0x3fb028(1, −1)`, crate::moby::classes::spiderbot::end) and
+//! on Ratchet's warps (`0x2bd368`'s `0x3fb028(0, 0)`).
+//!
+//! Not ported: the upgraded glove's end (`0x42e670`: its bot 0x0e79 has no port), the announcer's speech (`0x401d98`, its
 //! remarks `0x401e68` / `0x402090`), the restart's path straight into the wipe (`0x1a7904` = 2), the
-//! music (`0x335928`), the level's sounds, the challenges' weapon lock (`0x18b6f4`) and the fixed held items of 7 / 8 /
+//! level's sounds, the challenges' weapon lock (`0x18b6f4`) and the fixed held items of 7 / 8 /
 //! 13 beyond the hand request; the plates' sparks (`0x3d85a8`: the particle burst `0x345d88` has no port).
 
 use crate::hero::physics::{add, add_rot, atan2, dist, dist2, set_len, sub, V3};
@@ -492,6 +498,14 @@ mod pv {
     pub const WAVE: usize = 0x122;
     pub const WIPE: usize = 0x124;
     pub const SAID: usize = 0x1d0;
+    /// The music (`0x335928(track, stinger)`): the arena's track and stinger `+0x220` / `+0x228`, the resort's
+    /// `+0x224` / `+0x22c`, the bosses' `+0x230` / `+0x234`.
+    pub const MUSIC_ARENA: usize = 0x220;
+    pub const MUSIC_RESORT: usize = 0x224;
+    pub const STINGER_ARENA: usize = 0x228;
+    pub const STINGER_RESORT: usize = 0x22c;
+    pub const MUSIC_BOSS: usize = 0x230;
+    pub const STINGER_BOSS: usize = 0x234;
 }
 
 /// `$gp+0x2198`: the turns to attack each fighter class gets at a challenge's start.
@@ -787,14 +801,14 @@ fn menu_camera(ctx: &mut Ctx) {
     ctx.game.cameras.camera_script_targets(Some(MENU_EYE), Some(MENU_ANGLES));
 }
 
-/// `0x3fe020`: back to the resort — the announcer's goodbye, state 1, chunk 0, Ratchet at the cuboid `+0x78` (before
-/// the first win, facing 2.16) or the desk's `+0x74` (facing −1.59), the checkpoint, the fighters pooled, the plates
-/// and 0x0b89s down.
+/// `0x3fe020`: back to the resort — the announcer's goodbye, state 1, chunk 0 with the resort's music, Ratchet at the
+/// cuboid `+0x78` (before the first win, facing 2.16) or the desk's `+0x74` (facing −1.59), the checkpoint, the
+/// fighters pooled, the plates and 0x0b89s down, the resort's music asked for.
 fn leave(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let n = 0x25 + ctx.game.rng.randi(2);
     say(w, id, n);
     w.mobys[id].set_state(1, -1);
-    ctx.game.switch_chunk(0);
+    ctx.switch_chunk(0, w.mobys[id].pv_i(pv::MUSIC_RESORT));
     let m = &w.mobys[id];
     let place = if wins(ctx.game, 0) == 0 {
         ctx.level.cuboid_place(m.pv_i(pv::BACK)).map(|c| (c.0, f32::from_bits(0x400a_3d71)))
@@ -804,6 +818,7 @@ fn leave(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     if let Some((p, yaw)) = place {
         // `0x2bd368(.., 0, 1)`: its last argument the camera reset (`0x2dd6f8`).
         ctx.hero.teleport(p, [0.0, 0.0, yaw]);
+        super::spiderbot::end(w, false, 0);
         ctx.game.cameras.reset();
         ctx.hero.request_state(0, true);
         let (p, r) = (ctx.hero.pos, ctx.hero.rot);
@@ -812,6 +827,8 @@ fn leave(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     pool_all(w, id, ctx);
     raise_group(w, id, pv::B89, 0);
     raise_group(w, id, pv::PLATES, 0);
+    let m = &w.mobys[id];
+    ctx.host.music_request(m.pv_i(pv::MUSIC_RESORT), m.pv_i(pv::STINGER_RESORT));
     ctx.game.arena_menu = None;
 }
 
@@ -881,7 +898,11 @@ fn fail_kills(w: &MobyWorld, id: usize) -> i32 {
 }
 
 /// The challenge lost (its message shown, `0x313098`): state 10.
-fn lose(w: &mut MobyWorld, id: usize) { w.mobys[id].set_state(10, -1); }
+fn lose(w: &mut MobyWorld, id: usize) {
+    w.mobys[id].set_state(10, -1);
+    // `0x3fb028(1, −1)`: a Spiderbot out blows up.
+    super::spiderbot::end(w, true, -1);
+}
 
 /// The port's: the arena's middle (the cuboid `+0x88`'s place) kept for the moat's draw ([`draw_moat`] reads it as
 /// `0x3fd638` does).
@@ -932,6 +953,7 @@ pub fn update_master(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                     raise_group(w, id, pv::PLATES, 0);
                     if let Some((p, _)) = cuboid_at(ctx, w, id, pv::MIDDLE) {
                         ctx.hero.teleport(p, [0.0; 3]);
+                        super::spiderbot::end(w, false, 0);
                         ctx.hero.request_state(0x6f, true);
                         let (p, r) = (ctx.hero.pos, ctx.hero.rot);
                         ctx.game.save_checkpoint(p, r);
@@ -1212,9 +1234,9 @@ pub fn draw_hud(h: &ChallengeHud, text: &dyn Fn(u32) -> Vec<u8>, fonts: [(&[rc_f
     print(1, hud_box(380, 400, 320, 420, 360, 384), &first(0x2df6));
 }
 
-/// State 2: through the wipe into the arena — chunk 1, Ratchet at the entry cuboid `+0x8c`, the checkpoint, the
-/// camera behind him; the first time the announcer's welcome (the trigger `+0x108` hooked) and straight into the first
-/// challenge; else the overview once he has walked to the middle.
+/// State 2: through the wipe into the arena — chunk 1 with the arena's music, Ratchet at the entry cuboid `+0x8c`, the
+/// checkpoint, the arena's music asked for, the camera behind him; the first time the announcer's welcome (the trigger
+/// `+0x108` hooked) and straight into the first challenge; else the overview once he has walked to the middle.
 fn enter(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     if w.mobys[id].first() {
         w.mobys[id].timer = 0;
@@ -1232,14 +1254,17 @@ fn enter(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             // The wipe from the screen's full height (`0x401a20`, [`draw_wipe`]).
             w.mobys[id].set_pv_s(pv::WIPE, crate::gui::SCREEN_H as i16);
             wipe_tick(w, id, ctx);
-            ctx.game.switch_chunk(1);
+            ctx.switch_chunk(1, w.mobys[id].pv_i(pv::MUSIC_ARENA));
             if let Some((p, r)) = cuboid_at(ctx, w, id, pv::ENTRY) {
                 ctx.hero.teleport(p, r);
+                super::spiderbot::end(w, false, 0);
                 ctx.hero.request_state(0x6f, true);
                 let (p, r) = (ctx.hero.pos, ctx.hero.rot);
                 ctx.game.save_checkpoint(p, r);
                 ctx.game.cameras.camera_script([p[0], p[1], p[2] + 2.0], r, crate::script_camera::MODE_SNAP, 0, false, ctx.hero);
             }
+            let m = &w.mobys[id];
+            ctx.host.music_request(m.pv_i(pv::MUSIC_ARENA), m.pv_i(pv::STINGER_ARENA));
             w.mobys[id].timer = 2;
         }
         2 => {
@@ -1415,6 +1440,8 @@ fn fight(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         if waves <= m.pv_s(pv::WAVE) {
             if ch == 0 && wins(ctx.game, 0) == 0 { m.set_state(0xb, -1); } else { m.set_state(5, -1); }
             m.set_pv_s(pv::SELECTED, ch as i16);
+            // `0x3fb028(1, −1)`: a Spiderbot out blows up.
+            super::spiderbot::end(w, true, -1);
             return;
         }
         wave_start(w, id, ctx);
@@ -1449,6 +1476,7 @@ fn fight(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     if ch == 0xc && 0x1c20 < ticks {
         w.mobys[id].set_pv_i(pv::BOSS, 0);
         w.mobys[id].set_state(5, -1);
+        super::spiderbot::end(w, true, -1);
         return;
     }
     // Sending fighters: after a second (or at once with a boss), the round's spawner, the wave's fighters into it
@@ -1466,8 +1494,19 @@ fn fight(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                     }
                 }
             }
-            // `0x3fc148..0x3fc364`: the wave's bosses (crate::moby::classes::bosses), the announcer's line.
-            if let Some(n) = super::bosses::send_wave_bosses(w, id, ctx, wave.bosses) { say(w, id, n as i32); }
+            // `0x3fc148..0x3fc364`: the wave's bosses (crate::moby::classes::bosses), the announcer's line, the bosses'
+            // music.
+            if let Some(n) = super::bosses::send_wave_bosses(w, id, ctx, wave.bosses) {
+                say(w, id, n as i32);
+                let m = &w.mobys[id];
+                ctx.host.music_request(m.pv_i(pv::MUSIC_BOSS), m.pv_i(pv::STINGER_BOSS));
+            }
+            // `0x3fc364`: a wave without bosses asks for the arena's music unless it plays or is pending (the low bytes
+            // `0x1a63f0` / `0x1a63e4` against the whole word).
+            let track = w.mobys[id].pv_i(pv::MUSIC_ARENA);
+            if wave.bosses == [0, 0] && ctx.host.music_tracks().is_none_or(|(now, next)| now as i32 != track && next as i32 != track) {
+                ctx.host.music_request(track, w.mobys[id].pv_i(pv::STINGER_ARENA));
+            }
             if sent { open_gates(w, id, ctx); }
         }
     }

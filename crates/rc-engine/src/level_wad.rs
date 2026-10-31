@@ -287,32 +287,24 @@ pub fn load(root: &Path, index: u32) -> Result<LoadedLevel> {
     })
 }
 
-/// The level's music (`G/AUDIOn.WAD`): its header (`s32 size, 0`, then `{sector, bytes}` from +8) lists mono VAG
-/// streams in left / right pairs (`rc2_l00_main_al` / `_ar`, `_bl` / `_br`); pair k is the stereo track k (R&C1's
-/// level start plays track 0 once, then track 1 looping).
-fn music(root: &Path, index: u32) -> Result<[Option<std::sync::Arc<rc_game::audio::music::MusicTrack>>; 15]> {
+/// The level's music (`G/AUDIOn.WAD`): its header (`s32 size, 0`, then `{sector, bytes}` from +8; in memory at
+/// `0x150838`, L02) lists mono VAG streams, an empty entry 0 bytes; track t is stream t with stream t + 1 as its right
+/// channel (rc_game::audio::music::MusicTrack::table: `rc2_l00_main_al` / `_ar`, then the body `_bl` / `_br` at
+/// t + 2). The table goes on with the scenes' and the announcer's speech; the first
+/// [`rc_game::audio::music::TRACKS`] entries are loaded.
+fn music(root: &Path, index: u32) -> Result<Vec<Option<std::sync::Arc<rc_game::audio::music::MusicTrack>>>> {
     let file = crate::disc_source::read(root, &format!("G/AUDIO{index}.WAD"))?;
     let w = |o: usize| -> Option<usize> { file.get(o..o + 4).map(|b| u32::from_le_bytes(b.try_into().unwrap()) as usize) };
     let size = w(0).context("AUDIO header")?.min(file.len());
-    let mut streams = Vec::new();
+    let mut streams: Vec<Option<&[u8]>> = Vec::new();
     let mut o = 8;
-    while o + 8 <= size {
+    while o + 8 <= size && streams.len() < rc_game::audio::music::TRACKS {
         let (sector, bytes) = (w(o).unwrap_or(0), w(o + 4).unwrap_or(0));
-        if bytes == 0 { break; }
         let at = sector * 2048;
-        streams.push(file.get(at..at + bytes).context("AUDIO stream past the end")?);
+        streams.push(if bytes == 0 { None } else { Some(file.get(at..at + bytes).context("AUDIO stream past the end")?) });
         o += 8;
     }
-    let mut tracks: [Option<std::sync::Arc<rc_game::audio::music::MusicTrack>>; 15] = Default::default();
-    for (k, pair) in streams.chunks(2).enumerate().take(15) {
-        let t = match pair {
-            [l, r] => rc_game::audio::music::MusicTrack::from_vag_pair(l, r)?,
-            [m] => rc_game::audio::music::MusicTrack::from_vag(m)?,
-            _ => continue,
-        };
-        tracks[k] = Some(std::sync::Arc::new(t));
-    }
-    Ok(tracks)
+    Ok(rc_game::audio::music::MusicTrack::table(&streams))
 }
 
 /// The hand gadgets' sounds (`0x306018` / `0x305d50`): a gadget's part B is a sound bank of its own (bank 4) and its
@@ -349,32 +341,25 @@ fn gadget_sounds(root: &Path, index: u32, bank: &mut rc_formats::sound_bank::Ban
     if let Err(e) = run(bank, sounds) { eprintln!("audio: the gadgets' sounds not read ({e:#})"); }
 }
 
-/// The chunk banks (rc_formats::disc::level::Part::ChunkBank0): the level start loads chunk 0's as bank 1 (`0x304420`
-/// stage 4 → `0x32e4a0(0)`); banks 2 and 3 come only with the chunk switch `0x2f9bd8` (not ported), so their defs
-/// play nothing, as the original's with the bank not loaded (`0x35f3c0`). Bank 1 is appended to the level's and its
-/// defs point past the level's sounds (as the gadgets').
-fn chunk_sounds(wad: &LevelWad, bank: &mut rc_formats::sound_bank::Bank, sounds: &mut rc_formats::sound_bank::LevelSounds) {
-    let loaded = || -> Result<Option<rc_formats::sound_bank::Bank>> {
-        let Some(part) = wad.part_bytes(Part::ChunkBank0)? else { return Ok(None) };
+/// The chunk banks (rc_formats::disc::level::Part::ChunkBank0..2, bank handles 1..3; rc_game::audio::chunk): each
+/// appended once to the level's bank (989snd here plays from one), and chunk 0's loaded as the level start loads it
+/// (`0x304420` stage 4 → `0x32e4a0(0)`); the chunk switch loads another (rc_game::audio::AudioSystem::chunk_switch).
+fn chunk_sounds(wad: &LevelWad, bank: &mut rc_formats::sound_bank::Bank, sounds: &mut rc_formats::sound_bank::LevelSounds) -> rc_game::audio::chunk::ChunkBanks {
+    let read = |p: Part| -> Result<Option<rc_formats::sound_bank::Bank>> {
+        let Some(part) = wad.part_bytes(p)? else { return Ok(None) };
         let raw = if rc_formats::wad::is_wad(part) { rc_formats::wad::decompress(part)? } else { part.to_vec() };
         Ok(Some(rc_formats::sound_bank::parse_bank(&raw)?))
     };
-    let base = match loaded() {
-        Ok(b) => b.map(|b| bank.append(&b)),
-        Err(e) => {
-            eprintln!("audio: the chunk's sound bank not read ({e:#})");
-            None
-        }
-    };
-    for c in &mut sounds.classes {
-        for d in &mut c.defs {
-            d.index = match (d.bank_handle, base) {
-                (1, Some(b)) if d.index != 0xffff => b + d.index,
-                (1..=3, _) => 0xffff,
-                _ => continue,
-            };
+    let mut base = [None; 3];
+    for (k, p) in [Part::ChunkBank0, Part::ChunkBank1, Part::ChunkBank2].into_iter().enumerate() {
+        match read(p) {
+            Ok(b) => base[k] = b.map(|b| bank.append(&b)),
+            Err(e) => eprintln!("audio: chunk {k}'s sound bank not read ({e:#})"),
         }
     }
+    let mut banks = rc_game::audio::chunk::ChunkBanks::new(sounds, base);
+    banks.load(sounds, 0);
+    banks
 }
 
 /// The level's sound data for crate::audio_out (rc_game::audio, the 989snd bank R&C1's reader parses as it is): the
@@ -389,7 +374,7 @@ fn audio(root: &Path, index: u32, wad: &LevelWad, core_index: &[u8], core: &leve
         let mut bank = rc_formats::sound_bank::parse_bank(&bank)?;
         let mut sounds = rc_formats::sound_bank::parse_level_sounds(core_index, core, core_data)?;
         gadget_sounds(root, index, &mut bank, &mut sounds);
-        chunk_sounds(wad, &mut bank, &mut sounds);
+        let chunk_banks = chunk_sounds(wad, &mut bank, &mut sounds);
         let bank = std::sync::Arc::new(bank);
         let music = music(root, index).unwrap_or_else(|e| {
             eprintln!("audio: the level's music not read ({e:#})");
@@ -404,13 +389,14 @@ fn audio(root: &Path, index: u32, wad: &LevelWad, core_index: &[u8], core: &leve
         let pvars = rc_formats::disc::gameplay::pvar_blocks(gameplay)?;
         let instance_pvars = instances.iter().map(|i| usize::try_from(i.pvar_index).ok().and_then(|k| pvars.get(k)).cloned()).collect();
         Ok(rc_game::audio::LevelAudio {
-            bank, sounds, instances, instance_pvars, music, env_points: Vec::new(), collision: collision.map(std::sync::Arc::new),
+            bank, sounds, instances, instance_pvars, music, env_points: Vec::new(), collision: collision.map(std::sync::Arc::new), chunk_banks,
         })
     };
     match run() {
         Ok(a) => {
-            let names: Vec<&str> = a.music.iter().flatten().map(|m| m.name.as_str()).collect();
-            println!("audio: {} sounds, {} samples, {} level defs, {} classes with sounds, {} sound instances, music {:?}", a.bank.sounds.len(), a.bank.vags.len(), a.sounds.level_defs.len(), a.sounds.classes.iter().filter(|c| !c.defs.is_empty()).count(), a.instances.len(), names);
+            // The music streams up to the first gap (the level's own tracks; the speech follows).
+            let names: Vec<&str> = a.music.iter().map_while(Option::as_ref).map(|m| m.name.as_str()).collect();
+            println!("audio: {} sounds, {} samples, {} level defs, {} classes with sounds, {} sound instances, chunk banks at {:?}, music {:?} ({} streams)", a.bank.sounds.len(), a.bank.vags.len(), a.sounds.level_defs.len(), a.sounds.classes.iter().filter(|c| !c.defs.is_empty()).count(), a.instances.len(), a.chunk_banks.base, names, a.music.iter().flatten().count());
             Some(a)
         }
         Err(e) => {

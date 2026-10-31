@@ -408,9 +408,9 @@ impl GameState {
         self.area_hero.get(i).copied().unwrap_or(false)
     }
 
-    /// `0x3082e0(k, …)` (L02; L01 `0x2f9bd8`): chunk `k`'s world (its tfrags, collision and sound bank) in place of
-    /// the current one: the variant is `k` at once, the engine swaps the world after the tick. Nothing when `k` is in
-    /// place already.
+    /// `0x3082e0(k, …)` (L02; L01 `0x2f9bd8`): chunk `k`'s world (its tfrags and collision) in place of the current
+    /// one: the variant is `k` at once, the engine swaps the world after the tick. Nothing when `k` is in place
+    /// already. The objects switch through crate::moby::Ctx::switch_chunk, which adds the sound part.
     pub fn switch_chunk(&mut self, k: i32) {
         if self.variant == k { return; }
         self.variant = k;

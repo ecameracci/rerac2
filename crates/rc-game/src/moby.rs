@@ -100,6 +100,17 @@ pub struct Ctx<'a> {
     pub view: Option<crate::particles::BSphereView>,
 }
 
+impl Ctx<'_> {
+    /// `0x3082e0(k, track)` (L02): the chunk switch — its world after the tick (crate::game::GameState::switch_chunk),
+    /// its sound part (the bank, the sounds and the music stopped, `track` started) at once ([`MobyHost::switch_chunk_sound`]).
+    /// Nothing when chunk `k` is in place.
+    pub fn switch_chunk(&mut self, k: i32, track: i32) {
+        if self.game.variant == k { return; }
+        self.game.switch_chunk(k);
+        self.host.switch_chunk_sound(k, track);
+    }
+}
+
 /// What the level's class table gives a moby at init.
 #[derive(Clone, Debug, Default)]
 pub struct ClassInfo {
@@ -450,6 +461,14 @@ pub trait MobyHost {
     /// `0x3602f0(handle)`: stop a sound; `0x3602a8(moby, handle)`: it still plays.
     fn stop_sound(&mut self, _handle: i32) {}
     fn sound_playing(&self, _handle: i32) -> bool { false }
+    /// The chunk switch's sound part (`0x3082e0(k, track)`: chunk `k`'s sound bank, the sounds and the music stopped,
+    /// `track` started; crate::audio::chunk), through [`Ctx::switch_chunk`].
+    fn switch_chunk_sound(&mut self, _k: i32, _track: i32) {}
+    /// `0x335928(track, stinger)`: the music request (crate::audio::AudioSystem::music_request).
+    fn music_request(&mut self, _track: i32, _stinger: i32) {}
+    /// The low bytes of the current and the pending music track (`0x1a63f0`, `0x1a63e4`; 0xff none); None without
+    /// the audio.
+    fn music_tracks(&self) -> Option<(u8, u8)> { None }
 }
 
 /// The level's mobys (`0x1b1e1c`, 0x100 bytes each) with the class table and the collision grid.

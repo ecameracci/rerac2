@@ -21,6 +21,7 @@
 //! Not modelled: the two SPU2 cores' separate mixing stages (the reverb takes the reverb-flagged voices of every
 //! core), noise voices, voice pitch modulation (PMON), the 989snd RPC layer itself.
 
+pub mod chunk;
 pub mod class_sounds;
 pub(crate) mod grain_vm;
 pub mod music;
@@ -449,11 +450,14 @@ pub struct LevelAudio {
     pub instances: Vec<SoundInstance>,
     /// Pvar block per sound instance.
     pub instance_pvars: Vec<Option<Vec<u8>>>,
-    /// The level header's music table, loaded (track k = `music/k`).
-    pub music: [Option<Arc<MusicTrack>>; 15],
+    /// The level's music table, loaded (crate::audio::music::MusicTrack::table: track t = stream t, with t + 1 as
+    /// its right channel).
+    pub music: Vec<Option<Arc<MusicTrack>>>,
     pub env_points: Vec<EnvSamplePoint>,
     /// For the occlusion rays; None = never occluded.
     pub collision: Option<Arc<Collision>>,
+    /// The chunk banks (a level in chunks, [`chunk`]): where they sit in `bank`, which one is loaded.
+    pub chunk_banks: chunk::ChunkBanks,
 }
 
 /// One logged class sound play: `(tick, sound class, class sound index, flags, slot)`.
@@ -537,7 +541,7 @@ impl AudioSystem {
             .enumerate()
             .filter_map(|(i, s)| MusicBox::from_instance(i, s, data.instance_pvars.get(i)?.as_deref()?))
             .collect();
-        let music = Music::new(std::array::from_fn(|k| data.music[k].is_some()));
+        let music = Music::new(data.music.iter().map(Option::is_some).collect());
         let reverb_boxes = data
             .instances
             .iter()
@@ -649,6 +653,22 @@ impl AudioSystem {
     /// The IOP / SPU part: run the queued commands (their replies reach the EE next frame), then `n` samples
     /// with a 989snd tick every 200.
     pub fn render(&mut self, n: usize, out: &mut Vec<[i16; 2]>) {
+        self.run_snd_commands();
+        self.run_stream_commands();
+        // A scene's music pause holds a stream these commands keyed too.
+        if self.scene.music_paused { self.pause_music(); }
+        let bank = Arc::clone(&self.data.bank);
+        out.reserve(n);
+        for _ in 0..n {
+            if self.stats.samples.is_multiple_of(SAMPLES_PER_IOP_TICK as u64) { self.snd.tick(&bank, &mut self.spu); }
+            out.push(self.spu.mix());
+            self.stats.samples += 1;
+        }
+        self.stats.max_voices = self.stats.max_voices.max(self.spu.voices.iter().filter(|v| v.active()).count());
+    }
+
+    /// The IOP runs the queued 989snd commands; their replies wait for the EE's next frame.
+    fn run_snd_commands(&mut self) {
         let bank = Arc::clone(&self.data.bank);
         for c in std::mem::take(&mut self.snd_cmds) {
             match c {
@@ -667,18 +687,13 @@ impl AudioSystem {
                 SndCommand::AutoReverb { depth, delta, .. } => self.spu.reverb.auto(depth, delta),
             }
         }
+    }
+
+    /// The IOP runs the queued stream commands; their replies wait for the EE's next frame.
+    fn run_stream_commands(&mut self) {
         for c in std::mem::take(&mut self.stream_cmds) {
             if let Some(r) = self.streams.execute(&c, &self.data.music, &mut self.snd.vm, &mut self.spu) { self.stream_replies.push(r); }
         }
-        // A scene's music pause holds a stream these commands keyed too.
-        if self.scene.music_paused { self.pause_music(); }
-        out.reserve(n);
-        for _ in 0..n {
-            if self.stats.samples.is_multiple_of(SAMPLES_PER_IOP_TICK as u64) { self.snd.tick(&bank, &mut self.spu); }
-            out.push(self.spu.mix());
-            self.stats.samples += 1;
-        }
-        self.stats.max_voices = self.stats.max_voices.max(self.spu.voices.iter().filter(|v| v.active()).count());
     }
 
     /// `StartPssMovie` 0x2ad0c0 / `MovieModeUpdate` 0x2ad498 (a PSS movie, game mode 1): `sound_StopAllSounds`
@@ -688,7 +703,7 @@ impl AudioSystem {
     /// the sound instances' timers restart with it [L: the game keeps the emitters' own pvars]. The level start's
     /// automatic `music_start_track(0)` is not repeated: [`AudioSystem::movie_exit`] restarts the track.
     pub fn movie_stop(&mut self) {
-        let track = if self.music.pending_track != -1 { self.music.pending_track as i16 } else { self.music.main.track };
+        let track = if self.music.pending_track != -1 { self.music.pending_track } else { self.music.main.track };
         let mut fresh = AudioSystem::new(self.data.clone());
         fresh.sfx_option = self.sfx_option;
         fresh.music_option = self.music_option;
