@@ -162,6 +162,24 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     w.clear_hit(id);
 }
 
+/// `0x3a83f8` (L02): a crate put away until [`restore`] (Maktar's arena's crates, crate::moby::classes::arena) —
+/// state 6, hidden, no collision, not a target; it comes back (`+0xc8` 1) with no timer of its own (`+0xc9` 0xff); a
+/// nanotech crate's cluster gone (`0x3abad0`).
+pub fn put_away(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    let m = &mut w.mobys[id];
+    m.state = 6;
+    m.has_collision = false;
+    m.mode = (m.mode & !mode::TARGET) | 0x41;
+    m.set_pv_b(0xc8, 1);
+    m.set_pv_b(0xc9, 0xff);
+    let c = usize::try_from(m.pv_i(0xfc)).ok().filter(|&c| c != 0);
+    if let Some(c) = c.filter(|&c| w.mobys.get(c).is_some_and(|x| x.o_class == super::nanotech::CLASS && x.state < 0x80)) {
+        super::nanotech::free(w, c, ctx);
+    }
+    w.mobys[id].set_pv_i(0xfc, 0);
+    w.changed = true;
+}
+
 /// `0x3a8468` (L02): a broken crate back — shown, a target, resting (state 1), its collision, `+0x100` 0, a nanotech
 /// crate's cluster made again, its drops 0 (Maktar's arena's crate lifts, crate::moby::classes::arena).
 pub fn restore(w: &mut MobyWorld, id: usize) {

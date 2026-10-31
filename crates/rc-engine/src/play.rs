@@ -518,12 +518,16 @@ fn tick(
     // The vendor's menu (game mode 5, crate::vendor_play): a vendor moby's request of the last tick switches the mode
     // at this frame's start (`0x32c858` → `0x374038`); while it runs its frame replaces the main loop's (`0x375f40`:
     // the world stands), its camera the view, and Ratchet is hidden (`0x2d3208`).
-    if p.game.vendor_open.is_some() || p.vendor.menu.is_some() {
-        // `0x374038`'s light: the bank's set 14 lit from the vendor's rows (the preview's light word 0x0e0e).
-        if let Some(id) = p.game.vendor_open {
-            if let (Some(v), Some(l)) = (p.mobys.as_ref().and_then(|m| m.world.mobys.get(id)), level.0.mobys.lighting.as_mut()) {
-                l.bank.set_dir_light(rc_game::vendor::LIGHT_SET, rc_game::vendor::light_set(v.rows));
-            }
+    if p.game.vendor_open.is_some() || p.game.vendor_virtual.is_some() || p.vendor.menu.is_some() {
+        // `0x374038`'s light: the bank's set 14 lit from the vendor's rows (the preview's light word 0x0e0e; a virtual
+        // open's stand-in faces π).
+        let rows = match (p.game.vendor_open, p.game.vendor_virtual) {
+            (Some(id), _) => p.mobys.as_ref().and_then(|m| m.world.mobys.get(id)).map(|v| v.rows),
+            (None, Some(_)) => Some(rc_game::hero::physics::euler_rows([0.0, 0.0, std::f32::consts::PI])),
+            _ => None,
+        };
+        if let (Some(r), Some(l)) = (rows, level.0.mobys.lighting.as_mut()) {
+            l.bank.set_dir_light(rc_game::vendor::LIGHT_SET, rc_game::vendor::light_set(r));
         }
         let lv = &level.0;
         let f = {
@@ -537,10 +541,17 @@ fn tick(
                 if let Some(c) = card.as_deref() { parts.game.platinum_found = rc_game::menus::platinum_bolts(&c.save); }
                 p.vendor.open(&mut parts, id, widescreen);
             }
+            if let Some(kind) = parts.game.vendor_virtual.take() {
+                if let Some(c) = card.as_deref() { parts.game.platinum_found = rc_game::menus::platinum_bolts(&c.save); }
+                let eye = parts.game.cameras.last_view.0;
+                if !p.vendor.open_virtual(&mut parts, kind, eye, widescreen) { eprintln!("play: vendor: no vendor class on this level"); }
+            }
             p.vendor.frame(&mut parts)
         };
-        if f.closed {
+        if f.closed && !f.keep_camera {
             p.camera = FollowCamera::new(&cam_input(&p.hero, lv.collision.as_ref(), [0.0; 2]));
+        }
+        if f.closed {
             commands.insert_resource(crate::overlay_mobys::OverlayWindow::default());
         }
         if let Some((eye, rows)) = f.view {

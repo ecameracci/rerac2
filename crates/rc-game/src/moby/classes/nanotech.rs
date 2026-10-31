@@ -200,6 +200,15 @@ pub fn create(w: &mut MobyWorld, crate_: usize, kind: u8) -> Option<usize> {
     Some(id)
 }
 
+/// `0x3abad0` (L02): a cluster gone — its orbs' particles killed; the shared one stopped (state 4), any other deleted.
+pub fn free(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    for k in 0..8 {
+        if let (Some(o), Some(s)) = (orb_of(w, id, k), ctx.parts.as_deref_mut()) { s.kill_part(o); }
+        set_orb(w, id, k, None);
+    }
+    if w.nanotech.master == Some(id) { w.mobys[id].state = 4; } else { w.delete(id); }
+}
+
 /// `0x3a9bf0(pos, kind)` (L02, the slot machines' payout): a cluster of its own at `pos` (its `+0xb8` itself, so free
 /// at once), hidden, no collision, update distance 64.
 pub fn create_at(w: &mut MobyWorld, pos: V3, kind: u8) -> Option<usize> {

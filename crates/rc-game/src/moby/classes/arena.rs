@@ -12,10 +12,10 @@
 //!   first time the welcome scene and straight into the first challenge, else the overview once he is at the middle.
 //!   **4 / 5** (5 after a win: its reward, [`prize`]) the fighters pooled, the columns and plates down, Ratchet frozen
 //!   at the middle, the script camera moving to the big screen → **7** the menu ([`Menu`], [`draw_menu`]: ← / → the
-//!   challenges open, [`on_menu`]; ✕ starts one, △ back to the resort) or **6** the win's screen (✕ the menu at the
+//!   challenges open, [`on_menu`]; ✕ starts one, □ the vendor's weapons, △ back to the resort) or **6** the win's screen (✕ the menu at the
 //!   next challenge). **8** the challenge: the waves of the level's challenge table ([`read_challenges`], `$gp+0x2160`) — each its fighters sent out through the
 //!   spawners (the round's spawner far from Ratchet; then its doors opened), its columns and plates up and its crates
-//!   lifted; a wave is over with all sent and none left; every fourth tick the two gladiators or bladed robots nearest
+//!   lifted (the crates put away at the reset, the overview and each challenge's start); a wave is over with all sent and none left; every fourth tick the two gladiators or bladed robots nearest
 //!   Ratchet get the turns; a fighter that leaves the arena dies, Ratchet leaving it dies. Lost (time out in 3 / 5,
 //!   out of shots in 7 / 8, hurt in 12 / 13): its message and **10**, then the overview. **0xb** the first win's scene.
 //!   The wins count in the save's flag bytes (`0x1395b8 + 0x31..`, [`win_flag`]). It draws the moat's energy
@@ -38,7 +38,7 @@
 //!
 //! Not ported: the Spiderbot Glove bots' end at a challenge's end and on Ratchet's warps (`0x3fb028(1, −1)` /
 //! `0x42e670(1, −1)`: classes 0x0b58 / 0x0e79, no glove in the port, G-WPN-009), the announcer's speech (`0x401d98`, its
-//! remarks `0x401e68` / `0x402090`), the restart's path straight into the wipe (`0x1a7904` = 2), the menu's vendor (□, `0x332158(5)`), the
+//! remarks `0x401e68` / `0x402090`), the restart's path straight into the wipe (`0x1a7904` = 2), the
 //! music (`0x335928`), the level's sounds, the challenges' weapon lock (`0x18b6f4`) and the fixed held items of 7 / 8 /
 //! 13 beyond the hand request; the plates' sparks (`0x3d85a8`: the particle burst `0x345d88` has no port).
 
@@ -473,6 +473,8 @@ mod pv {
     pub const ENTRY: usize = 0x8c;
     pub const SPAWNED: usize = 0x90;
     pub const GATES: usize = 0xa8;
+    /// The gates' six words (`0xa8..0xbc`, cleared so by `0x3fc530`; `+0xc4..` are the crate and lift groups).
+    pub const GATE_SLOTS: usize = 6;
     pub const CRATES_B: usize = 0xc4;
     pub const CRATES_A: usize = 0xc8;
     pub const LIFTS: usize = 0xcc;
@@ -539,6 +541,13 @@ fn reset_master(w: &mut MobyWorld, id: usize) {
     m.set_pv_i(pv::GATE, 0);
     m.set_pv_i(pv::BOSS, 0);
     m.set_state(1, -1);
+}
+
+/// `0x3fe610`: the crates of both kinds (`+0xc8`, `+0xc4`) put away for the lifts (crate::moby::classes::crate_::put_away).
+fn put_crates_away(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    for c in [group(w, id, pv::CRATES_A), group(w, id, pv::CRATES_B)].concat() {
+        if w.mobys[c].state < 0x80 { super::crate_::put_away(w, c, ctx); }
+    }
 }
 
 /// `0x3fd130`: every fighter and boss back to the pool.
@@ -659,13 +668,13 @@ fn wave_of(w: &MobyWorld, id: usize, cs: &[Challenge]) -> Option<Wave> {
 }
 
 fn gate(w: &MobyWorld, id: usize) -> Option<usize> {
-    let k = w.mobys[id].pv_i(pv::GATE).clamp(0, 9) as usize;
+    let k = w.mobys[id].pv_i(pv::GATE).clamp(0, pv::GATE_SLOTS as i32 - 1) as usize;
     ai::link(&w.mobys[id], pv::GATES + 4 * k)
 }
 
 /// `0x3fd070`: once every spawner taken this round has let its fighters out, the round starts again.
 fn gates_reset(w: &mut MobyWorld, id: usize) {
-    let n = w.mobys[id].pv_i(pv::GATE).clamp(0, 9) as usize;
+    let n = w.mobys[id].pv_i(pv::GATE).clamp(0, pv::GATE_SLOTS as i32 - 1) as usize;
     for k in 0..=n {
         if let Some(g) = ai::link(&w.mobys[id], pv::GATES + 4 * k) {
             if !ready(w, g) { return; }
@@ -687,7 +696,7 @@ fn gate_pick(w: &mut MobyWorld, id: usize, ctx: &Ctx, wave: &Wave) {
         }
     }
     if !pick { return; }
-    let k = w.mobys[id].pv_i(pv::GATE).clamp(0, 9) as usize;
+    let k = w.mobys[id].pv_i(pv::GATE).clamp(0, pv::GATE_SLOTS as i32 - 1) as usize;
     let gs = group(w, id, pv::SPAWNERS);
     let far = |w: &MobyWorld, g: usize, r: f32| { let p = ctx.host.joint(&w.mobys[g], 0).unwrap_or(w.mobys[g].pos); w.mobys[g].drawn != 0 && r < dist(p, ctx.hero.pos) };
     let first = gs.iter().copied().find(|&g| far(w, g, 25.0) && ready(w, g));
@@ -711,7 +720,7 @@ fn send(w: &mut MobyWorld, id: usize, class: i16) -> bool {
 
 /// `0x3fcff8`: each spawner of the round holding fighters opened.
 fn open_gates(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
-    let n = w.mobys[id].pv_i(pv::GATE).clamp(0, 9) as usize;
+    let n = w.mobys[id].pv_i(pv::GATE).clamp(0, pv::GATE_SLOTS as i32 - 1) as usize;
     for k in 0..=n {
         if let Some(g) = ai::link(&w.mobys[id], pv::GATES + 4 * k) {
             if loaded(w, g) { open(w, g, ctx); }
@@ -828,29 +837,31 @@ fn reward(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, n: i32) {
     }
 }
 
-/// `0x3fe7c8`: the wave's crates lifted — for each kind (0x01f5, then 0x01ff) as many as it asks for, a broken one
-/// put on a free lift (0x0ccc, one in six skipped a round; [`super::fighters::lift`]).
+/// `0x3fe7c8`: the wave's crates lifted — for each kind (`+0xc8` 0x01f5, then `+0xc4` 0x01ff) as many out as it asks
+/// for: the kind's broken ones (state 6, `0x3a84f8`; the rest count as out), the last first, each put on a free lift
+/// (0x0ccc, `0x417fb8`; one in six passed over) by passes over the lifts from the first, at most 999 passes
+/// ([`lift`]).
 fn lift_crates(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, wave: &Wave) {
     for (want, from) in [(wave.crates[0], pv::CRATES_A), (wave.crates[1], pv::CRATES_B)] {
         if want == 0 { continue; }
         let crates = group(w, id, from);
-        let mut free: Vec<usize> = crates.iter().copied().filter(|&c| w.mobys[c].state != 6).collect();
-        let mut out = crates.len() as i32 - free.len() as i32;
-        if free.is_empty() || want as i32 <= out { continue; }
+        let mut broken: Vec<usize> = crates.iter().copied().filter(|&c| w.mobys[c].state == 6).collect();
+        let mut out = (crates.len() - broken.len()) as i32;
+        if broken.is_empty() || want as i32 <= out { continue; }
         let lifts = group(w, id, pv::LIFTS);
-        let mut tries = 0;
-        'round: while out < want as i32 {
+        if lifts.is_empty() { continue; }
+        let mut passes = 0;
+        loop {
+            passes += 1;
             for &l in &lifts {
-                tries += 1;
-                if 999 < tries { break 'round; }
-                let Some(c) = free.last().copied() else { break 'round };
+                let Some(&c) = broken.last() else { break };
                 if !lift_free(w, l) || ctx.game.rng.randi(6) != 0 { continue; }
-                free.pop();
+                broken.pop();
                 out += 1;
                 lift(w, l, c, 3.0 / 60.0, 720.0_f32.to_radians() / 60.0);
-                if want as i32 <= out { break 'round; }
+                break;
             }
-            if lifts.is_empty() { break; }
+            if 999 < passes || want as i32 <= out || broken.is_empty() { break; }
         }
     }
 }
@@ -885,6 +896,7 @@ pub fn update_master(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     match w.mobys[id].state {
         0 => {
             reset_master(w, id);
+            put_crates_away(w, id, ctx);
             ctx.game.arena_menu = None;
         }
         1 => {
@@ -914,6 +926,7 @@ pub fn update_master(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                         let n = w.mobys[id].pv_s(pv::CHALLENGE) as i32;
                         reward(w, id, ctx, n);
                     }
+                    put_crates_away(w, id, ctx);
                     pool_all(w, id, ctx);
                     raise_group(w, id, pv::B89, 0);
                     raise_group(w, id, pv::PLATES, 0);
@@ -1360,6 +1373,10 @@ fn menu(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         ctx.game.cameras.camera_script2(crate::script_camera::RELEASE_BLEND, ctx.hero);
         ctx.hero.request_state(0, true);
         ctx.game.arena_menu = None;
+    } else if pressed & crate::pad::button::SQUARE != 0 {
+        // `0x332158(5, 1, 0, 0, 0)`: the vendor (its weapons) with no vendor moby; the menu's draw not this tick.
+        ctx.game.vendor_virtual = Some(0);
+        ctx.game.arena_menu = None;
     } else if pressed & crate::pad::button::TRIANGLE != 0 {
         leave(w, id, ctx);
     }
@@ -1374,8 +1391,9 @@ fn fight(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         for k in 0..6 { m.set_pv_i(pv::SPAWNED + 4 * k, 0); }
         m.set_pv_i(pv::TICKS, 0);
         m.set_pv_i(pv::ALIVE, 0);
-        for k in 0..10 { m.set_pv_i(pv::GATES + 4 * k, 0); }
+        for k in 0..pv::GATE_SLOTS { m.set_pv_i(pv::GATES + 4 * k, 0); }
         m.set_pv_i(pv::GATE, 0);
+        put_crates_away(w, id, ctx);
         count_out(w, id, ctx);
         wave_start(w, id, ctx);
         let m = &mut w.mobys[id];

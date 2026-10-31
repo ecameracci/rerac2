@@ -13,6 +13,11 @@
 //! **Exit**: state 0, Ratchet put at the vendor's rows · (3.5, 0, 0) facing it (`0x2b9e68`), the follow camera reset
 //! (`0x4289f0(2)`: the caller's), the vendor's state 1, the preview gone.
 //!
+//! **Virtual** (`0x374038` with a list under 4 for a moby: Maktar's arena menu's □): a vendor moby (class 0xb, state 3)
+//! made where the vendor's camera lands on the view's place (the view's position + the camera offset, its z
+//! negated, facing π), the list the one asked; the camera not moved there. Its exit (`0x374628`): Ratchet not moved
+//! nor the camera reset, the stand-in deleted (`0x311688`).
+//!
 //! Not ported: the music pause and resume (`0x1a641a`), the GUI lump 0x5d's load, the exit's single world tick
 //! (`0x375f40`'s substate 2 end: the next tick runs anyway), the hero's `0x18c0d5`.
 
@@ -32,6 +37,8 @@ pub(crate) struct VendorPlay {
     pub preview: Option<usize>,
     /// A preview class this level has not got (said once).
     preview_missing: Option<i16>,
+    /// `0x22f7a0`: opened on a stand-in (module docs).
+    virtual_open: bool,
 }
 
 /// What a frame leaves the caller: the view (eye, rows) while the menu is up; `closed` when it ended this frame
@@ -40,6 +47,8 @@ pub(crate) struct VendorPlay {
 pub(crate) struct Frame {
     pub view: Option<([f32; 3], [[f32; 3]; 3])>,
     pub closed: bool,
+    /// Closed from a virtual open: the camera as it was.
+    pub keep_camera: bool,
 }
 
 /// The game's parts the menu works on.
@@ -67,10 +76,32 @@ fn facing(yaw: f32) -> [[f32; 3]; 3] {
 }
 
 impl VendorPlay {
+    /// `0x374038(kind)` with no vendor moby (module docs): the stand-in made before the view at `eye`, the menu opened
+    /// on it. False when the level has no vendor class.
+    pub(crate) fn open_virtual(&mut self, p: &mut Parts, kind: i32, eye: [f32; 3], widescreen: bool) -> bool {
+        if p.world.class(vendor::CLASS).is_none() { return false; }
+        let off = if widescreen { vendor::CAMERA_169 } else { vendor::CAMERA_43 };
+        let id = p.world.create(vendor::CLASS);
+        let v = &mut p.world.mobys[id];
+        v.pos = [eye[0] + off[0], eye[1] + off[1], eye[2] - off[2]];
+        v.rot = [0.0, 0.0, std::f32::consts::PI];
+        v.draw_dist = 0x40;
+        v.state = 3;
+        p.world.rebuild(id, &*p.host);
+        self.open_kind(p, id, kind, widescreen);
+        self.virtual_open = true;
+        true
+    }
+
     /// `0x374038(vendor)`: the menu opened on moby `id` (its kind from its pvar `+0x94`).
     pub(crate) fn open(&mut self, p: &mut Parts, id: usize, widescreen: bool) {
         let Some(v) = p.world.mobys.get(id) else { return };
         let kind = v.pv_i(0x94);
+        self.virtual_open = false;
+        self.open_kind(p, id, kind, widescreen);
+    }
+
+    fn open_kind(&mut self, p: &mut Parts, id: usize, kind: i32, widescreen: bool) {
         let mut outs = Vec::new();
         let menu = Vendor::open(kind, p.game, &p.level.items, widescreen, &mut outs);
         println!("play: vendor {id}: menu open (kind {kind}, {} entries {:?}, selection {})", menu.entries.len(), menu.entries.iter().map(|e| (e.item, e.ammo)).collect::<Vec<_>>(), menu.sel);
@@ -124,7 +155,10 @@ impl VendorPlay {
         };
         p.game.prompt.force(vendor::PROMPT_OWNER, 0, 1);
         for o in outs {
-            if self.apply(p, o) { out.closed = true; }
+            if self.apply(p, o) {
+                out.closed = true;
+                out.keep_camera = std::mem::take(&mut self.virtual_open);
+            }
         }
         let (Some(menu), Some(id)) = (self.menu.as_ref(), self.moby) else { return out };
         let Some(v) = p.world.mobys.get(id) else { return out };
@@ -203,6 +237,10 @@ impl VendorPlay {
         self.preview(p, None, [0.0; 3], [[0.0; 3]; 3]);
         p.hero.request_state(0, true);
         p.hero.items.no_use = 0;
+        if self.virtual_open {
+            if let Some(id) = moby { p.world.delete(id); }
+            return;
+        }
         if let Some(id) = moby {
             if let Some(v) = p.world.mobys.get(id) {
                 // `0x2b9e68`: Ratchet 3.5 in front of the vendor facing it.
