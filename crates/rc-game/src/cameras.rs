@@ -148,6 +148,8 @@ pub struct Cameras {
     /// `0x1b8d40` / `0x1b8f70`: the view's position and rows as the last camera update left them (the follow
     /// camera's when it is current).
     pub last_view: (V3, [V3; 3]),
+    /// [`Cameras::reset`] asked for a follow camera started over behind Ratchet on the next tick.
+    pub reset_pending: bool,
 }
 
 /// The level path `i` with each point's w its chord to the next (the last's to the first), and the length of the
@@ -193,6 +195,18 @@ impl Cameras {
 
     /// The current camera's place, angles and pvar word `o` (the ship's camera: `+0x20` its ship moby).
     pub fn current_record(&self, o: usize) -> Option<(V3, V3, i32)> { self.current.and_then(|i| self.slots.get(i)).map(|s| (s.pos, s.rot, s.i(o))) }
+
+    /// `0x2dd6f8` (Ratchet's teleport `0x2bd368` with its last argument set): the current camera's flags cleared
+    /// (`+0x8e`, `+0x7d`, `+0x7e`), the follow camera (`0x2db3a0(0)`) current and started over behind Ratchet
+    /// ([`Out::follow_reset`] on the next tick). Not ported: `0x1ba650` / `0x1ba7c4` cleared, `0x2dccb0`.
+    pub fn reset(&mut self) {
+        if let Some(s) = self.current.and_then(|i| self.slots.get_mut(i)) {
+            s.entered = 0;
+            s.release = 0;
+        }
+        self.current = self.slots.iter().position(|s| s.class == CLASS_FOLLOW);
+        self.reset_pending = true;
+    }
 
     /// The current camera's class (the follow camera without records).
     pub fn current_class(&self) -> i16 { self.current.and_then(|i| self.slots.get(i)).map_or(CLASS_FOLLOW, |s| s.class) }
@@ -358,6 +372,7 @@ impl Cameras {
     /// (`fade_in`: the rate per tick, 0 none).
     pub fn tick(&mut self, hero: &Hero, level: &LevelData, follow: (V3, [V3; 3]), fade: &mut f32, fade_in: &mut f32) -> Out {
         let mut out = Out::default();
+        out.follow_reset = std::mem::take(&mut self.reset_pending);
         let mut best = self.current;
         let mut switched = false;
         for i in 0..self.slots.len() {

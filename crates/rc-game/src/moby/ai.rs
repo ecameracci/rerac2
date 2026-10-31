@@ -66,6 +66,10 @@ pub fn target(m: &Moby) -> usize { block(m, 0xc) }
 /// `0x31fa50(m)`: the reaction block (the game's 0 for a moby without mode 0x20).
 pub fn react(m: &Moby) -> usize { block(m, 0x10) }
 pub fn mv(m: &Moby) -> usize { block(m, 0x18) }
+/// `0x323e18` / `0x323e48` (L02): the health / reaction block, none when its pointer word is 0 (a moby without the
+/// block; the port's offset 0 would be its pvar header). Their test of mode 0x20 is left to the callers.
+pub fn health_of(m: &Moby) -> Option<usize> { (m.pv_i(0) != 0).then(|| health(m)) }
+pub fn react_of(m: &Moby) -> Option<usize> { (m.pv_i(0x10) != 0).then(|| react(m)) }
 
 /// A moby word in the pvars: the index + 1 (0 none), as the game's pointers.
 pub fn link(m: &Moby, off: usize) -> Option<usize> { usize::try_from(m.pv_i(off)).ok().filter(|&v| v != 0).map(|v| v - 1) }
@@ -673,9 +677,10 @@ fn reaction(w: &MobyWorld, id: usize, ctx: &mut Ctx, kind: u8) -> Option<(u8, Re
 /// `0x31dd48(m, hit)` (L02 `0x3220a0`): the damage a hit does — none for the same hitter again within 10 ticks (60
 /// for the kind 9, which keeps its count), a new hitter's weapon kept; a last hitter deleted or dying (state 0xfe /
 /// 0xfd) is forgotten first, so a shot whose slot the next one takes does not count as it; under 1 on a moby of at
-/// most 1 health, 1; the hit's flag 0x100000 into the reaction's `+0x18`.
+/// most 1 health, 1; the hit's flag 0x100000 into the reaction's `+0x18` when it has one (the blade ball 0x0c3e has
+/// none: the port's offset 0 put the byte on its move block's pointer). None without a health block.
 pub(crate) fn damage_of(w: &mut MobyWorld, id: usize, hit: Option<&super::hits::HitRecord>, wrench: bool) -> f32 {
-    let h = health(&w.mobys[id]);
+    let Some(h) = health_of(&w.mobys[id]) else { return 0.0 };
     if link(&w.mobys[id], h + 0x18).and_then(|s| w.mobys.get(s)).is_some_and(|s| s.state == 0xfe || s.state == 0xfd) {
         let m = &mut w.mobys[id];
         m.set_pv_s(h + 0x1c, 0);
@@ -710,8 +715,7 @@ pub(crate) fn damage_of(w: &mut MobyWorld, id: usize, hit: Option<&super::hits::
         }
     }
     if m.pv_s(h + 4) as f32 <= 1.0 && 0.0 < dmg && dmg < 1.0 { dmg = 1.0; }
-    let r = react(m);
-    m.set_pv_b(r + 0x18, (hit.tmpl.flags & 0x100000 != 0) as u8);
+    if let Some(r) = react_of(m) { m.set_pv_b(r + 0x18, (hit.tmpl.flags & 0x100000 != 0) as u8); }
     dmg
 }
 

@@ -793,7 +793,9 @@ fn leave(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         usize::try_from(m.pv_i(pv::DESK_WON)).ok().and_then(|i| ctx.level.cylinders.get(i)).map(|c| ([c.matrix[3][0], c.matrix[3][1], c.matrix[3][2]], f32::from_bits(0xbfcb_851f)))
     };
     if let Some((p, yaw)) = place {
+        // `0x2bd368(.., 0, 1)`: its last argument the camera reset (`0x2dd6f8`).
         ctx.hero.teleport(p, [0.0, 0.0, yaw]);
+        ctx.game.cameras.reset();
         ctx.hero.request_state(0, true);
         let (p, r) = (ctx.hero.pos, ctx.hero.rot);
         ctx.game.save_checkpoint(p, r);
@@ -1359,7 +1361,6 @@ fn menu(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         ctx.hero.request_state(0, true);
         ctx.game.arena_menu = None;
     } else if pressed & crate::pad::button::TRIANGLE != 0 {
-        ctx.game.cameras.camera_script2(crate::script_camera::RELEASE_BLEND, ctx.hero);
         leave(w, id, ctx);
     }
 }
