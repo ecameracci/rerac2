@@ -38,6 +38,7 @@ pub mod spitter;
 pub mod shot;
 pub mod smash;
 pub mod spawn_point;
+pub mod spiderbot;
 pub mod teleport;
 pub mod tie_lights;
 pub mod telepad;
@@ -54,7 +55,8 @@ use super::UpdateFn;
 /// carrier: its model-less update, `0x315530`'s table `0x1ddfa0`, is in 18 overlays from level 2 to 21, not Aranos's,
 /// where none of its callers runs; the big explosion 0x0d4e, L02's record `0x2a69ec`), added to every level's class table
 /// as the overlay's table holds them.
-pub const CREATED_LOGIC: &[i16] = &[crate::ship::LASER_CLASS, teleport::CLASS, explosion::CLASS];
+/// The Spiderbot 0x0b58 is listed for the levels whose class list lacks it (`0x315530` creates it without a model, hidden).
+pub const CREATED_LOGIC: &[i16] = &[crate::ship::LASER_CLASS, teleport::CLASS, explosion::CLASS, spiderbot::BOT_CLASS];
 
 pub fn update_for(o_class: i16) -> Option<UpdateFn> {
     match o_class {
@@ -63,6 +65,8 @@ pub fn update_for(o_class: i16) -> Option<UpdateFn> {
         gravity_bomb::HAND_CLASS => Some(gravity_bomb::update),
         gravity_bomb::BOMB_CLASS => Some(gravity_bomb::update_bomb),
         gravity_bomb::BLAST_CLASS => Some(gravity_bomb::update_blast),
+        spiderbot::HAND_CLASS => Some(spiderbot::update_hand),
+        spiderbot::BOT_CLASS => Some(spiderbot::update_bot),
         0xbfe => Some(shot::update),
         flash::CLASS | flash::BOMB_CLASS => Some(flash::update),
         500 | 501 | 505 | 511 => Some(crate_::update),

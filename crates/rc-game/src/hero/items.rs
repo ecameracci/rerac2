@@ -37,6 +37,9 @@ pub const TRACTOR_CLASS: i16 = 0xbc;
 /// crate::moby::classes::electrolyzer).
 pub const ELECTROLYZER: i32 = 0x26;
 pub const ELECTROLYZER_CLASS: i16 = 0x870;
+/// The Spiderbot Glove: item 0x20, class 0x907 (L02 item table, row `0x266680`; crate::moby::classes::spiderbot).
+pub const SPIDERBOT: i32 = 0x20;
+pub const SPIDERBOT_CLASS: i16 = 0x907;
 
 /// An item record (`0x262500 + 0xe0·row`, row `0x139568[item]` = the item): the fields the port reads.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -63,14 +66,15 @@ pub struct ItemRow {
 }
 
 /// The rows the port has (L00 `0x262dc0`, `0x263f40`, `0x2649c0`; the Dynamo's from Oozla's live table; the
-/// Electrolyzer's from L02's).
-pub const ROWS: [ItemRow; 6] = [
+/// Electrolyzer's and the Spiderbot Glove's from L02's).
+pub const ROWS: [ItemRow; 7] = [
     ItemRow { item: WRENCH, attach: 0, class: WRENCH_CLASS, stance: 0, icon: 0, use_seq: 0, keep: false, speed: 0.0, rate: 0.0, damage: 1.0, ammo: false, max_ammo: 0, start_ammo: 0 },
     ItemRow { item: LANCER, attach: 0, class: LANCER_CLASS, stance: 1, icon: 0xea64, use_seq: 0x38, keep: true, speed: 60.0, rate: 7.0, damage: 0.5, ammo: true, max_ammo: 200, start_ammo: 200 },
     ItemRow { item: DYNAMO, attach: 1, class: DYNAMO_CLASS, stance: 1, icon: 0xea7f, use_seq: 0x8d, keep: false, speed: 0.0, rate: 0.0, damage: 0.0, ammo: false, max_ammo: 0, start_ammo: 0 },
     ItemRow { item: GRAVITY_BOMB, attach: 0, class: GRAVITY_BOMB_CLASS, stance: 2, icon: 0xea65, use_seq: 0x36, keep: false, speed: 0.0, rate: 0.5, damage: 0.0, ammo: true, max_ammo: 8, start_ammo: 8 },
     ItemRow { item: TRACTOR, attach: 0, class: TRACTOR_CLASS, stance: 1, icon: 0xea80, use_seq: 0, keep: true, speed: 0.0, rate: 0.0, damage: 0.0, ammo: false, max_ammo: 0, start_ammo: 0 },
     ItemRow { item: ELECTROLYZER, attach: 0, class: ELECTROLYZER_CLASS, stance: 1, icon: 0xea81, use_seq: 0, keep: false, speed: 0.0, rate: 0.0, damage: 0.0, ammo: false, max_ammo: 0, start_ammo: 0 },
+    ItemRow { item: SPIDERBOT, attach: 6, class: SPIDERBOT_CLASS, stance: 0, icon: 0xea6e, use_seq: 0x2c, keep: false, speed: 0.0, rate: 0.0, damage: 12.0, ammo: true, max_ammo: 8, start_ammo: 8 },
 ];
 
 /// Item `item`'s row.

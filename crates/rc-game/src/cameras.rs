@@ -4,7 +4,8 @@
 //! classes Aranos needs: 0 the follow camera ([`crate::camera::FollowCamera`], kept by the engine) and 0x13 the
 //! fly-by. R&C2's system is R&C1's evolved (`crate::camera::level`, `flyby`): the class table `0x2a3a00`
 //! (`{class, activate, init, update, pre}` rows: 0 follow, 4 first person, 5 script, 6, 7 the Swingshot's, 0x13
-//! the fly-by, 0x17 the placed view, 0x1b).
+//! the fly-by, 0x17 the placed view, 0x1b the Spiderbot's: its hook says no, the bot switches it in and runs it,
+//! crate::moby::classes::spiderbot).
 //!
 //! **Slots** (`0x2da248`): one per record in record order: the record's class, its pvar header's priority (+0x1c),
 //! blend kind (+0x1d) and activation kind (+0x1f); the follow camera current.
@@ -43,8 +44,7 @@
 //! release hands back to the follow camera with a cut or with its pose carried over ([`Out::follow_pose`]).
 //!
 //! Not ported: the classes 4 (first person: Ratchet's camera mode 4 / 0x51), 6, 7 (no Swingshot on Aranos), the
-//! placed view's record angles (`+0x14` / `+0x18`, used when its pvars' are both 0: not on Aranos), 0x1b (its hook
-//! says no); the blends (`0x2d8ab0`,
+//! placed view's record angles (`+0x14` / `+0x18`, used when its pvars' are both 0: not on Aranos); the blends (`0x2d8ab0`,
 //! `0x2d9488`: none between Aranos's cameras); the fly-by's look at a moby (+0x28 with the offset +0x2c: none on
 //! Aranos); the pre hooks; the camera-moby list `0x2d80c0`.
 
@@ -150,6 +150,8 @@ pub struct Cameras {
     pub last_view: (V3, [V3; 3]),
     /// [`Cameras::reset`] asked for a follow camera started over behind Ratchet on the next tick.
     pub reset_pending: bool,
+    /// The Spiderbot's camera (class 0x1b; crate::moby::classes::spiderbot, which switches it in and runs it).
+    pub bot: crate::moby::classes::spiderbot::BotCamera,
 }
 
 /// The level path `i` with each point's w its chord to the next (the last's to the first), and the length of the
@@ -413,6 +415,8 @@ impl Cameras {
                 out.view = Some((self.pos, self.rows));
             }
             CLASS_SCRIPT => self.script_update(hero, &mut out),
+            // `0x4575e8` ran in the bot's update (crate::moby::classes::spiderbot::camera_update).
+            crate::moby::classes::spiderbot::CAMERA_CLASS => out.view = Some((self.bot.pos, self.bot.rows)),
             _ => {}
         }
         self.last_view = out.view.unwrap_or(follow);

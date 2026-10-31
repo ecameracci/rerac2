@@ -147,7 +147,11 @@ fn launch(ctx: &Ctx, from: V3, target: Option<V3>) -> V3 {
 /// reach: where the camera's forward ray reaches the level of Ratchet's feet (when it looks down at all), its
 /// distance across from the camera held to `least`..`reach`, else `reach`; then eased by `1 − (1 − x)²`
 /// (`0x31b918`).
-fn look_aim(ctx: &Ctx) -> (V3, f32) {
+fn look_aim(ctx: &Ctx) -> (V3, f32) { look_aim_with(ctx, LEAST, REACH) }
+
+/// [`look_aim`] with the throw's own least and reach (the same code with other arguments: the Spiderbot Glove's
+/// `0x385b58`, crate::moby::classes::spiderbot).
+pub fn look_aim_with(ctx: &Ctx, least: f32, max: f32) -> (V3, f32) {
     use crate::hero::physics::unit;
     const DOWN: V3 = [0.0, 0.0, -1.0];
     let cam = ctx.host.camera_rows();
@@ -162,16 +166,16 @@ fn look_aim(ctx: &Ctx) -> (V3, f32) {
     let height = -dot(ctx.hero.pos, DOWN);
     let fwd = unit(cam[0]);
     let down = dot(DOWN, fwd);
-    let mut reach = REACH;
+    let mut reach = max;
     if 0.0 < down {
         let eye = ctx.host.camera_pos();
         let k = (dot(DOWN, eye) + height) / down;
         let v = sub(sub(eye, scale(fwd, k)), eye);
         let d = len(sub(v, scale(DOWN, dot(v, DOWN))));
-        reach = if REACH < d { REACH } else if d < LEAST { LEAST } else { d };
+        reach = if max < d { max } else if d < least { least } else { d };
     }
-    let x = reach / REACH;
-    (way, REACH * (1.0 - (1.0 - x) * (1.0 - x)))
+    let x = reach / max;
+    (way, max * (1.0 - (1.0 - x) * (1.0 - x)))
 }
 
 /// `0x37e988(gravity, from, vel, ..)`: the arc from `from` at `vel`, ten ticks between line tests (flags 0x12, not the
@@ -489,7 +493,12 @@ fn burst(w: &mut MobyWorld, ctx: &mut Ctx, id: usize, at: V3) {
 pub fn draw_marker(w: &MobyWorld, id: usize, hero_state: i32, frame: i32, out: &mut Vec<crate::fx::FxQuad>) {
     let m = &w.mobys[id];
     if m.pv_i(0x24) == 0 || matches!(hero_state, 0x17..=0x1b | 0x6f | 0x62) { return; }
-    let (at, n) = (m.pv_v(0), m.pv_v(0x10));
+    marker_quads(m.pv_v(0), m.pv_v(0x10), MARKER_RGBA, frame, out);
+}
+
+/// `0x37dfc0`'s two quads at `at` in the plane of the normal `n`, in the colours `rgba` (the Spiderbot Glove's copy
+/// `0x3857f0` passes its own when the throw is refused, crate::moby::classes::spiderbot).
+pub fn marker_quads(at: V3, n: V3, rgba: [u32; 2], frame: i32, out: &mut Vec<crate::fx::FxQuad>) {
     // Its frame: the second axis along the normal.
     let pitch = add_rot(-crate::hero::physics::atan2((n[0] * n[0] + n[2] * n[2]).sqrt(), n[1]), std::f32::consts::FRAC_PI_2);
     let yaw = crate::hero::physics::atan2(n[2], n[0]);
@@ -505,7 +514,7 @@ pub fn draw_marker(w: &MobyWorld, id: usize, hero_state: i32, frame: i32, out: &
             let (x, z) = (x * cs + z * sn, z * cs - x * sn);
             add(at, add(scale(rows[0], x), scale(rows[2], z)))
         };
-        let c = MARKER_RGBA[k];
+        let c = rgba[k];
         out.push(crate::fx::FxQuad {
             fx: MARKER_FX[k],
             additive: false,
