@@ -349,12 +349,20 @@ fn tick(
         }
         let mut m = m;
         m.canopy = canopy_mesh(&crate::level_load::extracted_root(), crate::level_load::level_index()).map(rc_game::canopy::Canopy::new);
-        // The nanotech glow's tables (Aranos's overlay's addresses, rc_game::moby::classes::nanotech).
-        m.world.nanotech.tables = (crate::level_load::level_index() == 0)
-            .then(|| crate::level_wad::overlay(&crate::level_load::extracted_root(), 0).ok())
-            .flatten()
-            .and_then(|ov| rc_game::moby::classes::nanotech::GlowTables::read(|a, n| crate::level_wad::overlay_read(&ov, a, n)))
-            .map(std::sync::Arc::new);
+        // The nanotech clusters' glow tables (rc_game::moby::classes::nanotech): Aranos's addresses at this level's copy
+        // (crate::level_code), on every level (the cluster's class is not in a level's own list: the crates make it).
+        let glow = || -> Option<rc_game::moby::classes::nanotech::GlowTables> {
+            let code = crate::level_code::LevelCode::load(&crate::level_load::extracted_root(), crate::level_load::level_index())
+                .map_err(|e| eprintln!("play: the level's code not read ({e:#}): no nanotech glow"))
+                .ok()?;
+            let t = code.with_reader(|read| rc_game::moby::classes::nanotech::GlowTables::read(read));
+            match &t {
+                Some(g) => println!("play: the nanotech glow tables: {} sphere points, {} halo quads", g.verts.len(), g.halo_quads.len()),
+                None => eprintln!("play: the nanotech glow tables not found in the level's overlay: no nanotech glow"),
+            }
+            t
+        };
+        m.world.nanotech.tables = glow().map(std::sync::Arc::new);
         // The Gravity Bomb's shockwave mesh (rc_game::moby::classes::gravity_bomb): the blast's tables at this level's
         // copy of Aranos's addresses (crate::level_code), on the levels that have the bomb's class (the blast's own
         // class has no assets of its own: it is not in the level's class list).
