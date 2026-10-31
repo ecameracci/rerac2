@@ -15,7 +15,7 @@
 //!
 //! Not ported: the shadow call while near the camera (`0x321db0`).
 
-use crate::hero::physics::{add, add_rot, dist, dist2, scale, set_len, sub, sub_rot, V3};
+use crate::hero::physics::{add, add_rot, dist2, scale, set_len, sub, sub_rot, V3};
 use crate::moby::{ai, mode, Ctx, MobyWorld};
 use super::props::{seq, wrapped};
 
@@ -291,7 +291,7 @@ fn go(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, goal: V3) {
     ai::move_step(w, id, ctx, yaw, goal);
 }
 
-/// 0x0c3e (`0x40d550`).
+/// 0x0c3e (`0x40d550`). The fighters' distances are all `0x2f2f50`'s, across (xy).
 pub fn update_0c3e(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     if w.mobys[id].state == 1 { return; }
     senses_0c3e(w, id, ctx);
@@ -647,7 +647,7 @@ fn round_plates_with(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, group: usize, 
     for p in list {
         if w.mobys.get(p).is_none_or(|x| x.o_class != super::arena::PLATE) || !super::arena::raised(w, p) { continue; }
         let (me, at) = (w.mobys[id].pos, w.mobys[p].pos);
-        if PLATE_NEAR <= dist(me, at) { continue; }
+        if PLATE_NEAR <= dist2(me, at) { continue; }
         let yaw = crate::hero::physics::atan2(at[0] - me[0], at[1] - me[1]);
         let face = w.mobys[id].rot[2];
         if PLATE_CONE.to_radians() <= crate::hero::physics::rot_dist(face, yaw) { continue; }
@@ -729,7 +729,7 @@ pub fn update_0c3b(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let tgt = ai::link(&w.mobys[id], TARGET_3B).and_then(|t| w.mobys.get(t)).map_or(ctx.hero.pos, |t| t.pos);
     let pos = w.mobys[id].pos;
     let yaw_t = crate::hero::physics::atan2(tgt[0] - pos[0], tgt[1] - pos[1]);
-    let d = dist(pos, tgt);
+    let d = dist2(pos, tgt);
     let mut sub_done = false;
     match w.mobys[id].sub_state {
         2 => {
@@ -760,7 +760,7 @@ pub fn update_0c3b(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             let p = w.mobys[id].pos;
             let yaw_s = crate::hero::physics::atan2(spot[0] - p[0], spot[1] - p[1]);
             if 2.792_527_2 < crate::hero::physics::rot_dist(w.mobys[id].rot[2], yaw_s) { turn_about(w, id); }
-            if w.mobys[id].timer != 0 || 0.5 <= dist(w.mobys[id].pos, spot) {
+            if w.mobys[id].timer != 0 || 0.5 <= dist2(w.mobys[id].pos, spot) {
                 go(w, id, ctx, spot);
             } else {
                 w.mobys[id].timer = 1;
@@ -825,11 +825,11 @@ pub fn update_0c3b(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             let p = w.mobys[id].pos;
             let hero = ctx.hero.pos;
             let yaw_h = crate::hero::physics::atan2(hero[0] - p[0], hero[1] - p[1]);
-            let close = !firing && dist(p, hero) < 15.0 && crate::hero::physics::rot_dist(w.mobys[id].rot[2], yaw_h) < std::f32::consts::FRAC_PI_2;
+            let close = !firing && dist2(p, hero) < 15.0 && crate::hero::physics::rot_dist(w.mobys[id].rot[2], yaw_h) < std::f32::consts::FRAC_PI_2;
             if close {
                 set_seq(w, id, ctx, 0xd, 10);
                 ai::senses(&mut w.mobys[id], f32::from_bits(0x3a91_a2b4), f32::from_bits(0x3d08_8889), f32::from_bits(0x3a18_825c), f32::from_bits(0x3d56_7752));
-            } else if 2.8 < dist(p, hero) {
+            } else if 2.8 < dist2(p, hero) {
                 if !round_plates(w, id, ctx) {
                     let off = w.mobys[id].pv_f(0x2d8);
                     ai::move_toward(w, id, ctx, off, tgt);
@@ -1221,7 +1221,7 @@ fn turn_09ca(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         if o == id { continue; }
         let x = &w.mobys[o];
         if x.state >= 0x80 || x.state < 3 || x.o_class != C9CA || x.pv_s(TURN_9CA) != 0 { continue; }
-        let d = dist(w.mobys[id].pos, x.pos);
+        let d = dist2(w.mobys[id].pos, x.pos);
         if d < near { near = d; best = Some(o); }
     }
     match best {
@@ -1277,7 +1277,7 @@ fn attack_09ca(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> bool {
     if sparring(w, id) { return false; }
     let m = &w.mobys[id];
     let (d, yaw) = match ai::link(m, TARGET_9CA).and_then(|t| w.mobys.get(t)) {
-        Some(t) => (dist(m.pos, t.pos), crate::hero::physics::atan2(t.pos[0] - m.pos[0], t.pos[1] - m.pos[1])),
+        Some(t) => (dist2(m.pos, t.pos), crate::hero::physics::atan2(t.pos[0] - m.pos[0], t.pos[1] - m.pos[1])),
         None => (100.0, 1.0),
     };
     if 4.0 <= d || 0.261_799_42 <= crate::hero::physics::rot_dist(yaw, m.rot[2]) { return false; }
@@ -1344,7 +1344,7 @@ pub fn update_09ca(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let tgt = ai::link(&w.mobys[id], TARGET_9CA).and_then(|t| w.mobys.get(t)).map_or(ctx.hero.pos, |t| t.pos);
     let pos = w.mobys[id].pos;
     let yaw_t = crate::hero::physics::atan2(tgt[0] - pos[0], tgt[1] - pos[1]);
-    let mut d = dist(pos, tgt);
+    let mut d = dist2(pos, tgt);
     let mut flags = 0;
     match w.mobys[id].sub_state {
         2 => {
@@ -1364,7 +1364,7 @@ pub fn update_09ca(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             }
             if w.mobys[id].pv_s(TURN_9CA) != 0 { fight_09ca(w, id, ctx); }
             let spot = w.mobys[id].pv_v(SPOT_9CA);
-            if w.mobys[id].timer == 0 && dist(w.mobys[id].pos, spot) < 0.5 {
+            if w.mobys[id].timer == 0 && dist2(w.mobys[id].pos, spot) < 0.5 {
                 w.mobys[id].timer = 1;
             } else {
                 ai::move_step(w, id, ctx, yaw_t, spot);
@@ -1415,7 +1415,7 @@ pub fn update_09ca(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         }
         _ => {}
     }
-    d = dist(w.mobys[id].pos, tgt);
+    d = dist2(w.mobys[id].pos, tgt);
     match w.mobys[id].state {
         3 => {
             if w.mobys[id].first() {
@@ -1786,7 +1786,7 @@ pub fn update_0b22(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let tgt = ai::link(&w.mobys[id], TARGET_B22).and_then(|t| w.mobys.get(t)).map_or(ctx.hero.pos, |t| t.pos);
     let pos = w.mobys[id].pos;
     let yaw_t = crate::hero::physics::atan2(tgt[0] - pos[0], tgt[1] - pos[1]);
-    let d = dist(pos, tgt);
+    let d = dist2(pos, tgt);
     match w.mobys[id].sub_state {
         2 => {
             if w.mobys[id].once & 2 == 0 {
@@ -1811,7 +1811,7 @@ pub fn update_0b22(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             let p = w.mobys[id].pos;
             let yaw_s = crate::hero::physics::atan2(spot[0] - p[0], spot[1] - p[1]);
             if 2.792_527_2 < crate::hero::physics::rot_dist(w.mobys[id].rot[2], yaw_s) { turn_about_b22(w, id); }
-            if w.mobys[id].timer != 0 || 0.5 <= dist(w.mobys[id].pos, spot) {
+            if w.mobys[id].timer != 0 || 0.5 <= dist2(w.mobys[id].pos, spot) {
                 go(w, id, ctx, spot);
             } else {
                 w.mobys[id].timer = 1;
