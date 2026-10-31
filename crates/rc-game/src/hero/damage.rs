@@ -123,7 +123,7 @@ impl Hero {
     }
 
     /// `0x2c4560` for the hurts and deaths.
-    pub(super) fn damage_entry(&mut self, anim: &mut dyn AnimCtl, _env: &Env, id: i32, play: bool) -> Entry {
+    pub(super) fn damage_entry(&mut self, anim: &mut dyn AnimCtl, env: &Env, id: i32, play: bool) -> Entry {
         match id {
             0x16 | 0x8c => {
                 self.group = 7;
@@ -160,6 +160,15 @@ impl Hero {
             0x74 => {
                 self.group = 0x14;
                 self.cam_mode = 0;
+                // Clank's fall on Endako (3) or level 0xe: the level's sound 0x11 / 0x15 past the split on him
+                // (`0x3607e8(0x11 / 0x15, 0, Ratchet)` at `0x2c5fd4` / `0x2c5ff4`).
+                if self.mode == 1 {
+                    match env.level {
+                        3 => self.level_sounds.push((0x11, 0)),
+                        0xe => self.level_sounds.push((0x15, 0)),
+                        _ => {}
+                    }
+                }
                 self.fall_g = 0.006_111_111_5;
                 self.fall_dec = 0.001_944_444_5;
                 self.vel = self.eff;

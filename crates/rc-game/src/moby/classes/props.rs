@@ -446,14 +446,19 @@ pub fn update_0c22(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 /// 0x0ac0 (`0x3ce5b0`): raised 1.5 and its place kept (`+0x210`), it waits out `+0x208` ticks, then moves 1/12 a
 /// tick along its yaw, back to the kept place every 0x208 ticks. With Ratchet in the cuboid `+0x220` it draws a ring
 /// of 9 points 3 out (`0x3ceaa8`, the effects pass); in the cuboid `+0x20c` and touching the ground under it
-/// (`0x2df8d8`) it plays Ratchet's sound 0x18 and throws sparks (not ported: the hero's sounds and the particles).
-pub fn update_0ac0(w: &mut MobyWorld, id: usize, _ctx: &mut Ctx) {
+/// (`0x2df8d8(0.5, Ratchet + 0.75 up, 2, Ratchet)`) it keeps the level's looped sound 0x18 past the split playing on
+/// Ratchet (`0x3607e8(0x18, 4, Ratchet)` at `0x3ce83c`, its slot `+0x224`, while `0x3602a8` finds it gone) and throws
+/// sparks; else the slot is stopped and −1. Not ported: the ring, the sparks (`0x33a6a0`) and their random draws, the
+/// slot's owner test (the port's `sound_playing` tests the slot only, so the slot starts at −1 here).
+pub fn update_0ac0(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let m = &mut w.mobys[id];
     if m.state == 0 {
         m.pos[2] += 1.5;
         m.set_pv_i(0x200, 0);
         m.set_pv_v(0x210, m.pos);
         m.set_pv_i(0x204, 0);
+        // No slot yet: the port's stand-in for the game's owner test on `+0x224`'s first use.
+        m.set_pv_i(0x224, -1);
         m.state = 1;
     }
     if m.state == 1 {
@@ -473,6 +478,20 @@ pub fn update_0ac0(w: &mut MobyWorld, id: usize, _ctx: &mut Ctx) {
         }
         w.changed = true;
     }
+    // Ratchet on the ground in the cuboid `+0x20c`: its looped sound on him.
+    let hp = ctx.hero.pos;
+    let touching = ctx.level.in_cuboid(w.mobys[id].pv_i(0x20c), hp)
+        && ctx.coll.and_then(|c| crate::collision::coll_sphere_m(c, ctx.scene, [hp[0], hp[1], hp[2] + 0.75], 0.5, crate::collision::QueryFlags(2), ctx.hero_moby)).is_some();
+    let slot = w.mobys[id].pv_i(0x224);
+    if touching {
+        if let Some(h) = ctx.hero_moby.filter(|_| !ctx.host.sound_playing(slot)) {
+            let k = ctx.host.play_level_sound_after(w.mobys.get(h), 0x18, 4);
+            w.mobys[id].set_pv_i(0x224, k);
+        }
+        return;
+    }
+    if slot != -1 && ctx.host.sound_playing(slot) { ctx.host.stop_sound(slot); }
+    w.mobys[id].set_pv_i(0x224, -1);
 }
 
 /// `0x327898(m, o_class, update_dist)`: a moby of `o_class` in `m`'s place — its position and angles, its scale by
@@ -701,9 +720,10 @@ pub fn update_0f13(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 /// fly-by camera [2] armed and the screen black (1.5): the ship flies the path [5] at [7] a second (the next point
 /// within 0.75), its parts on it (`0x384d28`), until after 10 ticks the fly-by is over (`0x42a508`): the ship hidden,
 /// Ratchet walked 2 out of [1] along its yaw (state 4); once he is not walking, state 5. Else state 4 at once. In
-/// the states 4 and 5 the parts are hidden. Not ported: the item 0x18 (`0x2f51a0`), the ship's engine glow and
-/// draw callback, the music (`0x3607e8(0x17)`), the level name (`0x30d658`). The placed view [4] is reset (`0x42b9f0`)
-/// at the fly-by's end and on state 4's first tick.
+/// the states 4 and 5 the parts are hidden. State 2's first tick plays the level's sound 0x17 past the split
+/// (`0x3607e8(0x17, 0, 0)` at `0x384984`, the fly-by's tune). Not ported: the item 0x18 (`0x2f51a0`), the ship's
+/// engine glow and draw callback, the level name (`0x30d658`). The placed view [4] is reset (`0x42b9f0`) at the
+/// fly-by's end and on state 4's first tick.
 pub fn update_1330(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let ship = |w: &MobyWorld| ai_link(w, id, 0x18);
     let state = w.mobys[id].state;
@@ -761,6 +781,8 @@ pub fn update_1330(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             }
         }
         2 => {
+            // `0x32a7c8`: the first tick, the level's sound 0x17 past the split.
+            if w.mobys[id].first() { ctx.host.play_level_sound_after(None, 0x17, 0); }
             let m = &mut w.mobys[id];
             m.state_ticks = m.state_ticks.wrapping_add(1);
             if 10 < m.state_ticks && ctx.game.cameras.flyby_over(ctx.game.scenes.fade) {

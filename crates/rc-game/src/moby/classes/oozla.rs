@@ -2062,15 +2062,14 @@ fn can_talk(w: &MobyWorld, id: usize, ctx: &Ctx, r: f32, n: i32) -> bool {
 ///   step on (wrapping past the points); with its sequence having wrapped (`+0x60 & 2`) sequence 0 rising, else 1 (a
 ///   10-tick blend: the animation's trigger sounds go with them). A hit with the flags 0x10000 (`0x313d88`) knocks it
 ///   off: 0.05 a tick along its facing (`gp+0x82c` / 120 through its rows), 0.05 down; the fourth hit of the level on
-///   Oozla shows the message 0x1233 once (`0x1a7a75`); 2.
+///   Oozla plays the level's sound 1 and shows the message 0x1233 once (`0x1a7a75`); 2.
 /// * **2**: its first tick plays class sound 0 (`0x320328` = L00 `0x32a7c8`, `0x356978`); it flies (the velocity falling 0.003 a
 ///   tick, slowing to 0.98 across, its pitch easing to π), its animation at half speed; within 0.5 of the ground
 ///   under it (`0x312c20` = L00 `0x31ce20`) it sinks for 30 ticks: 3.
 /// * **3**: its first tick plays class sound 1; it sinks at its fall's speed; then it is gone.
 ///
 /// Not ported: the splash (`0x317148`: the billows, the splash drops, the light), the break's debris and drops
-/// (`0x3a7428`) and the drop `0x31d020(0, rider, 1)`, the half animation speed of state 2, the call `0x356ad8(1, 0, 0)`
-/// with the hint, and the hint flag's save.
+/// (`0x3a7428`) and the drop `0x31d020(0, rider, 1)`, the half animation speed of state 2, and the hint flag's save.
 pub fn update_061c(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     const STEP: f32 = 6.0;
     const SCALE: f32 = 2.0;
@@ -2124,6 +2123,8 @@ pub fn update_061c(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             ctx.game.rider_hits += 1;
             if 3 < ctx.game.rider_hits && ctx.game.level == 1 && !ctx.game.rider_hint {
                 ctx.game.rider_hint = true;
+                // The level's sound 1 (`0x356ad8(1, 0, 0)` at `0x3a7264`).
+                ctx.host.play_level_sound(None, 1, 0);
                 ctx.game.messages.push(crate::msgbox::Request::Text { text: 0x1233, ticks: None });
             }
             w.mobys[id].set_state(2, -1);

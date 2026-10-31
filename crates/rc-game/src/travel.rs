@@ -609,13 +609,15 @@ fn row_of(g: &GameState, level: i32) -> Option<usize> {
     Some(k)
 }
 
-/// `0x3448a8` kind 4 / `0x344498`: the map opens on the current planet, fading in over 6 frames.
+/// `0x3448a8` kind 4 / `0x344498`: the map opens on the current planet, fading in over 6 frames; its planet
+/// picture's set-up `0x306bf8` ends with the level's sound 0x11 (`0x360750(0x11, 0, 0)` at `0x306d98`).
 pub fn open_menu(g: &mut GameState) {
     let level = g.level;
     let row = row_of(g, level).unwrap_or(0);
     let missions = std::mem::take(&mut g.travel.menu.missions);
     g.travel.menu = Menu { page: Page::Map, row, selected: level, reticle: [56.0, -50.0], fade_frames: 6, fade: 0, scroll: 0, frame: 0, missions, mission_row: vec![0; LEVELS], mission_scroll: 0, backdrop: Backdrop::new() };
     g.travel.phase = Phase::Menu;
+    g.level_sounds.push(0x11);
 }
 
 /// The pages' frame (`0x3450d0`: the map list `0x350398`, the planet page's `0x351b90` + `0x34fe48`; module docs).
@@ -661,6 +663,9 @@ pub fn menu_tick(g: &mut GameState, pad: &PadState) -> Vec<MenuOut> {
             }
         }
         Page::Planet => {
+            // The planet's picture (`0x351410` → `0x307438`): △, Select or R3 pressed, the level's sound 0x13
+            // (`0x360750(0x13, 0, 0)` at `0x30746c`).
+            if pressed & (button::TRIANGLE | button::SELECT | button::R3) != 0 { out.push(MenuOut::Sound(0x13)); }
             if pressed & (button::START | button::SELECT) != 0 {
                 // `0x34fe48`: the pages close on the current planet.
                 m.selected = level;

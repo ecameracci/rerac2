@@ -43,7 +43,7 @@ impl Plugin for PlayPlugin {
             .init_resource::<CanopyDraw>()
             .init_resource::<ShotDraw>()
             .add_systems(PreUpdate, (input_map::sample_system, switch_camera).chain().after(bevy::input::InputSystems))
-            .add_systems(FixedUpdate, (game_fog, tick, pause_tick).chain().after(crate::card::CardStep))
+            .add_systems(FixedUpdate, (game_fog, tick, pause_tick, level_sounds).chain().after(crate::card::CardStep))
             .add_systems(Update, (draw_created, draw_hud, move_instances, ship_screen.after(draw_created), crate::overlay_mobys::assign_layers.after(draw_created)))
             .add_systems(Update, crate::puzzle_view::apply)
             .add_systems(PostUpdate, draw_canopy.before(bevy::asset::AssetEventSystems))
@@ -57,6 +57,19 @@ impl Plugin for PlayPlugin {
 /// Quit Game: the front end comes back (crate::front_end), the running game ends.
 #[derive(Resource)]
 pub(crate) struct ReturnToFrontEnd;
+
+/// The level sound table's defs the tick's systems asked without a moby (rc_game::game::GameState::level_sounds:
+/// `0x360750(i, 0, 0)`, L02 `0x367f58`), at the listener; without the audio they go.
+fn level_sounds(play: Option<ResMut<Play>>, audio: Option<ResMut<crate::audio_out::AudioOut>>) {
+    let Some(mut play) = play else { return };
+    let p = &mut *play;
+    let asked = std::mem::take(&mut p.game.level_sounds);
+    let Some(mut audio) = audio else { return };
+    let sys = audio.system();
+    let mut rng = sys.rng;
+    for i in asked { sys.play_level_sound(i, 0, None, &listener(&p.camera), &mut rng, p.ticks); }
+    sys.rng = rng;
+}
 
 /// The pause's pages, after the game's tick read the pad (rc_game::menus: the pause list, Options, the save and load
 /// pages, Port Options, Quit Game).
@@ -110,7 +123,8 @@ fn pause_tick(
             // (the boots, the packs) are not ported.
             Out::Equip { slot: 0, item } => equip(p.game.held, &mut p.hero, item),
             Out::Equip { .. } => {}
-            Out::Sound(_) => {}
+            // The pages' sounds (`0x360750(n, 0, 0)`: [`level_sounds`]).
+            Out::Sound(n) => p.game.level_sounds.push(n as i32),
         }
     }
 }
@@ -130,7 +144,7 @@ fn quick_select_frame(qs: &mut rc_game::quick_select::QuickSelect, paused: &mut 
                 equip(game.held, hero, item);
             }
             rc_game::quick_select::Out::Resume => *paused = false,
-            rc_game::quick_select::Out::Sound(_) => {}
+            rc_game::quick_select::Out::Sound(n) => game.level_sounds.push(n as i32),
         }
     }
     qs.ring_tick(&slots);
@@ -586,7 +600,10 @@ fn tick(
     // Start (level 00 `0x3706f0`: mode 3 kind 1, after the level's first 8 frames, not while dying or in a vehicle's
     // states 0x6f / 0x31).
     if p.pad.pressed & rc_game::pad::button::START != 0 && 7 < p.game.frame && !matches!(p.hero.state, 0x6f | 0x31) {
-        p.pause = Some(rc_game::menus::Menus::pause(0).0);
+        // Its sound 0x12 (`0x360750(0x12, 0, 0)` at `0x370a20`).
+        let (m, o) = rc_game::menus::Menus::pause(0);
+        if let rc_game::menus::Out::Sound(n) = o { p.game.level_sounds.push(n as i32); }
+        p.pause = Some(m);
         p.pause_opened = true;
         return;
     }
@@ -690,6 +707,11 @@ fn tick(
             for (index, flags) in std::mem::take(&mut p.hero.sounds) {
                 let ev = rc_game::audio::SoundEvent { index, flags: flags as u32, moby: h, o_class: 0, sound_class: 0, pos: p.hero.pos, tick: p.ticks };
                 sys.play_class_sound(&ev, Some(h), &listener(&p.camera), &mut rng);
+            }
+            // The level table past its split on him (`0x3607e8(index, flags, Ratchet)`).
+            for (index, flags) in std::mem::take(&mut p.hero.level_sounds) {
+                let owner = rc_game::audio::voices::Owner { id: h as u32, privileged: true };
+                sys.play_level_sound_after(index, flags, Some((owner, p.hero.pos)), &listener(&p.camera), &mut rng, p.ticks);
             }
             // His looping sounds: a channel whose slot still plays his sound keeps it; stopped channels release it.
             let ours = |sys: &rc_game::audio::AudioSystem, k: i32| usize::try_from(k).ok().and_then(|i| sys.slots.slots.get(i)).is_some_and(|s| s.state != rc_game::audio::voices::state::FREE && s.owner.is_some_and(|o| o.id == h as u32));
@@ -1457,7 +1479,7 @@ fn travel_frame(p: &mut Play, lv: &mut crate::level_load::LoadedLevel, commands:
             rc_game::travel::menu_frame(&mut p.game);
             for o in rc_game::travel::menu_tick(&mut p.game, &p.pad) {
                 match o {
-                    MenuOut::Sound(_) => {}
+                    MenuOut::Sound(n) => p.game.level_sounds.push(n as i32),
                     MenuOut::Movie(id) => {
                         // `0x2f4ee8` + `0x2f5030`: the movie plays over the pages (the tick and the draw return to
                         // them after it).
@@ -2211,7 +2233,15 @@ fn draw_hud(
             quads.extend(f.radar_quads(&m.world, &tex));
         }
         // In the space fights the ship's HUD stands for Ratchet's (rc_game::ship::Flight::status).
-        let mut draws = if p.ship.is_some() { Vec::new() } else { p.hud.draw(p.game.bolts) };
+        // `0x3122e0`: the screen callback first (rc_game::hud::ScreenCallback); one that returns non-zero takes the
+        // counters' place. Its texts go over its sprites.
+        let mut screen_text = Vec::new();
+        let mut screen_draws = Vec::new();
+        let screen = match (p.game.screen_callback, p.mobys.as_ref()) {
+            (Some(rc_game::hud::ScreenCallback::Spiderbot), Some(m)) => rc_game::moby::classes::spiderbot::draw_screen(&m.world, (&hud.data.assets().glyphs_2, 2), &mut screen_draws, &mut screen_text),
+            _ => false,
+        };
+        let mut draws = if p.ship.is_some() || screen { screen_draws } else { p.hud.draw(p.game.bolts) };
         // The boss bar while a fight refreshes it (`0x2f2158`).
         if let (None, Some((f, _))) = (&p.ship, p.game.boss_bar) { rc_game::hud::boss_bar(f, p.game.boss_icon, &mut draws); }
         // The quick select's ring and texts (rc_game::quick_select).
@@ -2222,6 +2252,7 @@ fn draw_hud(
         }
         let icon = |id: u16, f: u16| hud.icons.get(&(id, f)).map(|&(i, s)| (rc_game::gui::Tex::Slot(i), s));
         quads.extend(rc_game::hud::quads(&draws, &hud.data.assets().sprites, &hud.data.assets().glyphs, &icon, rc_game::gui::MENU_TAN));
+        quads.extend(screen_text);
         let a = hud.data.assets();
         // The action prompt's text (rc_game::prompt) and the vendor's menu (rc_game::vendor): the level's texts, else
         // the front end's strings.

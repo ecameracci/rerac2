@@ -57,20 +57,30 @@
 //! is at hand; crate::cameras shows it.
 //!
 //! **The ends** (`0x3fb028(on, n)`): a bot out goes to 5 (on: blows up) or 7 (not), the hand told, its timer `n` (−1:
-//! 10). The arena master calls `(1, −1)` at a challenge's end, Ratchet's warp `0x2bd368` `(0, 0)`.
+//! 10). The arena master calls `(1, −1)` at a challenge's end, Ratchet's warp `0x2bd368` `(0, 0)`. The port's warp
+//! (crate::hero::Hero::teleport) has no moby world: it counts the warps (crate::hero::Hero::warps) and the bot ends
+//! itself `(0, 0)` first thing in its update when the count moved since it last looked — the same tick as the
+//! original when the warp came before the bot in the moby loop, and in either case before its next state is run.
+//!
+//! **The screen** ([`draw_screen`], `0x3f9818`): from its state 0 to its state 8 the bot is the HUD's screen callback
+//! (crate::hud::ScreenCallback): its clock in the counters' place. **The bolts** ([`pull_bolts`], `0x3fa9a8`): while
+//! it is steered, every other frame the resting bolts within 5 fly to it (crate::moby::classes::bolt::attract_to), and
+//! are counted where they reach it.
 //!
 //! Not ported: the upgraded glove (item 0x4e: the hand 0x0e7a `0x42e7a0`, its bot 0x0e79 `0x42b978` with its shells
-//! `0x430a10` / `0x431858`, its end `0x42e670`: the same machine with its own globals); the 30 s on the screen
-//! (`0x3f9818`, the screen callback `0x311b10`: two HUD sprites 0xc1 / 0xc2 at (454, 380·k) and the clock
-//! `"%d:%02d:%02d"` of `0x1b4280` at (405, 372·k)); the blast's sphere (`0x3facb0`: the overlay's mesh `0x298dc0` /
-//! `0x2987c0` with its 98 scrolling texture offsets `0x2496d0`, 2·reach across); the bolts it pulls in (`0x3fa9a8`:
-//! every other frame the bolts within 5, `0x38a9d8(0, 0, bolt, bot)`: crate::moby::classes::bolt flies only to
-//! Ratchet); the weapon mods on the blast's hits (`0x422630`); the gravity frames and moving frames (`0x386d68` /
-//! `0x386e48`, `0x388638` / `0x3886f0`, `0x326450`), the level-specific refusal under 462.43 (`0x1a8ff4`) and the
-//! landing on the lava level's surface 3 (`0x1a79f8`); the camera's blend in (its record's blend kind 1, `0x2db6b8`:
-//! a cut here) and its `+0x28` / `+0x2c` set to (−10.75, 4) while the bot blows up (nothing reads them); `0x189ff2`.
-//! The quaternion turns (`0x2f3ba8` of an axis not made unit) are made unit here: the original's rows are set to
-//! length where they are read.
+//! `0x430a10` / `0x431858`, its end `0x42e670`, which `0x2bd368` also calls: the same machine with its own globals);
+//! the blast's sphere (`0x3facb0`, registered every tick by `0x3fac68` while the reach is under 8: the overlay's mesh
+//! `0x298dc0` / `0x2987c0`, 48 quads 2·reach across, textured with a copy of the frame (`0x2ea6c8(−1)`) at the
+//! screen place of each corner (`0x2ea5b8`) moved by its 98 wobbles `0x2496d0` — a heat shimmer, which needs a copy
+//! of the rendered frame the renderer does not make; its wobbles' random draws in state 0 are kept); the weapon mods
+//! on the blast's hits (`0x422630`); the gravity frames and moving frames (`0x386d68` / `0x386e48`, `0x388638` /
+//! `0x3886f0`, `0x326450`), the level-specific refusal under 462.43 (`0x1a8ff4`) and the landing on the lava level's
+//! surface 3 (`0x1a79f8`); the camera's blend in (its record's blend kind 1, `0x2db6b8`: a cut here) and its `+0x28` /
+//! `+0x2c` set to (−10.75, 4) while the bot blows up (nothing reads them); `0x189ff2`; PAL's screen scale on the
+//! clock (`0x1b3e04`). The warp count also moves on the port's other placings (crate::hero::Hero::teleport stands in
+//! for `0x2b9e68` too: the vendor's exit, the arrivals), where the original does not end the bot; none of them can
+//! happen while Ratchet steers one. The quaternion turns (`0x2f3ba8` of an axis not made unit) are made unit here:
+//! the original's rows are set to length where they are read.
 
 use crate::cameras::Cameras;
 use crate::collision::QueryFlags;
@@ -125,6 +135,8 @@ mod pv {
     pub const MAGNETIC: usize = 0x44;
     pub const SURFACE6: usize = 0x48;
     pub const HAND: usize = 0x4c;
+    /// The port's: Ratchet's warps it has seen (crate::hero::Hero::warps).
+    pub const WARPS: usize = 0x50;
 }
 
 /// `gp+0x2090` / `+0x2094`: its height to its middle and its size (the corners' reach, the shadow).
@@ -146,6 +158,8 @@ const SCALE_TO: f32 = f32::from_bits(0x3c94_5b6c);
 const BLAST_MAX: f32 = 8.0;
 const BLAST_GROWTH: f32 = 16.0;
 const BLAST_TICKS: i32 = 50;
+/// `gp+0x2078`: the reach it pulls the bolts in from.
+const PULL_REACH: f32 = 5.0;
 /// `t[3]` of the blast's hits (`0x45afdf66`).
 const NO_KNOCK_LIMIT: f32 = 5627.987;
 /// `gp+0x2038` / `+0x2058`: the animation frames its feet sound at and the class sounds.
@@ -307,6 +321,33 @@ pub fn draw_marker(w: &MobyWorld, id: usize, hero_state: i32, mode: i32, frame: 
     super::gravity_bomb::marker_quads(m.pv_v(hand::LAND), m.pv_v(hand::NORMAL), rgba, frame, out);
 }
 
+/// `0x36fe20(ticks, ..)`: minutes, seconds and hundredths (more than 99: 0) of `ticks`, in the original's floats.
+fn clock_parts(ticks: i32) -> (i32, i32, i32) {
+    let f = ticks as f32;
+    let m = (f * f32::from_bits(0x3991_a2b4)) as i32;
+    let f = f - (m as f32 * 3600.0) as i32 as f32;
+    let s = (f * f32::from_bits(0x3c88_888a)) as i32;
+    let h = ((f - (s as f32 * 60.0) as i32 as f32) * f32::from_bits(0x3fd5_5555)) as i32;
+    (m, s, if 99 < h { 0 } else { h })
+}
+
+/// `0x3f9818`, the bot's screen callback (`0x311b10(0, 0x3f9818)` in its state 0, `(0, 0)` in its state 8;
+/// crate::hud::ScreenCallback): with a bot out (`gp+0x2084`) the GUI sprites 0xc1 (`0x60442d00`) and 0xc2
+/// (`0x55f0c070`) at (454, 380), half wide and mirrored (`0x389130(.., −0.5, 1, 0, ..)`), and its 30 s
+/// (`0x1b4280`) as `"%d:%02d:%02d"` (`0x1b1088`, [`clock_parts`]) at (405, 372) in font 2 (`0x2ed478`:
+/// `0x2ea6c8(2)`, its glyphs `0x28edb0`) in `0x80808080`. True: it takes the HUD's place (`0x3122e0`). `font`:
+/// font 2's glyphs and layer texture. Not ported: PAL's screen scale (`0x1b3e04`).
+pub fn draw_screen(w: &MobyWorld, font: (&[rc_formats::disc::boot::Glyph; 256], usize), draws: &mut Vec<crate::hud::Draw>, out: &mut Vec<crate::gui::Quad>) -> bool {
+    let Some(b) = live_bot(w) else { return true };
+    for (id, colour) in [(0xc1, 0x6044_2d00), (0xc2, 0x55f0_c070)] {
+        draws.push(crate::hud::Draw::Sprite { id, pos: [454.0, 380.0], scale: [-0.5, 1.0], frame: 0.0, colour });
+    }
+    let (m, s, h) = clock_parts(w.mobys[b].pv_i(pv::CLOCK));
+    let text = format!("{m}:{s:02}:{h:02}");
+    crate::gui::text(out, font.0, font.1, text.as_bytes(), 405.0, 372.0, 1.0, 0x8080_8080u32.to_le_bytes());
+    true
+}
+
 /// `0x3c6e98`: the hand may throw again (`+0x28`).
 fn tell_hand(w: &mut MobyWorld) {
     if let Some(h) = w.mobys.iter().position(|m| m.o_class == HAND_CLASS && m.state < 0x80) { w.mobys[h].set_pv_i(hand::READY, 1); }
@@ -343,6 +384,7 @@ fn make_bot(w: &mut MobyWorld, ctx: &mut Ctx, pos: V3, vel: V3) -> Option<usize>
     m.rot = rot;
     m.rows = crate::hero::physics::euler_rows(rot);
     m.set_pv_v(pv::VEL, vel);
+    m.set_pv_i(pv::WARPS, ctx.hero.warps as i32);
     w.rebuild(id, &*ctx.host);
     w.changed = true;
     Some(id)
@@ -359,6 +401,12 @@ fn steer_over(ctx: &Ctx) -> bool { ctx.hero.state != 0x1c || ctx.game.scenes.mod
 /// `0x3f8ff8`.
 pub fn update_bot(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     w.mobys[id].pvars.resize(crate::moby::PVAR_BYTES, 0);
+    // `0x2bd368`'s `0x3fb028(0, 0)`: Ratchet warped since its last update (module docs, "The ends").
+    let warps = ctx.hero.warps as i32;
+    if w.mobys[id].pv_i(pv::WARPS) != warps {
+        w.mobys[id].set_pv_i(pv::WARPS, warps);
+        end(w, false, 0);
+    }
     // Its down: the gravity's (`0x3864f0` / `0x32aa88`: up (0, 0, 1)), or on surface 2 the surface's (`0x1b4284`).
     let mut down = [0.0, 0.0, -1.0];
     {
@@ -392,6 +440,14 @@ pub fn update_bot(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 m.set_pv_i(pv::TIMER, 0);
                 m.scale = SCALE_FROM;
                 m.set_pv_i(pv::CLOCK, CLOCK);
+                // The blast sphere's 98 texture wobbles (`0x2496d0`: an angle, a turn of 720..2160° a second with
+                // a random sign), drawn for the order of the draws; the sphere is not ported (module docs).
+                for _ in 0..98 {
+                    ctx.game.rng.rand_angle();
+                    ctx.game.rng.randf_signed(720.0, 2160.0);
+                }
+                // `0x311b10(0, 0x3f9818)`: its clock in the HUD's place ([`draw_screen`]).
+                ctx.game.screen_callback = Some(crate::hud::ScreenCallback::Spiderbot);
             }
             if flight_over(ctx) {
                 camera_release(&mut ctx.game.cameras);
@@ -411,6 +467,7 @@ pub fn update_bot(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             stick(w, id, ctx);
             turn(w, id, ctx);
             walk(w, id, ctx, down);
+            pull_bolts(w, id, ctx);
             steps(w, id, ctx);
             let mut c = w.mobys[id].pv_i(pv::CLOCK);
             let out = countdown(&mut c);
@@ -440,6 +497,8 @@ pub fn update_bot(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         8 => {
             if ctx.hero.state == 0x1c { ctx.hero.request_state(0, true); }
             if ctx.game.cameras.current_class() == CAMERA_CLASS { camera_release(&mut ctx.game.cameras); }
+            // `0x311b10(0, 0)`.
+            ctx.game.screen_callback = None;
             w.delete(id);
             return;
         }
@@ -687,6 +746,20 @@ fn steps(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     w.mobys[id].set_pv_f(pv::FRAME, f);
 }
 
+/// `0x3fa9a8`: on odd frames (`0x1b30c8`) every live moby (`0x334d38`'s list `0x1b35a8`: not deleted, not mode 2,
+/// in slot order) of class type 0x13 (the bolts) within 5 (`gp+0x2078`) of the bot, resting (state 3, `0x38ab80`),
+/// flies to the bot instead of Ratchet (`0x38a9d8(0, 0, bolt, bot)`, crate::moby::classes::bolt::attract_to).
+fn pull_bolts(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    if ctx.game.frame & 1 == 0 { return; }
+    let at = w.mobys[id].pos;
+    for b in 0..w.mobys.len() {
+        let m = &w.mobys[b];
+        if m.state & 0x80 != 0 || m.mode & mode::NO_UPDATE != 0 || m.state != 3 { continue; }
+        if w.class(m.o_class).is_none_or(|c| c.kind != 0x13) || PULL_REACH <= len(sub(m.pos, at)) { continue; }
+        super::bolt::attract_to(w, b, 0.0, 0.0, Some(id), ctx);
+    }
+}
+
 /// State 4: the fall under 22 a second², then [`sweep`].
 fn fall(w: &mut MobyWorld, id: usize, ctx: &Ctx) {
     let m = &mut w.mobys[id];
@@ -858,4 +931,17 @@ fn camera_pull(ctx: &Ctx, id: usize, c: &BotCamera, look: V3, mut wanted: V3) ->
         }
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_clock_reads_minutes_seconds_and_hundredths() {
+        assert_eq!(clock_parts(CLOCK), (0, 30, 0));
+        assert_eq!(clock_parts(1799), (0, 29, 98));
+        assert_eq!(clock_parts(3661), (1, 1, 1));
+        assert_eq!(clock_parts(0), (0, 0, 0));
+    }
 }

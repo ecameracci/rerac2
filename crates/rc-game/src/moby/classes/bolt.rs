@@ -14,12 +14,13 @@
 //! * **State 3** (resting): within the pickup radii (`0x18c2c4` 2.125 across, `0x18c2c8` 1.25 up) it flies to him; a
 //!   made bolt more than 32 across from him that is not drawn goes to the bank; drawn, the resting pose and the bob
 //!   (`(0.25 − f²)·0.0125·of`).
-//! * **State 4** (to Ratchet, `0x3831a8` [`attract`]): below his ground plane its velocity is pushed toward his up
-//!   at 0.133 (at most 0.0139 a tick); else it brakes 0.0067 a tick and the speed eases to 0.533. His move past 0.0667
-//!   a tick carries it; it tumbles and moves by its velocity, then by the speed toward his centre (`0x189f00`), the
-//!   way leaned in his frame by its two angles (`+0x4c` about his up, `+0x48` sideways, mirrored when it is ahead of
-//!   him) — the curve the bolts fly in on. Within the speed: collected (`0x382c18`: its value to the bolt count
-//!   `0x1a7a00`, the counter shown 180 ticks), the pickup sound, gone.
+//! * **State 4** (to its target `+0x60`, Ratchet or a moby, `0x3831a8` [`attract_to`]): flying to Ratchet below his
+//!   ground plane its velocity is pushed toward his up at 0.133 (at most 0.0139 a tick); else it brakes 0.0067 a tick
+//!   and the speed eases to 0.533. His move past 0.0667 a tick carries it; it tumbles and moves by its velocity, then
+//!   by the speed toward his centre (`0x189f00`; another target: its place), the way leaned in his frame by its two
+//!   angles (`+0x4c` about his up, `+0x48` sideways, mirrored when it is ahead of him) — the curve the bolts fly in
+//!   on. Within the speed: collected (`0x382c18`: its value to the bolt count `0x1a7a00`, the counter shown 180
+//!   ticks), the pickup sound, gone. The Spiderbot pulls resting bolts to itself (crate::moby::classes::spiderbot).
 //!
 //! Drawn, every state but 0 adds its glitter ([`glitter`], `0x383758`).
 //!
@@ -28,7 +29,7 @@
 //! again (state 1, its tumble stopped, the platform's move as its velocity) once the platform is gone or a 0.25
 //! sphere at it touches nothing.
 //!
-//! Not ported: the per-level tally (`0x18d208`), targets other than Ratchet (`+0x60`: every caller passes him).
+//! Not ported: the per-level tally (`0x18d208`).
 
 use crate::hero::physics::{add, add_rot, approach, atan2, dist2, len, scale, set_len, slope_of, sub, V3};
 use crate::moby::attach::rows_of;
@@ -56,6 +57,8 @@ const LEFT: usize = 0x57;
 const SPEED: usize = 0x64;
 /// The platform it rests on (`0x322028`'s moby; here its index + 1, 0 none).
 const PLATFORM: usize = 0x5c;
+/// What it flies to (`0x3831a8`'s last argument; here 0 Ratchet, else the moby's index + 1).
+const TARGET: usize = 0x60;
 const START_Z: usize = 0x68;
 
 const DEG: f32 = 0.017_453_294;
@@ -215,12 +218,15 @@ fn mark_near(m: &mut Moby, hero: V3) {
 fn fly_in(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let h = &*ctx.hero;
     let (rows, ground, carry) = (h.rows, h.ground_point, h.carry);
-    let to = centre(ctx);
+    // Another target (its class not 0, Ratchet's): its place, no ground plane. A target deleted since keeps its
+    // place until its slot is taken again, as the original's moby does.
+    let target = (w.mobys[id].pv_i(TARGET) as usize).checked_sub(1).and_then(|t| w.mobys.get(t)).map(|t| t.pos);
+    let to = target.unwrap_or_else(|| centre(ctx));
     let m = &mut w.mobys[id];
     let mut vel = m.pv_v(VEL);
     // `(pos − 0x18a0f0)` in his frame (`0x189e60`): below his ground plane.
     let d = sub(m.pos, ground);
-    if d[0] * rows[2][0] + d[1] * rows[2][1] + d[2] * rows[2][2] < 0.0 {
+    if target.is_none() && d[0] * rows[2][0] + d[1] * rows[2][1] + d[2] * rows[2][2] < 0.0 {
         let mut push = sub(set_len(rows[2], HOP), vel);
         if 0.013_888_889 < len(push) { push = set_len(push, 0.013_888_889); }
         vel = add(vel, push);
@@ -326,20 +332,24 @@ fn rest_pose(m: &mut Moby, (g, grot): (V3, V3)) -> V3 {
     g
 }
 
-/// `0x3831a8(lean, side, bolt, Ratchet)`: off to him (state 4) unless it already is; no lean: ±30°, no side: 0..30°.
-/// From rest it hops off its ground at 0.133 a tick; its speed in starts at 0; it tumbles 12° a tick about
-/// `(him − it) × velocity`.
-pub fn attract(w: &mut MobyWorld, id: usize, lean: f32, side: f32, ctx: &mut Ctx) {
+/// `0x3831a8(lean, side, bolt, Ratchet)`: off to him ([`attract_to`]).
+pub fn attract(w: &mut MobyWorld, id: usize, lean: f32, side: f32, ctx: &mut Ctx) { attract_to(w, id, lean, side, None, ctx); }
+
+/// `0x3831a8(lean, side, bolt, target)` (L02 `0x38a9d8`): off to `target` (`+0x60`; none: Ratchet) in state 4 unless
+/// it already is; no lean: ±30°, no side: 0..30°. From rest it hops off its ground at 0.133 a tick; its speed in
+/// starts at 0; it tumbles 12° a tick about `(target − it) × velocity`.
+pub fn attract_to(w: &mut MobyWorld, id: usize, lean: f32, side: f32, target: Option<usize>, ctx: &mut Ctx) {
     if w.mobys[id].state == 4 { return; }
     let rng = &mut ctx.game.rng;
     let lean = if lean == 0.0 { rng.randf(-30.0, 30.0) * DEG } else { lean };
     let side = if side == 0.0 { rng.randf(0.0, 30.0) * DEG } else { side };
-    let to = ctx.hero.pos;
+    let to = target.and_then(|t| w.mobys.get(t)).map_or(ctx.hero.pos, |t| t.pos);
     let m = &mut w.mobys[id];
     if m.state == 3 { m.set_pv_v(VEL, set_len(rows_of(m.pv_v(GROUND_ROT))[2], HOP)); }
     m.set_pv_f(SPEED, 0.0);
     m.set_pv_f(LEAN, lean);
     m.set_pv_f(SIDE, side);
+    m.set_pv_i(TARGET, target.map_or(0, |t| t as i32 + 1));
     let axis = set_len(crate::hero::physics::cross(sub(to, m.pos), m.pv_v(VEL)), 1.0);
     m.set_pv_q(TUMBLE, quat::axis_angle(0.209_439_51, axis));
     m.state = 4;

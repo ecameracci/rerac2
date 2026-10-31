@@ -1346,9 +1346,9 @@ const COUNTED: [i16; 5] = [0x0a9c, 0x0d0d, 0x0aa4, 0x0e93, 0x1259];
 
 /// 0x12cf (`0x38b458`), the count of the resort's breakables (`$gp−0x3c0`, [`Globals::left`]): at its start (update
 /// distance 0xff) on Maktar it counts the placed 0x0a9c, 0x0d0d, 0x0aa4, 0x0e93 and 0x1259 under z 400; at the level's
-/// frame 2 the count is set to 113 (the game's own figure); at 10 left or fewer, once, the message 0x1233 shows
-/// (`0x32c310(0x1233, −1)`, crate::prompt). Not ported: the level's sound 1 then (`0x367f58`), the flag `0x1a903c`,
-/// level 3's count (classes 0xf37, 0xf38, 0xf3e: 112, at 11).
+/// frame 2 the count is set to 113 (the game's own figure); at 10 left or fewer, once, the level's sound 1
+/// (`0x367f58(1, 0, 0)` at `0x38b648`) and the message 0x1233 (`0x32c310(0x1233, −1)`, crate::prompt). Not ported:
+/// the flag `0x1a903c`, level 3's count (classes 0xf37, 0xf38, 0xf3e: 112, at 11).
 pub fn update_12cf(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     match w.mobys[id].state {
         0 => {
@@ -1364,6 +1364,7 @@ pub fn update_12cf(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             if ctx.game.frame == 2 { w.maktar.left = 0x71; }
             if 10 < w.maktar.left || w.maktar.told { return; }
             w.maktar.told = true;
+            ctx.host.play_level_sound(None, 1, 0);
             ctx.game.prompt.announce(0x1233, -1);
         }
         _ => {}
@@ -1530,7 +1531,7 @@ const SYMBOL_ST: f32 = 2.320_500_1;
 /// A hit with the flags 0x10000 for more than 2 from anything but the wrench (and not Ratchet) breaks it (5, counted).
 /// Blown up, two creatures of its group `+0x58` waiting (state 13) drop out at (0.5, ∓0.45, 0) in its frame facing
 /// Ratchet (crate::moby::classes::critter::waiting / wake). Its reels draw while it is drawn ([`draw_0a9c`]). Not
-/// ported: the HUD's bolt count shown for 240 ticks (`0x3119f0`), the jackpot's level sound 1 and flag `0x1a903c`.
+/// ported: the HUD's bolt count shown for 240 ticks (`0x3119f0`), the jackpot's flag `0x1a903c`.
 pub fn update_0a9c(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     if w.mobys[id].drawn != 0 { w.register_draw(id); }
     if w.mobys[id].pvars.len() < 0xa8 { w.mobys[id].pvars.resize(0xa8, 0); }
@@ -1728,6 +1729,8 @@ fn slot_pay(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         5 => {
             if !w.maktar.jackpot {
                 w.maktar.jackpot = true;
+                // The level's sound 1 (`0x367f58(1, 0, 0)` at `0x3e8f08`).
+                ctx.host.play_level_sound(None, 1, 0);
                 ctx.game.prompt.announce(0x1233, -1);
             }
             ctx.game.bolts += 300;

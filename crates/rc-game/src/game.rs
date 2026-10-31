@@ -21,6 +21,10 @@ pub struct GameState {
     pub crate_sound_frame: i32,
     /// `$gp+0x3a6c`: the frame an ammo pickup last played its sound (crate::moby::classes::pickup).
     pub pickup_sound_frame: i32,
+    /// The level sound table's defs below its split asked this tick without a moby (`0x360750(i, 0, 0)`, L02
+    /// `0x367f58`: the GUI's set — the pause, the quick select, the ship's pages, the health's rise), played at the
+    /// listener by the engine at the tick's end (crate::audio::level_sounds).
+    pub level_sounds: Vec<i32>,
     /// `0x1a7a1c`: the bolt bank: value a drop could not put into bolt mobys (the limit per drop, bolts that fell
     /// far from the camera); each later drop takes (bank + 49) / 50 of it.
     pub bolt_bank: i32,
@@ -236,6 +240,8 @@ pub struct GameState {
     /// screen at `ftoi(fade × 128)` over everything, a fade past 1 held at 1; crate::gui::fill).
     pub fade_black: f32,
     pub fade_white: f32,
+    /// `0x311b10`: the HUD's screen callback (crate::hud::ScreenCallback; the engine runs it in the HUD's draw).
+    pub screen_callback: Option<crate::hud::ScreenCallback>,
 }
 
 /// The flag bytes `0x1395b8..0x139685` ([`GameState::flags`]): the save's global chunk 5 (0xcd bytes).
@@ -251,12 +257,12 @@ const HP_LEVELS: [i16; 66] = [
 impl Default for GameState {
     fn default() -> Self {
         GameState {
-            bolts: 0, raritanium: 0, max_health: 4, level: 0, occlusion: 0, crate_sound_frame: -100, pickup_sound_frame: -100, bolt_bank: 0, xp_bank: 0, xp: 0, uid_bits: vec![0; 0x400],
+            bolts: 0, raritanium: 0, max_health: 4, level: 0, occlusion: 0, crate_sound_frame: -100, pickup_sound_frame: -100, level_sounds: Vec::new(), bolt_bank: 0, xp_bank: 0, xp: 0, uid_bits: vec![0; 0x400],
             show_bolts: None, show_health: None, rng: Default::default(), recent_breaks: 0, last_break_frame: -1000, frame: 0,
             clank: false, thruster: false, boots: false, charge_boots: false, grind_boots: false, nanotech: [false; 10], level_xp: [0; 2], death_z: None, boss_bar: None, boss_icon: 0, shadow: Default::default(), water_base: 0.0, water_z: 0.0, water_scroll: [[0.0; 2]; 2], water_cam: [0.0; 3], missions: vec![0; 0x200], mission_area: 0, cam_tweaks: Default::default(), shakes: Default::default(), uid_pending: vec![0; 0x800], uid_dead: vec![0; 0x800], mission_table: vec![0; 0x100],
             mission_xp: vec![0; 0x30], mission_bolts: vec![0; 0x30], checkpoint: None, checkpoint_bits: Vec::new(), last_checkpoint: None, messages: Vec::new(), help_state: 0, help_req: None, help_counts: vec![0; 0x100], help_shift: 0, help_shift_ticks: 0, help_aux: vec![0; 0x100], help_last: vec![0; 0x100], help_levels: vec![0; 0x100], help_queue: Vec::new(), hint_flags: [0; 3], no_item_area: false, variant: 0, chunk_request: None, items: vec![0; 0x40], quick_select: vec![0; 28], planets: vec![0; 0x1c], travel: Default::default(), ring: [0; 8], ammo: vec![0; 0x50], held: 0, wrench_out: false, trail_phase: 0.0, view_far: 1024.0, sky: Default::default(), markers: Vec::new(), scenes_seen: vec![false; 0x100], scenes: Default::default(), cameras: Default::default(), ship_parts: Vec::new(), underwater: false, fog: Default::default(), fog_flash: Default::default(), area_ask: Vec::new(), area_hero: Vec::new(), next_level: None, next_level_save: false, bolt_help_done: false, space_bolts: 0, space_bolts_shown: 0, rider_hits: 0, rider_hint: false, store_left: 0, store_done: false, play_time: 0, visited: vec![0; 0x1c], puzzle: Default::default(),
             stock: [0xff; crate::vendor::STOCK_SLOTS], challenge: false, rac1_weapons: 0, vendor_open: None, vendor_virtual: None, vendor_phase: [0.0; 3], vendor_beam: [0.0; 2], prompt: Default::default(),
-            armor: 0, armor_offer: 0, mods_available: [0; 0x38], mods_bought: [0; 0x38], platinum_spent: 0, platinum_found: 0, platinum: vec![0; 0x70], flags: vec![0; FLAGS_LEN], arena_menu: None, arena_hud: None, arena_wipe: None, arena_results: None, fade_black: 0.0, fade_white: 0.0,
+            armor: 0, armor_offer: 0, mods_available: [0; 0x38], mods_bought: [0; 0x38], platinum_spent: 0, platinum_found: 0, platinum: vec![0; 0x70], flags: vec![0; FLAGS_LEN], arena_menu: None, arena_hud: None, arena_wipe: None, arena_results: None, fade_black: 0.0, fade_white: 0.0, screen_callback: None,
         }
     }
 }
@@ -496,14 +502,18 @@ impl GameState {
     }
 
     /// `0x2d6258`'s health part (every 16th frame and the first): the health limit = the XP's + the nanotech
-    /// upgrades; a change fills the health (a rise past frame 10 shows the bar: `show_health`).
+    /// upgrades; a change fills the health (a rise past frame 10 shows the bar, `show_health`, and plays the level's
+    /// sound 6, `0x360750(6, 0, 0)` at `0x2d6360`).
     pub fn health_tick(&mut self, hp: &mut i32) {
         if self.frame & 0xf == 1 && self.frame != 1 { return; }
         let (h, lv) = self.xp_health();
         self.level_xp = lv;
         let max = h + self.nanotech.iter().filter(|&&n| n).count() as i32;
         if max != self.max_health {
-            if 10 < self.frame && self.max_health < max { self.show_health = Some(0x168); }
+            if 10 < self.frame && self.max_health < max {
+                self.show_health = Some(0x168);
+                self.level_sounds.push(6);
+            }
             self.max_health = max;
             *hp = max;
         }

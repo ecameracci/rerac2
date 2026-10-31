@@ -19,7 +19,7 @@
 //!
 //! Not ported: the dust of 0x0af7 (`0x3d7f60`: 6 or 15 puffs `0x31d2e0`), the sparkles of 0x0f32 / 0x0f33 (`0x31b4f0`,
 //! `0x2e2388`), 0x10fa's glows at its start (`0x335530`), its sparks (`0x3165d8`, no damage) and its four puffs, the
-//! wares' count `0x1b3468`, 0x12dc's sound (`0x356ad8(1, 0, 0)`) and `0x1a907c`.
+//! wares' count `0x1b3468`, 0x12dc's flag `0x1a907c`.
 
 use crate::hero::physics::{add, add_rot, scale, V3};
 use crate::moby::{bolts, shards, Ctx, MobyWorld};
@@ -209,13 +209,16 @@ pub fn update_10fa(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 }
 
 /// 0x12dc: the count set to 66 on the level's second frame; from the sixth, once none is left (and `0x1a7a77` not
-/// set), the message 0x1233.
+/// set), the level's sound 1 and the message 0x1233.
 pub fn update_12dc(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     if w.mobys[id].state == 0 { w.mobys[id].update_dist = 0xff; }
     let g = &mut *ctx.game;
     if w.frame == 2 { g.store_left = 0x42; }
     if 5 < w.frame && g.store_left < 1 && !g.store_done {
         g.store_done = true;
+        // The level's sound 1 (`0x356ad8(1, 0, 0)` at `0x379e70`).
+        ctx.host.play_level_sound(None, 1, 0);
+        let g = &mut *ctx.game;
         g.messages.push(crate::msgbox::Request::Text { text: 0x1233, ticks: None });
     }
 }

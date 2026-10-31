@@ -289,7 +289,8 @@ fn body(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, pts: &[V3]) -> bool {
 /// the level or a moby (flags 2, not its source; `0x2dcd48`) is pushed out and its spin turned by `velocity × normal`.
 /// On a floor (the normal within 45° of up) half its speed into the face bounces off; under 1/30 it stays on the
 /// floor and rolls — its speed eased toward 1/30 by 0.00194 a tick and its spin a tenth of the way to the roll for its
-/// radius — and from 1/30 into the face it sounds (its sound, else the level's 8; not ported). Against a wall it
+/// radius — and from 1/30 into the face it sounds (its sound, else the level's 8; the slot's position `0x3609d0` is not
+/// ported). Against a wall it
 /// reflects. Its life counts down every tick; true when it is over (or it left the world).
 fn ball(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> bool {
     fly(w, id);
@@ -321,7 +322,10 @@ fn ball(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> bool {
             }
             m.set_pv_v(VEL, vel);
             let sound = m.pvars[SOUND];
-            if 0.033_333_335 <= vn.abs() && sound != 0xff { ctx.host.play_sound(&w.mobys[id], sound as i32, 0); }
+            if 0.033_333_335 <= vn.abs() {
+                // Its class sound, or without one the level's 8 on it (`0x360750(8, 0, moby)` at `0x2dc730`).
+                if sound != 0xff { ctx.host.play_sound(&w.mobys[id], sound as i32, 0); } else { ctx.host.play_level_sound(Some(&w.mobys[id]), 8, 0); }
+            }
         } else {
             let d = dot(vel, n);
             if d < 0.0 { vel = sub(vel, scale(n, 2.0 * d)); }

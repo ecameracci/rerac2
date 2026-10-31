@@ -210,6 +210,15 @@ impl Fader {
     }
 }
 
+/// `0x311b10(arg, f)`: the GUI object's one screen callback (`+0x3f9f0` / `+0x3f9f4`, cleared at the level start
+/// `0x470ab0`). The HUD's draw `0x3122e0` runs it first; one that returns non-zero takes the HUD's place: the
+/// counters (the GUI's draw `+0x3f9d4`) are not drawn that frame.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ScreenCallback {
+    /// `0x3f9818`: the Spiderbot's clock (crate::moby::classes::spiderbot::draw_screen).
+    Spiderbot,
+}
+
 /// One draw of the HUD.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Draw {
