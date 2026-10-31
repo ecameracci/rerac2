@@ -326,7 +326,8 @@ fn gadget_sounds(root: &Path, index: u32, bank: &mut rc_formats::sound_bank::Ban
             let mut defs: Vec<rc_formats::sound_bank::SoundDef> = if n > 0 && 0 < ptr { b.pod_slice(ptr as usize, n, "gadget sound defs")? } else { Vec::new() };
             let base = bank.append(&own);
             for d in &mut defs {
-                d.index = base + d.index;
+                // 0xffff: no sound (the remap's "none").
+                if d.index != 0xffff { d.index = base + d.index; }
                 d.bank_handle = 4;
             }
             let bank_ids = defs.iter().map(|d| d.index).collect();
@@ -390,13 +391,14 @@ fn audio(root: &Path, index: u32, wad: &LevelWad, core_index: &[u8], core: &leve
         let instance_pvars = instances.iter().map(|i| usize::try_from(i.pvar_index).ok().and_then(|k| pvars.get(k)).cloned()).collect();
         Ok(rc_game::audio::LevelAudio {
             bank, sounds, instances, instance_pvars, music, env_points: Vec::new(), collision: collision.map(std::sync::Arc::new), chunk_banks,
+            level_split: crate::mobys::footstep_base(gameplay),
         })
     };
     match run() {
         Ok(a) => {
             // The music streams up to the first gap (the level's own tracks; the speech follows).
             let names: Vec<&str> = a.music.iter().map_while(Option::as_ref).map(|m| m.name.as_str()).collect();
-            println!("audio: {} sounds, {} samples, {} level defs, {} classes with sounds, {} sound instances, chunk banks at {:?}, music {:?} ({} streams)", a.bank.sounds.len(), a.bank.vags.len(), a.sounds.level_defs.len(), a.sounds.classes.iter().filter(|c| !c.defs.is_empty()).count(), a.instances.len(), a.chunk_banks.base, names, a.music.iter().flatten().count());
+            println!("audio: {} sounds, {} samples, {} level defs, {} classes with sounds, {} sound instances, chunk banks at {:?}, music {:?} ({} streams)", a.bank.sounds.len(), a.bank.vags.len(), format!("{} (split at {})", a.sounds.level_defs.len(), a.level_split), a.sounds.classes.iter().filter(|c| !c.defs.is_empty()).count(), a.instances.len(), a.chunk_banks.base, names, a.music.iter().flatten().count());
             Some(a)
         }
         Err(e) => {

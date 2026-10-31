@@ -24,9 +24,11 @@
 pub mod chunk;
 pub mod class_sounds;
 pub(crate) mod grain_vm;
+pub mod level_sounds;
 pub mod music;
 pub mod reverb;
 pub mod scene;
+pub mod speech;
 pub mod voices;
 
 use rc_formats::collision::Collision;
@@ -458,6 +460,9 @@ pub struct LevelAudio {
     pub collision: Option<Arc<Collision>>,
     /// The chunk banks (a level in chunks, [`chunk`]): where they sit in `bank`, which one is loaded.
     pub chunk_banks: chunk::ChunkBanks,
+    /// The level sound table's split (`$gp − 0x60e4`, [`level_sounds`]): the defs below it play by their index, the
+    /// footsteps' and the rest from it.
+    pub level_split: usize,
 }
 
 /// One logged class sound play: `(tick, sound class, class sound index, flags, slot)`.
@@ -523,6 +528,8 @@ pub struct AudioSystem {
     pub underwater: bool,
     /// The checkpoint record's music track 0x1bc304 ([`AudioSystem::checkpoint_saved`]); None: no record this visit.
     pub(crate) checkpoint_track: Option<i16>,
+    /// The dialogue request `0x1a63cc` (L02; None: −1), [`speech`].
+    pub(crate) speech_req: Option<i32>,
     started: bool,
     /// The level start's `music_start_track(0, 1, 0x400)` done ([`AudioSystem::level_music_start`]).
     music_started: bool,
@@ -571,6 +578,7 @@ impl AudioSystem {
             reverb_log: None,
             underwater: false,
             checkpoint_track: None,
+            speech_req: None,
             started: false,
             music_started: false,
             snd_cmds: Vec::new(),
@@ -647,6 +655,7 @@ impl AudioSystem {
         self.music_resume_countdown();
         let more = self.music.tick(input.hero_pos, &mut self.boxes);
         self.stream_cmds.extend(more);
+        self.speech_update();
         self.stats.max_slots = self.stats.max_slots.max(self.slots.slots.iter().filter(|s| s.state != voices::state::FREE).count());
     }
 

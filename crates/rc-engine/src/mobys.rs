@@ -427,6 +427,35 @@ impl MobyHost for Host<'_> {
 
     fn music_tracks(&self) -> Option<(u8, u8)> { self.sound.as_ref().map(|s| s.system.music_tracks()) }
 
+    /// `0x367f58`: the level sound table below its split (rc_game::audio::level_sounds).
+    fn play_level_sound(&mut self, m: Option<&Moby>, index: i32, flags: u8) -> i32 {
+        let Some(s) = self.sound.as_mut() else { return -1 };
+        let owner = m.map(|m| (rc_game::audio::voices::Owner { id: m.index as u32, privileged: false }, m.pos));
+        let mut rng = s.system.rng;
+        let k = s.system.play_level_sound(index, flags, owner, &s.listener, &mut rng, s.tick);
+        s.system.rng = rng;
+        k
+    }
+
+    /// `0x367ff0`: from the split.
+    fn play_level_sound_after(&mut self, m: Option<&Moby>, index: i32, flags: u8) -> i32 {
+        let Some(s) = self.sound.as_mut() else { return -1 };
+        let owner = m.map(|m| (rc_game::audio::voices::Owner { id: m.index as u32, privileged: false }, m.pos));
+        let mut rng = s.system.rng;
+        let k = s.system.play_level_sound_after(index, flags, owner, &s.listener, &mut rng, s.tick);
+        s.system.rng = rng;
+        k
+    }
+
+    fn speech_free(&self) -> bool { self.sound.as_ref().is_none_or(|s| s.system.speech_free()) }
+
+    fn request_speech(&mut self, id: i32) -> bool {
+        let Some(s) = self.sound.as_mut() else { return true };
+        let taken = s.system.request_speech(id);
+        if taken { println!("speech: line {id} asked for (stream {})", id - 2000); }
+        taken
+    }
+
     fn sequence_sphere(&self, m: &Moby) -> Option<[f32; 4]> {
         let (class, s, _) = self.state_of(m)?;
         let seqs = &self.lv.anim.get(class)?.sequences;
@@ -438,7 +467,9 @@ impl MobyHost for Host<'_> {
     }
 }
 
-fn footstep_base(gameplay: &[u8]) -> usize {
+/// `$gp − 0x60e4` (`0x3012a0`): the level settings' word after their variant blocks (`[0x17 + 8·n]`, n = `[0x1a]`;
+/// `[0x1f]` without blocks) — the level sound table's split (rc_game::audio::level_sounds), the footsteps' base.
+pub(crate) fn footstep_base(gameplay: &[u8]) -> usize {
     let Ok(Some(s)) = rc_formats::disc::gameplay::level_settings(gameplay) else { return 0 };
     let w = |i: usize| s.get(4 * i..4 * i + 4).map_or(0, |b| i32::from_le_bytes(b.try_into().unwrap()));
     let n = w(0x1a);

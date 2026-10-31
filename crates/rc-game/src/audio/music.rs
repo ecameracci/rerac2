@@ -31,8 +31,9 @@ use rc_formats::vag;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-/// The track table's entries loaded ([`MusicTrack::table`]): the requests' tracks are bytes (`0x335928`).
-pub const TRACKS: usize = 0x100;
+/// The track table's entries loaded ([`MusicTrack::table`]): the music requests' tracks are bytes (`0x335928`), the
+/// dialogue's streams reach id − 2000 / − 3000 (crate::audio::speech).
+pub const TRACKS: usize = 0x400;
 
 /// One music VAG: its body up to and including the end frame (the 0x7 pad frame is never played). A stereo track
 /// (Going Commando's left / right pairs) has a right channel too: `body` is then the left one.

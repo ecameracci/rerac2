@@ -182,20 +182,25 @@ impl AudioSystem {
     fn start_speech(&mut self, bytes: &[u8]) {
         let Ok((h, body)) = vag::parse_vag(bytes) else { return };
         let Ok(ext) = vag::sample_extent(body, 0) else { return };
-        let part = StreamPart { data: Arc::from(&body[..ext.bytes()]), looped: false };
+        self.start_speech_body(h.sample_rate, Arc::from(&body[..ext.bytes()]));
+    }
+
+    /// The dialogue player's stream (group 2, full volume): `body` ADPCM up to its end frame at `rate`.
+    pub(super) fn start_speech_body(&mut self, rate: u32, body: Arc<[u8]>) {
+        let part = StreamPart { data: body, looped: false };
         let vm = &mut self.snd.vm;
         let Some(i) = vm.allocate(&mut self.spu, SPEECH_GROUP as usize, 127, 0) else { return };
         let base = vm.make_volume(127, 0, 127, 0, 127, 0);
         let regs = vm.voice_registers(base, SPEECH_GROUP as usize);
         let v = &mut self.spu.voices[i];
-        v.key_on(VoiceData::Stream { cur: part, queue: Default::default() }, 0, vag::rate_to_pitch(h.sample_rate), STREAM_ADSR1, STREAM_ADSR2);
+        v.key_on(VoiceData::Stream { cur: part, queue: Default::default() }, 0, vag::rate_to_pitch(rate), STREAM_ADSR1, STREAM_ADSR2);
         v.vol = regs;
         let generation = v.generation;
         vm.voices[i] = VoiceSlot { owner: VoiceUse::Stream { handle: u32::MAX }, priority: 127, group: SPEECH_GROUP, basevol: base, start_tick: 0, generation };
         self.scene.speech = Some((i, generation));
     }
 
-    fn stop_speech(&mut self) {
+    pub(super) fn stop_speech(&mut self) {
         if let Some((i, generation)) = self.scene.speech.take() {
             if self.spu.voices[i].generation == generation { self.spu.voices[i].key_off(); }
             self.snd.vm.voices[i].owner = VoiceUse::Free;

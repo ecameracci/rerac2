@@ -43,10 +43,14 @@
 //! The Spiderbot Glove's bot ends at a challenge's end (`0x3fb028(1, −1)`, crate::moby::classes::spiderbot::end) and
 //! on Ratchet's warps (`0x2bd368`'s `0x3fb028(0, 0)`).
 //!
-//! Not ported: the upgraded glove's end (`0x42e670`: its bot 0x0e79 has no port), the announcer's speech (`0x401d98`, its
-//! remarks `0x401e68` / `0x402090`), the restart's path straight into the wipe (`0x1a7904` = 2), the
-//! level's sounds, the challenges' weapon lock (`0x18b6f4`) and the fixed held items of 7 / 8 /
-//! 13 beyond the hand request; the plates' sparks (`0x3d85a8`: the particle burst `0x345d88` has no port).
+//! The announcer ([`say`], `0x401d98`): its 39 lines (`+0x130..`) through the dialogue (crate::audio::speech, id +
+//! 2000) — at the desk's goodbye, the wins, the menu's first tick, the win screen, the bosses sent; its remarks on the
+//! fight ([`remark`], `0x401e68`) and on the boss ([`boss_remarks`], `0x402090`). The level's sounds
+//! (crate::audio::level_sounds): the crowd's gasp 0x17 ([`score`]), the columns' hum 0x11, the menu's 3 / 4.
+//!
+//! Not ported: the upgraded glove's end (`0x42e670`: its bot 0x0e79 has no port), the restart's path straight into the
+//! wipe (`0x1a7904` = 2), the challenges' weapon lock (`0x18b6f4`) and the fixed held items of 7 / 8 / 13 beyond the
+//! hand request; the plates' sparks (`0x3d85a8`: the particle burst `0x345d88` has no port).
 
 use crate::hero::physics::{add, add_rot, atan2, dist, dist2, set_len, sub, V3};
 use crate::moby::attach::{angles_of, rows_of, turn, Carrier, Kind, Member};
@@ -498,6 +502,13 @@ mod pv {
     pub const WAVE: usize = 0x122;
     pub const WIPE: usize = 0x124;
     pub const SAID: usize = 0x1d0;
+    /// The remarks (`0x401e68`): the wait `+0xe4`, the damage and kills summed `+0xe8` / `+0xec`, the sums' restart
+    /// `+0x100`; the announcer's 39 line ids `+0x130..` (crate::audio::speech).
+    pub const REMARK_WAIT: usize = 0xe4;
+    pub const REMARK_SUM: usize = 0xe8;
+    pub const REMARK_KILLS: usize = 0xec;
+    pub const REMARK_RESTART: usize = 0x100;
+    pub const LINES: usize = 0x130;
     /// The music (`0x335928(track, stinger)`): the arena's track and stinger `+0x220` / `+0x228`, the resort's
     /// `+0x224` / `+0x22c`, the bosses' `+0x230` / `+0x234`.
     pub const MUSIC_ARENA: usize = 0x220;
@@ -538,11 +549,88 @@ fn placed(w: &MobyWorld, i: i32) -> Option<usize> { usize::try_from(i).ok().filt
 
 fn cuboid_at(ctx: &Ctx, w: &MobyWorld, id: usize, off: usize) -> Option<(V3, V3)> { ctx.level.cuboid_place(w.mobys[id].pv_i(off)) }
 
-/// `0x401d98(m, n)`: line `n` of the announcer (`+0x130` / `+0x180`), said once a challenge (`+0x1d0`). Not ported:
-/// the speech itself (`0x1a63cc` = id + 2000).
-fn say(w: &mut MobyWorld, id: usize, n: i32) {
-    if !(0..=0x26).contains(&n) { return; }
+/// `0x401d98(m, n)`: line `n` of the announcer — with the dialogue free its id (`+0x130 + 4n`, the low 14 bits) + 2000
+/// asked for (`0x1a63cc`, crate::audio::speech: the stream id of the level's table) and the line marked said this
+/// challenge (`+0x1d0 + 2n`); whether it was.
+fn say(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, n: i32) -> bool {
+    if !(0..=0x26).contains(&n) { return false; }
+    let line = (w.mobys[id].pv_i(pv::LINES + 4 * n as usize) & 0x3fff) + 2000;
+    if !ctx.host.request_speech(line) { return false; }
     w.mobys[id].set_pv_s(pv::SAID + 2 * n as usize, 1);
+    true
+}
+
+fn said(w: &MobyWorld, id: usize, n: i32) -> bool { w.mobys[id].pv_s(pv::SAID + 2 * n as usize) != 0 }
+
+/// `$gp+0x2570..+0x2584`: the remarks' damage and kills to pass (9, 5), the hurt (0.5), the low health (a quarter), the
+/// wait after a remark (240 + up to 240 ticks), a boss's low life (0.4 of its most).
+const REMARK_DAMAGE: f32 = 9.0;
+const REMARK_KILLS: i32 = 5;
+const REMARK_HURT: f32 = 0.5;
+const REMARK_LOW: f32 = 0.25;
+const REMARK_WAIT: i32 = 240;
+const REMARK_BOSS_LOW: u32 = 0x3ecc_cccd;
+/// The remarks' sum restart (`+0x100`): every 300 ticks.
+const REMARK_RESTART: i32 = 300;
+
+/// `0x401e68(damage, hurt, m, kills)`: the announcer's remarks on the fight, with the dialogue free and the last one's
+/// wait `+0xe4` over — the damage and the kills summed (`+0xe8`, `+0xec`; restarted every 300 ticks, `+0x100`): past 9
+/// or 5 its lines 0x1d.. 0x22 not said (0x1d only without a boss), and the sums restarted; hurt more than 0.5 its lines
+/// 0x1a..0x1c; Ratchet under a quarter of his health 0x23; down 0x24. One of them at random, then a wait of 240 + up
+/// to 240 ticks.
+fn remark(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, damage: f32, hurt: f32, kills: i32) {
+    if !ctx.host.speech_free() || w.mobys[id].pv_i(pv::REMARK_WAIT) != 0 { return; }
+    let m = &mut w.mobys[id];
+    let sum = m.pv_f(pv::REMARK_SUM) + damage;
+    let k = m.pv_i(pv::REMARK_KILLS) + kills;
+    m.set_pv_i(pv::REMARK_KILLS, k);
+    m.set_pv_f(pv::REMARK_SUM, sum);
+    let boss = m.pv_i(pv::BOSS) != 0;
+    let mut lines = Vec::new();
+    if REMARK_DAMAGE < sum || REMARK_KILLS < k {
+        lines.extend((0..6).filter(|&j| !(j == 0 && boss)).map(|j| 0x1d + j).filter(|&n| !said(w, id, n)));
+        let m = &mut w.mobys[id];
+        m.set_pv_i(pv::REMARK_KILLS, 0);
+        m.set_pv_f(pv::REMARK_SUM, 0.0);
+    }
+    let m = &mut w.mobys[id];
+    let mut t = m.pv_i(pv::REMARK_RESTART);
+    let over = crate::moby::countdown(&mut t);
+    m.set_pv_i(pv::REMARK_RESTART, t);
+    if over {
+        m.set_pv_i(pv::REMARK_KILLS, 0);
+        m.set_pv_i(pv::REMARK_RESTART, REMARK_RESTART);
+        m.set_pv_f(pv::REMARK_SUM, 0.0);
+    }
+    if REMARK_HURT < hurt { lines.extend((0x1a..0x1d).filter(|&n| !said(w, id, n))); }
+    if (ctx.hero.hp as f32) < ctx.game.max_health as f32 * REMARK_LOW && !said(w, id, 0x23) { lines.push(0x23); }
+    if ctx.hero.hp < 1 && !said(w, id, 0x24) { lines.push(0x24); }
+    if lines.is_empty() { return; }
+    let n = lines[ctx.game.rng.randi(lines.len() as i32) as usize];
+    say(w, id, ctx, n);
+    let wait = REMARK_WAIT + ctx.game.rng.randi(REMARK_WAIT);
+    w.mobys[id].set_pv_i(pv::REMARK_WAIT, wait);
+}
+
+/// `0x402090`: the remarks on the challenge's boss (`+0xd0`): Ratchet down, one of its two lines (0x10 / 0x11 for
+/// 0x09f8, 0x16 / 0x17 for 0x0a44) unless said; its life under 0.4 of its most, 0x12 / 0x18; gone, 0x13 / 0x19 — each
+/// once.
+fn boss_remarks(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    let Some(b) = ai::link(&w.mobys[id], pv::BOSS) else { return };
+    let (down, low, gone) = match w.mobys[b].o_class {
+        0x09f8 => (0x10, 0x12, 0x13),
+        0x0a44 => (0x16, 0x18, 0x19),
+        _ => return,
+    };
+    let (life, most) = (w.mobys[b].pv_f(0x20), w.mobys[b].pv_s(0x24) as f32);
+    let mut n = -1;
+    if ctx.hero.hp as f32 <= 0.0 {
+        let k = down + ctx.game.rng.randi(2);
+        n = if said(w, id, k) { -1 } else { k };
+    }
+    if !said(w, id, low) && life < most * f32::from_bits(REMARK_BOSS_LOW) { n = low; }
+    if !said(w, id, gone) && life <= 0.0 { n = gone; }
+    if 0 < n { say(w, id, ctx, n); }
 }
 
 /// `0x3fc530`: the challenge and wave none, the counts cleared, state 1.
@@ -625,8 +713,9 @@ fn count_out(w: &mut MobyWorld, id: usize, ctx: &Ctx) {
 fn is_fighter_or_boss(c: i16) -> bool { super::fighters::FIGHTERS_AND_BOSSES.contains(&c) }
 
 /// `0x3fc6c0`: the score — over a ring of four windows of 600 ticks, the damage done, the kills and the health lost,
-/// weighted 1/1..1/4 newest first, then `0.2·damage + kills − 2·health lost` (`+0x6c`). Not ported: the crowd's gasp
-/// when Ratchet is hurt (the level's sound 0x17, `0x367ff0`), the announcer's remarks (`0x401e68`).
+/// weighted 1/1..1/4 newest first, then `0.2·damage + kills − 2·health lost` (`+0x6c`). Before that the announcer's
+/// remarks ([`remark`]) and, Ratchet hurt, the crowd's gasp (the level's sound 0x17 past the split, `0x367ff0(0x17, 0,
+/// 0)`).
 fn score(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let (mut n, mut life) = (0, 0.0);
     for f in group(w, id, pv::ENEMIES) {
@@ -636,6 +725,10 @@ fn score(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         if 0.0 < x.pv_f(0x20) || matches!(x.o_class, 0x09f8 | 0x0a44) { n += 1; }
     }
     let hp = ctx.hero.hp as f32;
+    let m = &w.mobys[id];
+    let (was_life, was_hp, was_n) = (m.pv_f(pv::LIFE), m.pv_f(pv::HEALTH), m.pv_i(pv::ALIVE));
+    remark(w, id, ctx, was_life - life, was_hp - hp, was_n - n);
+    if 0.0 < was_hp - hp { ctx.host.play_level_sound_after(None, 0x17, 0); }
     let m = &mut w.mobys[id];
     let r = (m.pv_s(pv::RING) as usize & 3) * 0x10;
     if n < m.pv_i(pv::ALIVE) { m.set_pv_i(r, m.pv_i(r) + m.pv_i(pv::ALIVE) - n); }
@@ -806,7 +899,7 @@ fn menu_camera(ctx: &mut Ctx) {
 /// fighters pooled, the plates and 0x0b89s down, the resort's music asked for.
 fn leave(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let n = 0x25 + ctx.game.rng.randi(2);
-    say(w, id, n);
+    say(w, id, ctx, n);
     w.mobys[id].set_state(1, -1);
     ctx.switch_chunk(0, w.mobys[id].pv_i(pv::MUSIC_RESORT));
     let m = &w.mobys[id];
@@ -838,11 +931,11 @@ fn leave(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 /// (`0x311738(0, -1)`).
 fn reward(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, n: i32) {
     if n == 0 && wins(ctx.game, 0) == 0 {
-        say(w, id, 7);
+        say(w, id, ctx, 7);
         ctx.game.get_item(super::electrolyzer::ITEM);
     } else {
         let line = match n { 6 => 8, 0xb => 9, _ => 2 + ctx.game.rng.randi(5) };
-        say(w, id, line);
+        say(w, id, ctx, line);
         ctx.game.xp += xp(&ctx.level.arena, ctx.game, n);
         let b = prize(&ctx.level.arena, ctx.game, n);
         w.mobys[id].set_pv_i(pv::PRIZE, b);
@@ -972,6 +1065,17 @@ pub fn update_master(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         6 => {
             // After a win: its screen ([`draw_results`]); ✕ the menu at the next challenge, △ back to the resort.
             if ctx.hero.state != 0x6f { ctx.hero.request_state(0x6f, true); }
+            // Its first tick, the challenge's win not counted: the announcer's line on it (`0x3fb1b0`).
+            let ch = w.mobys[id].pv_s(pv::CHALLENGE) as i32;
+            if w.mobys[id].first() && wins(ctx.game, ch) == 0 {
+                let n = match ch {
+                    0 => Some(10),
+                    1 | 2 | 4 | 5 | 6 | 10 => Some(0xb + ctx.game.rng.randi(2)),
+                    3 => Some(0xd),
+                    _ => None,
+                };
+                if let Some(n) = n { say(w, id, ctx, n); }
+            }
             let m = &w.mobys[id];
             ctx.game.arena_results = Some(Results { first: m.pv_s(pv::SELECTED) == 0 && wins(ctx.game, 0) < 2, prize: m.pv_i(pv::PRIZE) });
             let pressed = ctx.hero.items.pressed;
@@ -1026,6 +1130,10 @@ pub fn update_master(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     ctx.game.arena_hud = fighting.then(|| challenge_hud(w, id, &ctx.level.arena));
     let m = &mut w.mobys[id];
     if m.state_ticks != -1 { m.state_ticks = m.state_ticks.wrapping_add(1); }
+    // `0x3fc4c8`: the remarks' wait (`+0xe4`) counts down.
+    let mut t = m.pv_i(pv::REMARK_WAIT);
+    crate::moby::countdown(&mut t);
+    m.set_pv_i(pv::REMARK_WAIT, t);
 }
 
 /// What the challenge's HUD (`0x3ffee0`) reads from the master.
@@ -1359,9 +1467,14 @@ fn to_middle(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     if let Some((p, _)) = cuboid_at(ctx, w, id, pv::MIDDLE) { ctx.hero.script_walk_to(0.0, p, false); }
 }
 
-/// State 7, `0x3fee58`: the menu — ← / → the challenges open (auto-repeat every 15 ticks, the level sound 3), ✕ the
-/// selected one starts, △ back to the resort. Not ported: the level's sounds 3 / 4 (`0x367f58`).
+/// State 7, `0x3fee58`: the menu — on its first tick the announcer's line 0 or 1 (`0x3fb1b0`); ← / → the challenges
+/// open (auto-repeat every 15 ticks) with the level's sound 3 (`0x367f58(3, 0, 0)`: → when it found one, ← from any but
+/// the first, twice from the second), ✕ the selected one starts (its sound 4), △ back to the resort.
 fn menu(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    if w.mobys[id].first() {
+        let n = ctx.game.rng.randi(2);
+        say(w, id, ctx, n);
+    }
     if ctx.hero.state != 0x6f { ctx.hero.request_state(0x6f, true); }
     let pressed = ctx.hero.items.pressed;
     let held = ctx.hero.items.held;
@@ -1374,6 +1487,8 @@ fn menu(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         if let Some(n) = next.filter(|&n| n != sel) {
             w.mobys[id].set_pv_s(pv::SELECTED, n as i16);
         }
+        let sounds = if right { next.is_some() as usize } else { [0, 2, 1][(sel.clamp(0, 2)) as usize] };
+        for _ in 0..sounds { ctx.host.play_level_sound(None, 3, 0); }
         rep = 0xf;
     } else if rep != 0 {
         rep -= 1;
@@ -1397,6 +1512,7 @@ fn menu(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         m.set_state(8, -1);
         ctx.game.cameras.camera_script2(crate::script_camera::RELEASE_BLEND, ctx.hero);
         ctx.hero.request_state(0, true);
+        ctx.host.play_level_sound(None, 4, 0);
         ctx.game.arena_menu = None;
     } else if pressed & crate::pad::button::SQUARE != 0 {
         // `0x332158(5, 1, 0, 0, 0)`: the vendor (its weapons) with no vendor moby; the menu's draw not this tick.
@@ -1497,7 +1613,7 @@ fn fight(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             // `0x3fc148..0x3fc364`: the wave's bosses (crate::moby::classes::bosses), the announcer's line, the bosses'
             // music.
             if let Some(n) = super::bosses::send_wave_bosses(w, id, ctx, wave.bosses) {
-                say(w, id, n as i32);
+                say(w, id, ctx, n as i32);
                 let m = &w.mobys[id];
                 ctx.host.music_request(m.pv_i(pv::MUSIC_BOSS), m.pv_i(pv::STINGER_BOSS));
             }
@@ -1516,6 +1632,7 @@ fn fight(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         0xd => { ctx.hero.items.ask(ctx.game.held, 10); }
         _ => {}
     }
+    boss_remarks(w, id, ctx);
     if ctx.game.frame & 3 == 0 { deal_turns(w, id, ctx); }
     keep_in(w, id, ctx);
 }
@@ -1545,7 +1662,7 @@ pub fn column_set(w: &mut MobyWorld, id: usize, on: bool) { w.mobys[id].set_pv_s
 /// 0x0b89 (`0x403620`): a flame column in the floor. Off (1) it waits; on, after its rest it warns (2: its glow
 /// flashes twice, 60 ticks apart) and burns (3) for 60 ticks — in view, Ratchet within 4 is hit for `+0x14` on the
 /// column's line (its reach 1 at the floor, 0.5 at its top), else what is at its foot; two rising puffs a tick (the
-/// exhaust puffs) — then rests again. Not ported: the level's looped sound 0x11 while it burns (`0x367ff0`).
+/// exhaust puffs) and its hum (the level's looped sound 0x11) — then rests again (the hum stopped).
 pub fn update_column(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let m = &mut w.mobys[id];
     m.rows = rows_of(m.rot);
@@ -1615,6 +1732,13 @@ pub fn update_column(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             let mut t = m.pv_s(0x32) as i32;
             crate::moby::countdown(&mut t);
             m.set_pv_s(0x32, t as i16);
+            // Its hum: the level's looped sound 0x11 past the split (`0x367ff0(0x11, 4, m)`) unless its slot `+0x36` still
+            // plays it (`0x367ab0`).
+            let h = m.pv_s(0x36) as i32;
+            if !(0 <= h && ctx.host.sound_playing(h)) {
+                let k = ctx.host.play_level_sound_after(Some(&w.mobys[id]), 0x11, 4);
+                w.mobys[id].set_pv_s(0x36, k as i16);
+            }
             return;
         }
         _ => return,

@@ -469,6 +469,16 @@ pub trait MobyHost {
     /// The low bytes of the current and the pending music track (`0x1a63f0`, `0x1a63e4`; 0xff none); None without
     /// the audio.
     fn music_tracks(&self) -> Option<(u8, u8)> { None }
+    /// `0x367f58(index, flags, moby)`: the level sound table's def `index` below its split (crate::audio::level_sounds),
+    /// on moby `m` (None: at the listener, 2-D); the slot or −1.
+    fn play_level_sound(&mut self, _m: Option<&Moby>, _index: i32, _flags: u8) -> i32 { -1 }
+    /// `0x367ff0(index, flags, moby)`: def split + `index` of the table.
+    fn play_level_sound_after(&mut self, _m: Option<&Moby>, _index: i32, _flags: u8) -> i32 { -1 }
+    /// The dialogue is free (`0x1a6410` = 0, `0x1a63cc` = −1; crate::audio::speech); without the audio always.
+    fn speech_free(&self) -> bool { true }
+    /// `0x1a63cc = id` when the dialogue is free (crate::audio::speech); whether it was taken (without the audio
+    /// always, as if said).
+    fn request_speech(&mut self, _id: i32) -> bool { true }
 }
 
 /// The level's mobys (`0x1b1e1c`, 0x100 bytes each) with the class table and the collision grid.
