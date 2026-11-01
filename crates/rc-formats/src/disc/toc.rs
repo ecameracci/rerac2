@@ -39,10 +39,14 @@ pub enum PictureTable {
     /// The Skill Points page's (`0x14d920` in the `BONUS` header, a row per point: the panel `0x284ad8`, flags
     /// 0x10221).
     SkillPoints,
+    /// The Movies page's (`0x14d7f0` in the `BONUS` header, a row per page row: the panel `0x284c70`) and its movie
+    /// list's (`0x14d818`, a row per movie: the panel `0x284e08`), as the Skill Points page's.
+    Movies,
+    MovieList,
 }
 
 impl PictureTable {
-    pub const ALL: [PictureTable; 10] = [
+    pub const ALL: [PictureTable; 12] = [
         PictureTable::Gadgets,
         PictureTable::Weapons,
         PictureTable::Items,
@@ -53,6 +57,8 @@ impl PictureTable {
         PictureTable::ControlsRight,
         PictureTable::Galaxy,
         PictureTable::SkillPoints,
+        PictureTable::Movies,
+        PictureTable::MovieList,
     ];
 
     fn table(self) -> (usize, usize) {
@@ -67,14 +73,19 @@ impl PictureTable {
             PictureTable::ControlsRight => (0xa90, 5),
             PictureTable::Galaxy => (0x10a8, 28),
             PictureTable::SkillPoints => (0x808, 30),
+            PictureTable::Movies => (0x6d8, 5),
+            PictureTable::MovieList => (0x700, 33),
         }
     }
 
     /// The global WAD holding the table and its pictures.
-    pub fn global(self) -> Global { if self == PictureTable::SkillPoints { Global::Bonus } else { Global::Hud } }
+    pub fn global(self) -> Global { if self.bonus() { Global::Bonus } else { Global::Hud } }
+
+    /// The tables in `BONUS.WAD`'s header (the Specials Menu's pages).
+    fn bonus(self) -> bool { matches!(self, PictureTable::SkillPoints | PictureTable::Movies | PictureTable::MovieList) }
 
     /// The file of [`PictureTable::global`].
-    pub fn file(self) -> &'static str { if self == PictureTable::SkillPoints { "G/BONUS.WAD" } else { "G/HUD.WAD" } }
+    pub fn file(self) -> &'static str { if self.bonus() { "G/BONUS.WAD" } else { "G/HUD.WAD" } }
 
     /// The pictures' height (their panel's `+0x3c`; all are 256 wide).
     pub fn height(self) -> u32 {

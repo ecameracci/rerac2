@@ -8,6 +8,7 @@ pub mod audio;
 pub mod camera;
 pub mod cameras;
 pub mod canopy;
+pub mod cheats;
 pub mod collision;
 pub mod front_end;
 pub mod exhaust;

@@ -1007,6 +1007,8 @@ pub fn update_master(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let fighting = w.mobys[id].state == 8;
     ctx.game.arena_wipe = None;
     ctx.game.arena_results = None;
+    // `0x1a9010`: set on every tick, cleared at the desk (state 1); the lava's electric death reads it.
+    ctx.game.arena_on = w.mobys[id].state != 1;
     match w.mobys[id].state {
         0 => {
             reset_master(w, id);

@@ -133,9 +133,9 @@ impl Hero {
                 if self.prev_state == 0x38 || self.prev2_state == 0x38 || self.hp == 0 {
                     self.hot_hops += 1;
                     if 2 < self.hot_hops || self.hp == 0 {
-                        // The third hop in a row, or no health left: the death (0x79 for a body that can burn; the
-                        // electric 0x7d on level 2 is not ported).
-                        return Entry::Return(self.set_state(anim, env, 0x39, true));
+                        // The third hop in a row, or no health left: the lava's death.
+                        let id = self.lava_death(env, anim);
+                        return Entry::Return(self.set_state(anim, env, id, true));
                     }
                 } else {
                     self.hot_hops = 0;

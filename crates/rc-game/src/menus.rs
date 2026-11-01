@@ -178,6 +178,9 @@ pub enum Page {
     Special,
     SkillPoints,
     Cheats,
+    /// The Specials Menu's Movies page (`0x284b40`) and its list of the game's movies (`0x284cd8`) ([`special`]).
+    Movies,
+    MovieList,
 }
 
 /// The Help pages' item list (`+0x3c480`: `0x43a188` / `0x43a6d0` / `0x43a820`; its list `+0x2c8`: `0x439e98` /
@@ -662,6 +665,11 @@ pub enum Out {
     Resume,
     /// In the game: Quit Game was answered yes (back to the front end).
     Quit,
+    /// The Cheats page toggled cheat byte `cheat` (`0x1a7a48 + cheat`, crate::cheats): the game's copy follows.
+    Cheat { cheat: usize, on: bool },
+    /// The Movies pages' ✕: movie `id` queued (`0x2f4ee8(0x1bef40, id)`), the queue started after the frame's last
+    /// (`0x2f5030`, crate::scene).
+    Movie(i32),
 }
 
 /// Mode 4, kind 1 (`0x286270(1, page)`): the card dialog in front of a page.
@@ -736,6 +744,9 @@ pub struct Menus {
     special_row: usize,
     skill_row: usize,
     cheat_row: usize,
+    /// The Movies page's row (`gp−0x326c`) and its list's (`gp−0x3250`).
+    movie_row: usize,
+    movie_list_row: usize,
     /// The buttons held last frame (the Skill Points page's arrows light while ↑ / ↓ are held).
     held: u16,
 }
@@ -803,6 +814,8 @@ impl Menus {
             special_row: 0,
             skill_row: 0,
             cheat_row: 0,
+            movie_row: 0,
+            movie_list_row: 0,
             held: 0,
         }
     }
@@ -824,7 +837,8 @@ impl Menus {
                 Page::Pause => None,
                 Page::PauseOptions | Page::Port | Page::Weapons | Page::Gadgets | Page::Items | Page::Help | Page::Special => Some(Page::Pause),
                 Page::HelpTopic(_) => Some(Page::Help),
-                Page::SkillPoints | Page::Cheats => Some(Page::Special),
+                Page::SkillPoints | Page::Cheats | Page::Movies => Some(Page::Special),
+                Page::MovieList => Some(Page::Movies),
                 _ => Some(Page::PauseOptions),
             }
         } else {
@@ -951,6 +965,8 @@ impl Menus {
                 self.description_tick(special::skill_description(self.skill_row, cx.save), special::skill::DESCRIPTION[3], cx.held);
             }
             Page::Cheats => self.cheats_tick(pressed, cx, &mut out),
+            Page::Movies => self.movies_tick(pressed, cx, &mut out),
+            Page::MovieList => self.movie_list_tick(pressed, cx, &mut out),
         }
         self.held = cx.held;
         out
@@ -1324,6 +1340,8 @@ impl Menus {
                 Some((table, u16::try_from(record(v.tables, v.save, item)?.picture).ok()?))
             }
             Page::SkillPoints => special::skill_picture(self.skill_row, v.save),
+            Page::Movies => special::movies_picture(self.movie_row, v.tables, v.save),
+            Page::MovieList => special::movie_list_picture(self.movie_list_row, v.save),
             _ => None,
         }
     }
@@ -1944,6 +1962,8 @@ impl Menus {
             Page::Special => return self.draw_special(out, a, v, icon),
             Page::SkillPoints => return self.draw_skill_points(out, a, v),
             Page::Cheats => return self.draw_cheats(out, a, v),
+            Page::Movies => return self.draw_movies(out, a, v),
+            Page::MovieList => return self.draw_movie_list(out, a, v),
             Page::Quit => {
                 self.draw_pause_options(out, a, icon);
                 gui::fill(out, [0, 0, 0, 0x30]);
@@ -1974,7 +1994,7 @@ impl Menus {
                 self.draw_planet(out, a, card);
                 self.draw_message(out, a, card);
             }
-            Page::Options | Page::Toggle(_) | Page::Port | Page::Pause | Page::PauseOptions | Page::Quit | Page::Sound | Page::Camera | Page::Controls | Page::Weapons | Page::Gadgets | Page::Items | Page::Help | Page::HelpTopic(_) | Page::Special | Page::SkillPoints | Page::Cheats => {}
+            Page::Options | Page::Toggle(_) | Page::Port | Page::Pause | Page::PauseOptions | Page::Quit | Page::Sound | Page::Camera | Page::Controls | Page::Weapons | Page::Gadgets | Page::Items | Page::Help | Page::HelpTopic(_) | Page::Special | Page::SkillPoints | Page::Cheats | Page::Movies | Page::MovieList => {}
         }
     }
 

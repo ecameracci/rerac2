@@ -245,7 +245,7 @@ impl FrontEnd {
                             menus::Out::NewGame => self.start_intro(),
                             menus::Out::Loaded { level } => req.push(Request::Load { level }),
                             menus::Out::Port(s, v) => req.push(Request::Port(s, v)),
-                            menus::Out::Resume | menus::Out::Quit | menus::Out::Equip { .. } => {}
+                            menus::Out::Resume | menus::Out::Quit | menus::Out::Equip { .. } | menus::Out::Cheat { .. } | menus::Out::Movie(_) => {}
                         }
                     }
                 }

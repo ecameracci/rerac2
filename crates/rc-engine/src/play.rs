@@ -13,7 +13,7 @@
 //!
 //! Environment: `RC_PLAY=0` (no tick), `RC_PLAY_FLY=1` (start on the fly camera; Tab switches), `RC_PLAY_TRACE=1`
 //! (one line per tick: state, position, velocity, air ticks, sequence), `RC_SCENES=0` (the scenes count as seen),
-//! `RC_HERO_AT=x,y,z,yaw` (Ratchet's start), `RC_GRAVITY_AT=x,y,z` (the gravity frames pinned on about a centre), `RC_GIVE_ITEMS=a,b,…` (the items had, the last in the hand).
+//! `RC_HERO_AT=x,y,z,yaw` (Ratchet's start), `RC_GRAVITY_AT=x,y,z` (the gravity frames pinned on about a centre), `RC_GIVE_ITEMS=a,b,…` (the items had, the last in the hand), `RC_CHEATS=a,b,…` (those cheat bytes on).
 
 use crate::game_camera::CameraSource;
 use crate::input_map::{self, PadFrame, Script};
@@ -83,7 +83,8 @@ fn pause_tick(
 ) {
     let Some(mut play) = play else { return };
     let p = &mut *play;
-    if p.pause.is_none() { return; }
+    // A movie the Movies pages started plays with the pause waiting under it (back on its page after, `0x1fecc0`).
+    if p.pause.is_none() || movie_over_pause(p) { return; }
     let Some(mut card) = card else {
         p.pause = None;
         return;
@@ -98,6 +99,7 @@ fn pause_tick(
     let outs = m.tick((p.pad.pressed & 0xffff) as u16, &mut cx);
 
     use rc_game::menus::Out;
+    let mut movies = false;
     for o in outs {
         match o {
             Out::Resume | Out::MainMenu | Out::Close => p.pause = None,
@@ -125,8 +127,19 @@ fn pause_tick(
             Out::Equip { .. } => {}
             // The pages' sounds (`0x360750(n, 0, 0)`: [`level_sounds`]).
             Out::Sound(n) => p.game.level_sounds.push(n as i32),
+            // The Cheats page's toggle: the game's byte (a body re-dresses Ratchet: crate::armour_dress).
+            Out::Cheat { cheat, on } => p.game.set_cheat(cheat, on),
+            // The Movies pages' ✕: the movies queued (`0x2f4ee8`), then started (`0x2f5030`) below.
+            Out::Movie(id) => movies |= p.game.scenes.queue.push(id),
         }
     }
+    if movies { p.game.scenes.start_queue(p.hero.hp); }
+}
+
+/// A movie asked for or playing while the pause is open (the Movies pages'): the pause's pages wait.
+fn movie_over_pause(p: &Play) -> bool {
+    let s = &p.game.scenes;
+    p.pause.is_some() && (s.mode == rc_game::scene::MOVIE || s.pending == rc_game::scene::MOVIE)
 }
 
 /// The quick select's screen and ring for a frame (`0x2f84e8`, then the ring's part of `0x443c08`): the item it asks
@@ -343,6 +356,10 @@ fn tick(
         let dev = fresh && !DEV_START.swap(true, std::sync::atomic::Ordering::Relaxed);
         // `RC_SCENES=0`: every scene counts as seen (no opening, no scene triggers' scenes).
         if dev && std::env::var("RC_SCENES").is_ok_and(|v| v.trim() == "0") { p.game.scenes_seen.iter_mut().for_each(|s| *s = true); }
+        // `RC_CHEATS=a,b,…`: those cheat bytes on (rc_game::cheats).
+        if let Some(v) = std::env::var("RC_CHEATS").ok().filter(|_| dev) {
+            for b in v.split(',').filter_map(|x| x.trim().parse::<usize>().ok()) { p.game.set_cheat(b, true); }
+        }
         // `RC_GIVE_ITEMS=a,b,…` (crate::debug_hud's repro line): the items had, their ammo full, the last in the hand.
         if let Some(v) = std::env::var("RC_GIVE_ITEMS").ok().filter(|_| dev) {
             let items: Vec<i32> = v.split(',').filter_map(|x| x.trim().parse().ok()).collect();
@@ -483,9 +500,11 @@ fn tick(
         None if *source == CameraSource::Play => frame.0,
         None => rc_game::pad::PadInput::neutral(),
     };
-    p.pad.update(Some(&input.bytes()), false);
+    // The mirror cheat (byte 4, rc_game::cheats): the sticks' x and ← / → swapped (`0x3306b0`).
+    p.pad.update(Some(&input.bytes()), p.game.cheat(rc_game::cheats::cheat::MIRROR));
     // The pause: the game stops while its pages run ([`pause_tick`]); the frame count goes on (the pad script reads it).
-    if p.pause.is_some() {
+    // A movie its Movies pages started plays (the movie mode below) with the pause waiting.
+    if p.pause.is_some() && !movie_over_pause(p) {
         p.ticks += 1;
         return;
     }
@@ -696,7 +715,7 @@ fn tick(
         }
         let env = Env {
             coll, pad: &p.pad, cam_yaw: p.camera.yaw(), cam_pos: p.camera.pos, cam_rows: p.camera.rows, mirror: false, scene: scene.as_ref(), hero_moby: mobys.hero_moby, targets: &targets, hit, death_z,
-            clank: p.game.clank, pack: p.game.pack(), boots: p.game.boots, charge_boots: p.game.charge_boots, grind_boots: p.game.grind_boots, rails: &mobys.rails, level: p.game.level, classes: &classes, nodes: &nodes, hooks: &hooks, pulls: &pulls,
+            clank: p.game.clank, pack: p.game.pack(), boots: p.game.boots, charge_boots: p.game.charge_boots, grind_boots: p.game.grind_boots, rails: &mobys.rails, level: p.game.level, arena_on: p.game.arena_on, classes: &classes, nodes: &nodes, hooks: &hooks, pulls: &pulls,
         };
         let before = rc_game::hero::anim::AnimCtl::view(&p.anim.ctl(class));
         let mut ctl = p.anim.ctl(class);
@@ -1163,6 +1182,8 @@ fn mode_changes(p: &mut Play, lv: &mut crate::level_load::LoadedLevel) {
             rc_game::scene::Change::StartScene(id) => start_scene(p, lv, id),
             rc_game::scene::Change::StartMovie(id) => {
                 println!("play: movie {id:#x}");
+                let g = &mut p.game;
+                g.scenes.start_movie(id, &mut g.scenes_seen);
                 p.movie_started = true;
                 p.movie = Some(crate::front_end::Playing::level(id as u32, rc_formats::disc::scene::record_of(id) as usize));
             }
@@ -2123,7 +2144,7 @@ fn draw_hud(
         rc_game::moby::classes::arena::draw_wipe(h, hud.fx.get(&rc_game::moby::classes::arena::WIPE_FX).map(|&(i, _)| i), &mut quads);
     }
     if let Some(pic) = p.movie_picture.take() { hud.layer.write(&mut images, crate::front_end::MOVIE, &pic); }
-    if let (Some(m), Some(c)) = (p.pause.as_ref(), card.as_deref()) {
+    if let (Some(m), Some(c), false) = (p.pause.as_ref(), card.as_deref(), movie_over_pause(p)) {
         // The page loop's picture (`0x2ccc18`): the stopped game darkened, then the pages.
         rc_game::gui::fill(&mut quads, [0, 0, 0, 0x38]);
         let port = crate::port_options::values(&gfx, &display);

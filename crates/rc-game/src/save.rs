@@ -10,7 +10,7 @@
 //! 2, the Gravity Boots 0x13, the Grind Boots 0x14, the Charge Boots 0x36) and their "ever had" copy `0x1a7b38`; the
 //! ammo `0x139688` (0xe0); the quick-select list `0x139948` (0x70); the hand item `0x1a7398`; the quick select's slots `0x1a73b8` (8 items); the scenes seen
 //! `0x139768` (0x100: scene `n` is bit `n & 31` of the word at byte `n & !3`, as the scene code indexes it); the save
-//! clock `0x1a7360` (8 bytes, BCD); the skill points `0x1a7a68` (chunk 8, 0x20); and others not typed yet.
+//! clock `0x1a7360` (8 bytes, BCD); the skill points `0x1a7a68` (chunk 8, 0x20); the cheats `0x1a7a48` (chunk 7); and others not typed yet.
 //! **Level chunks** (boot `0x2562e8`, 10 per level, at `addr + level·size`): visited `0x1a7bf0` (1), the map mask
 //! `0x18d278` (0x800), the missions `0x19b2e8` (0x10), the uid bits `0x19b4a8` (0x400), and six not typed yet.
 
@@ -171,6 +171,8 @@ mod at {
     pub const PLATINUM: u32 = 0x19b278;
     /// The skill points, one byte each (chunk 8, 0x20 bytes; crate::skill_points).
     pub const SKILL_POINTS: u32 = 0x1a7a68;
+    /// The cheats, one byte each (chunk 7; crate::cheats).
+    pub const CHEATS: u32 = 0x1a7a48;
     /// The planets unlocked (`0x322730`), one byte per level (crate::travel).
     pub const PLANETS: u32 = 0x1a7bd0;
     pub const PLANETS_LEN: usize = 0x1c;
@@ -221,6 +223,7 @@ impl GameState {
         s.set_u8(G, at::PLATINUM_SPENT, self.platinum_spent);
         if let Some(b) = s.bytes_mut(G, at::PLATINUM, self.platinum.len()) { b.copy_from_slice(&self.platinum); }
         if let Some(b) = s.bytes_mut(G, at::SKILL_POINTS, self.skill_points.len()) { b.copy_from_slice(&self.skill_points); }
+        if let Some(b) = s.bytes_mut(G, at::CHEATS, self.cheats.len()) { b.copy_from_slice(&self.cheats); }
         for (n, &seen) in self.scenes_seen.iter().enumerate() {
             let (w, bit) = scene_bit(n);
             let v = s.i32(G, w) as u32;
@@ -286,6 +289,7 @@ impl GameState {
         self.platinum_spent = s.u8(G, at::PLATINUM_SPENT);
         if let Some(b) = s.bytes(G, at::PLATINUM, self.platinum.len()) { self.platinum.copy_from_slice(b); }
         if let Some(b) = s.bytes(G, at::SKILL_POINTS, self.skill_points.len()) { self.skill_points.copy_from_slice(b); }
+        if let Some(b) = s.bytes(G, at::CHEATS, self.cheats.len()) { self.cheats.copy_from_slice(b); }
         for n in 0..self.scenes_seen.len() {
             let (w, bit) = scene_bit(n);
             self.scenes_seen[n] = s.i32(G, w) as u32 & bit != 0;

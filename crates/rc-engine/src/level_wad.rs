@@ -24,13 +24,20 @@ fn attach_ratchet(root: &Path, core: &level::LevelCore, mobys: &mut crate::moby_
     attach_armour_row(root, core, mobys, textures, 0, armor)
 }
 
-/// Armour row `row`'s mesh and textures into class `o_class` ([`attach_ratchet`]).
-fn attach_armour_row(root: &Path, core: &level::LevelCore, mobys: &mut crate::moby_render::LevelMobys, textures: &mut Vec<texture::LevelTexture>, o_class: i32, row: usize) -> Result<()> {
+/// Armour row `row` of `G/ARMOR.WAD` (`RC2.HDR`'s table): its mesh and textures (crate::armour_dress re-dresses with
+/// it).
+pub(crate) fn read_armour(root: &Path, row: usize) -> Result<rc_formats::disc::armor::Armor> {
     use rc_formats::disc::{armor as ar, toc::Toc};
     let hdr = crate::disc_source::read(root, "RC2.HDR")?;
     let parts = ar::armors(&Toc::parse(&hdr)?)?;
     let part = *parts.get(row).with_context(|| format!("no armour row {row}"))?;
-    let a = ar::read(&crate::disc_source::read(root, "G/ARMOR.WAD")?, part)?;
+    Ok(ar::read(&crate::disc_source::read(root, "G/ARMOR.WAD")?, part)?)
+}
+
+/// Armour row `row`'s mesh and textures into class `o_class` ([`attach_ratchet`]; the level starts in row 0, the body
+/// the game asks for is put on by crate::armour_dress).
+fn attach_armour_row(root: &Path, core: &level::LevelCore, mobys: &mut crate::moby_render::LevelMobys, textures: &mut Vec<texture::LevelTexture>, o_class: i32, row: usize) -> Result<()> {
+    let a = read_armour(root, row)?;
     let class = mobys.classes.iter_mut().find(|c| c.o_class == o_class).with_context(|| format!("no class {o_class} in the level"))?;
     rc_formats::moby::attach_packets(&mut class.class, &a.mesh)?;
     let base = core.moby_textures.len().max(textures.iter().filter(|t| t.table == texture::TextureTable::Moby).map(|t| t.index + 1).max().unwrap_or(0));

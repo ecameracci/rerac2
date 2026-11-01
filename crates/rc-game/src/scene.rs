@@ -26,7 +26,7 @@
 //!
 //! Not ported: the speech (`0x32ea38`, the scene's audio start), the music pause and resume, the subtitles' other
 //! languages, the attract-mode list (`0x1bef40` word 0), the end's teleport (`0x1bca86`) and callback (`0x1a8fd0`),
-//! the mirror cheat's camera, the scene lighting and shadows of the actors, the modes 3..9.
+//! the scene lighting and shadows of the actors, the modes 3..9.
 
 use crate::hero::physics::*;
 use rc_formats::scene::{Scene, Subtitle};
@@ -288,6 +288,13 @@ impl Scenes {
         self.letterbox = self.space.is_none();
         self.bars = if self.space.is_none() { 0x34 } else { 0 };
         self.player = Some(Player { id, scene, tick: 0, chunk_tick: 0, chunk: 0, done: false, actors });
+    }
+
+    /// `0x371bd8`, a movie's start: its id marked seen (below 0xb1, the scene bits `0x139768`: the pause's movie list
+    /// reads them), and the chain's rest (`0x2f4f80`).
+    pub fn start_movie(&self, id: i32, seen: &mut [bool]) {
+        if (0..0xb1).contains(&id) { if let Some(s) = seen.get_mut(id as usize) { *s = true; } }
+        self.queue.mark_seen(seen);
     }
 
     /// `0x371bd8`'s end: the movie over (or skipped), the chain's next, else back.

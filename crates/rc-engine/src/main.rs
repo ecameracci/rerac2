@@ -76,6 +76,8 @@ mod tfrag_render;
 mod tie_lod;
 mod tie_render;
 mod aa_blit;
+mod armour_dress;
+mod mirror_render;
 mod world_lights;
 
 use bevy::core_pipeline::tonemapping::{DebandDither, Tonemapping};
@@ -173,6 +175,8 @@ fn main() -> anyhow::Result<()> {
     .add_plugins(overlay_mobys::OverlayPlugin)
     .add_plugins(world_screen::WorldScreenPlugin)
     .add_plugins(aa_blit::AaBlitPlugin)
+    .add_plugins(mirror_render::MirrorRenderPlugin)
+    .add_plugins(armour_dress::ArmourDressPlugin)
     // Sound slots, 989snd, music and the software SPU2 mixed per game tick (crate::audio_out; RC_AUDIO=0 off).
     .add_plugins(audio_out::AudioOutPlugin::new(level.audio.take()))
     // The GS frame clear: level settings +0x00..+0x08 via `set_background_color` (game_camera::level_background).

@@ -194,6 +194,8 @@ pub struct GameState {
     pub store_left: i32,
     /// `0x1a7a68`: the skill points, one byte each (crate::skill_points).
     pub skill_points: [u8; crate::skill_points::LEN],
+    /// `0x1a7a48`: the cheats, one byte each (crate::cheats).
+    pub cheats: [u8; crate::cheats::LEN],
     /// `0x1a7b70`: the vendor's stock (crate::vendor: 32 slots, 0xff free, the item | 0x40 when owned as it went
     /// in); `0x1a7a12`: the challenge mode; `0x1a7a28`: the R&C1 save's weapons found (bits 0..4), for Barlow's
     /// Gadgetron vendor.
@@ -236,6 +238,9 @@ pub struct GameState {
     pub arena_wipe: Option<i16>,
     /// The arena's win screen this tick (crate::moby::classes::arena::draw_results).
     pub arena_results: Option<crate::moby::classes::arena::Results>,
+    /// `0x1a9010`: the arena master away from its desk state (set every tick it updates, cleared in state 1): on level
+    /// 2 the lava kills with the electric death 0x7d (crate::hero::damage).
+    pub arena_on: bool,
     /// `$gp+0x3ff0` / `+0x3ff4`: the screen's fades to black and to white (the frame's draw `0x2e9b68` covers the
     /// screen at `ftoi(fade × 128)` over everything, a fade past 1 held at 1; crate::gui::fill).
     pub fade_black: f32,
@@ -260,9 +265,9 @@ impl Default for GameState {
             bolts: 0, raritanium: 0, max_health: 4, level: 0, occlusion: 0, crate_sound_frame: -100, pickup_sound_frame: -100, level_sounds: Vec::new(), bolt_bank: 0, xp_bank: 0, xp: 0, uid_bits: vec![0; 0x400],
             show_bolts: None, show_health: None, rng: Default::default(), recent_breaks: 0, last_break_frame: -1000, frame: 0,
             clank: false, thruster: false, boots: false, charge_boots: false, grind_boots: false, nanotech: [false; 10], level_xp: [0; 2], death_z: None, boss_bar: None, boss_icon: 0, shadow: Default::default(), water_base: 0.0, water_z: 0.0, water_scroll: [[0.0; 2]; 2], water_cam: [0.0; 3], missions: vec![0; 0x200], mission_area: 0, cam_tweaks: Default::default(), shakes: Default::default(), uid_pending: vec![0; 0x800], uid_dead: vec![0; 0x800], mission_table: vec![0; 0x100],
-            mission_xp: vec![0; 0x30], mission_bolts: vec![0; 0x30], checkpoint: None, checkpoint_bits: Vec::new(), last_checkpoint: None, messages: Vec::new(), help_state: 0, help_req: None, help_counts: vec![0; 0x100], help_shift: 0, help_shift_ticks: 0, help_aux: vec![0; 0x100], help_last: vec![0; 0x100], help_levels: vec![0; 0x100], help_queue: Vec::new(), hint_flags: [0; 3], no_item_area: false, variant: 0, chunk_request: None, items: vec![0; 0x40], quick_select: vec![0; 28], planets: vec![0; 0x1c], travel: Default::default(), ring: [0; 8], ammo: vec![0; 0x50], held: 0, wrench_out: false, trail_phase: 0.0, view_far: 1024.0, sky: Default::default(), markers: Vec::new(), scenes_seen: vec![false; 0x100], scenes: Default::default(), cameras: Default::default(), ship_parts: Vec::new(), underwater: false, fog: Default::default(), fog_flash: Default::default(), area_ask: Vec::new(), area_hero: Vec::new(), next_level: None, next_level_save: false, bolt_help_done: false, space_bolts: 0, space_bolts_shown: 0, rider_hits: 0, store_left: 0, skill_points: [0; crate::skill_points::LEN], play_time: 0, visited: vec![0; 0x1c], puzzle: Default::default(),
+            mission_xp: vec![0; 0x30], mission_bolts: vec![0; 0x30], checkpoint: None, checkpoint_bits: Vec::new(), last_checkpoint: None, messages: Vec::new(), help_state: 0, help_req: None, help_counts: vec![0; 0x100], help_shift: 0, help_shift_ticks: 0, help_aux: vec![0; 0x100], help_last: vec![0; 0x100], help_levels: vec![0; 0x100], help_queue: Vec::new(), hint_flags: [0; 3], no_item_area: false, variant: 0, chunk_request: None, items: vec![0; 0x40], quick_select: vec![0; 28], planets: vec![0; 0x1c], travel: Default::default(), ring: [0; 8], ammo: vec![0; 0x50], held: 0, wrench_out: false, trail_phase: 0.0, view_far: 1024.0, sky: Default::default(), markers: Vec::new(), scenes_seen: vec![false; 0x100], scenes: Default::default(), cameras: Default::default(), ship_parts: Vec::new(), underwater: false, fog: Default::default(), fog_flash: Default::default(), area_ask: Vec::new(), area_hero: Vec::new(), next_level: None, next_level_save: false, bolt_help_done: false, space_bolts: 0, space_bolts_shown: 0, rider_hits: 0, store_left: 0, skill_points: [0; crate::skill_points::LEN], cheats: [0; crate::cheats::LEN], play_time: 0, visited: vec![0; 0x1c], puzzle: Default::default(),
             stock: [0xff; crate::vendor::STOCK_SLOTS], challenge: false, rac1_weapons: 0, vendor_open: None, vendor_virtual: None, vendor_phase: [0.0; 3], vendor_beam: [0.0; 2], prompt: Default::default(),
-            armor: 0, armor_offer: 0, mods_available: [0; 0x38], mods_bought: [0; 0x38], platinum_spent: 0, platinum_found: 0, platinum: vec![0; 0x70], flags: vec![0; FLAGS_LEN], arena_menu: None, arena_hud: None, arena_wipe: None, arena_results: None, fade_black: 0.0, fade_white: 0.0, screen_callback: None,
+            armor: 0, armor_offer: 0, mods_available: [0; 0x38], mods_bought: [0; 0x38], platinum_spent: 0, platinum_found: 0, platinum: vec![0; 0x70], flags: vec![0; FLAGS_LEN], arena_menu: None, arena_hud: None, arena_wipe: None, arena_results: None, arena_on: false, fade_black: 0.0, fade_white: 0.0, screen_callback: None,
         }
     }
 }
@@ -334,6 +339,7 @@ impl GameState {
             platinum_found: old.platinum_found,
             platinum: old.platinum,
             skill_points: old.skill_points,
+            cheats: old.cheats,
             ..Default::default()
         };
         // The level start (`0x2a3b88`): visited.

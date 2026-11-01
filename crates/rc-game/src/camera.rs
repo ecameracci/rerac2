@@ -30,10 +30,12 @@
 //!
 //! **Not ported**: the body cameras (Giant Clank's branch of `0x4239d0`: the hero is never Giant Clank yet), the focus
 //! mobys `0x1b8e84` / `0x18b270` (nothing sets them on Aranos), the stick auto-centre (`$gp+0x2540` is 0 on the disc),
-//! the water settle (D+0x14e), the knock-down view (state 0x74, mode 11), the camera's own shift `0x1b8fc0`, the
-//! underwater test `0x2d9a58`, the magnetic walkway's branch of `0x4227b8` (the gravity frames' is ported: crate::gravity); the other camera classes (first person `0x427bf8` needs Ratchet's camera mode 4 / 0x51,
-//! script 5, 6, the Swingshot's 7, 0x1b), the blends between cameras (`0x2d8168` / `0x2d8ab0` / `0x2d9488`) and the
-//! FOV blend `0x2d7b70`. The shakes are [`Shakes`] (set by the Gravity Bomb's blast; the blast `0x320538` and the
+//! the knock-down view (state 0x74, mode 11), the camera's own shift `0x1b8fc0`, the magnetic walkway's branch of
+//! `0x4227b8` (the gravity frames' is ported: crate::gravity) and the settle after the walkway and the frames (D+0x14e:
+//! 15 ticks of re-blending once `0x18a168` / `0x1a8ff0` go off; not the water's); the other camera classes (first
+//! person `0x427bf8` needs Ratchet's camera mode 4 / 0x51, script 5, 6, the Swingshot's 7, 0x1b), the blends between
+//! cameras (`0x2d8168` / `0x2d8ab0` / `0x2d9488`) and the FOV blend `0x2d7b70`. The underwater test `0x2d9a58` is
+//! crate::fog's. The shakes are [`Shakes`] (set by the Gravity Bomb's blast; the blast `0x320538` and the
 //! others that ask for one are not ported).
 
 use crate::hero::physics::{add, dot, len, scale, sub, V3};
@@ -1001,7 +1003,7 @@ impl FollowCamera {
         if h.gravity.on {
             // The frames (`0x1a8ff0`; the walkway's `0x18a168` is not ported here): the look from the smoothed target,
             // the blend's length 15, the vertical target the target's part along the up (D+0x80 too). Its countdown
-            // D+0x14e (the water settle's) and the raise's restart `0x422098` are not ported.
+            // D+0x14e (the settle once they go off) and the raise's restart `0x422098` are not ported.
             self.look_from_s = 1;
             self.look_blend_len = 0xf;
             self.vtarget = scale(up2, dot(self.target, up2));

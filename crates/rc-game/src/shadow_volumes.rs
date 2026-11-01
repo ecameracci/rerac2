@@ -16,8 +16,9 @@
 //! at `up·pos + off`, `±t` about it (crate `rc-engine` `shadow_render` takes them with the posed proxy); `t ≤ 0` = no
 //! shadow. Every probe is the line test with flags 0x22 (no moby primitives, not the water).
 //!
-//! The gravity frames (`0x1a8ff0`, crate::gravity) switch the probes to their up-row branch. Not ported: the water
-//! and liquid heights Ratchet's slab also seeds from (`0x18a150` / `0x18a154`, G-HERO-001).
+//! The gravity frames (`0x1a8ff0`, crate::gravity) switch the probes to their up-row branch. Ratchet's slab seeds
+//! from the ground under him, else the liquid's or the quicksand's surface the ground probe last found (`0x18a150` /
+//! `0x18a154`; Oozla's swamp is quicksand).
 
 pub mod volume;
 
@@ -127,7 +128,10 @@ pub fn probe_near(w: &mut crate::moby::MobyWorld, id: usize, ctx: &crate::moby::
 pub fn hero_pass(w: &mut crate::moby::MobyWorld, ctx: &mut crate::moby::Ctx) {
     let Some(id) = ctx.hero_moby.filter(|&i| i < w.mobys.len()) else { return };
     let h = &*ctx.hero;
-    let input = HeroIn { group: h.group, state: h.state, body: h.mode, air_ticks: h.air_ticks, ground_z: h.ground_z };
+    let input = HeroIn {
+        group: h.group, state: h.state, body: h.mode, air_ticks: h.air_ticks, ground_z: h.ground_z, water_z: h.surf.water_z,
+        sand_z: h.surf.sand_z,
+    };
     let gravity = h.gravity.on;
     let (coll, scene) = (ctx.coll, ctx.scene);
     let line = |a: V3, b: V3| coll.and_then(|c| crate::collision::coll_line_m(c, scene, a, b, crate::collision::QueryFlags(PROBE_FLAGS), None)).map(|o| o.point);
@@ -145,8 +149,11 @@ pub struct HeroIn {
     pub body: u8,
     /// `0x18a16e`: ticks in the air.
     pub air_ticks: i16,
-    /// `0x18a138`: the ground's height under him (his slab's seed).
+    /// `0x18a138`: the ground's height under him (his slab's seed); `0x18a150` / `0x18a154`: the liquid's and the
+    /// quicksand's surface the ground probe last found (crate::hero::surface; kept when he leaves them).
     pub ground_z: f32,
+    pub water_z: f32,
+    pub sand_z: f32,
 }
 
 /// The pitch targets (0.97 on the ground, 1.56 in the air or in group 4) and the step a tick.
@@ -165,8 +172,8 @@ pub const HERO_PROBE_Z: [f32; 4] = [-0.6, 0.7, 0.7, 0.7];
 ///   [`probe_down`]'s gravity branch, but 16 down his up row and the half thickness a quarter of his radius
 ///   (`+0xbd` 0xff, the pitch 1.56);
 /// * upright: direction 1, its pitch stepping 0.052 a tick toward 0.97 (1.56 in the air or in group 4): `(cos p·cos
-///   φ, cos p·sin φ, −sin p)`, φ his key light's heading. The slab seeds at his ground height (at least 1; none
-///   below). With the pitch within 0.1 of 1.56 (under him) it is the seed, 0.18 thick; else four probes from his
+///   φ, cos p·sin φ, −sin p)`, φ his key light's heading. The slab seeds at his ground height when at least 1,
+///   else the liquid's surface when at least 1, else the quicksand's when above 1; none else. With the pitch within 0.1 of 1.56 (under him) it is the seed, 0.18 thick; else four probes from his
 ///   sphere's centre, each turned [`HERO_PROBE_TURN`] from φ at 0.35 of his radius and [`HERO_PROBE_Z`] × it up,
 ///   along the direction twice its drop to 0.5 below the seed: the slab spans the seed and the hits, 0.12 more on
 ///   each side, at most 1 (the extra raises its middle).
@@ -196,8 +203,15 @@ pub fn update_hero(m: &mut Moby, s: &mut ShadowState, h: &HeroIn, gravity: bool,
     let phi = atan2(l[0], l[1]);
     let dir = [phi.cos() * s.pitch.cos(), phi.sin() * s.pitch.cos(), -s.pitch.sin()];
     s.dirs[DIR_HERO] = [dir[0], dir[1], dir[2], 0.0];
-    let seed = h.ground_z;
-    if seed < 1.0 { return clear(m); }
+    let seed = if 1.0 <= h.ground_z {
+        h.ground_z
+    } else if 1.0 <= h.water_z {
+        h.water_z
+    } else if 1.0 < h.sand_z {
+        h.sand_z
+    } else {
+        return clear(m);
+    };
     if (s.pitch - PITCH_AIR).abs() < 0.1 {
         m.shadow_slab = [seed - m.pos[2], f32::from_bits(0x3e38_51ec)];
         return;
@@ -290,6 +304,14 @@ mod tests {
         for _ in 0..20 { update_hero(&mut m, &mut s, &air, false, |_, _| None); }
         assert!(close(s.pitch, PITCH_AIR));
         assert!(close(m.shadow_slab[0], 0.0) && close(m.shadow_slab[1], 0.18));
+        // No ground under him: the liquid's surface, else the quicksand's (above 1), else none.
+        let over = HeroIn { ground_z: 0.0, water_z: f32::NEG_INFINITY, sand_z: 58.0, ..air };
+        update_hero(&mut m, &mut s, &over, false, |_, _| None);
+        assert!(close(m.shadow_slab[0], -2.0) && close(m.shadow_slab[1], 0.18), "{:?}", m.shadow_slab);
+        update_hero(&mut m, &mut s, &HeroIn { water_z: 59.0, ..over }, false, |_, _| None);
+        assert!(close(m.shadow_slab[0], -1.0), "{:?}", m.shadow_slab);
+        update_hero(&mut m, &mut s, &HeroIn { sand_z: 1.0, ..over }, false, |_, _| None);
+        assert_eq!(m.shadow_slab, [0.0; 2]);
         // Swimming: off.
         update_hero(&mut m, &mut s, &HeroIn { group: 0x12, ..h }, false, |_, _| None);
         assert_eq!(m.mode & MODE_CASTER, 0);

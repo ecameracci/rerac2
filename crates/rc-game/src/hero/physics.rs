@@ -71,6 +71,8 @@ pub struct Env<'a> {
     pub grind_boots: bool,
     pub rails: &'a [crate::paths::GrindPath],
     pub level: i32,
+    /// `0x1a9010`: Maktar's arena master out of its desk state (crate::game::GameState::arena_on).
+    pub arena_on: bool,
     /// Every moby's o_class by its index (the ground moby's class).
     pub classes: &'a [i16],
     /// The Swingshot nodes (class 0x2f6), the hook nodes (0x323) and the pull targets (0x99d).

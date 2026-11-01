@@ -10,8 +10,13 @@
 //! The liquid heights `0x18a150` / `0x18a154` are the ground probe's (`0x2b4a08`, crate::hero::physics; the water's
 //! height query `0x31d7a0` in crate::hero::water's docs). Nothing is done with the hero's updates off (`0x18c0dd`).
 //!
-//! Not ported: the vehicle body's lava 0x7a (`0x18c0d4` = 1), the lava death's variants with no health (0x7d on level
-//! 2 with `0x1a9010`, 0x79 unless Ratchet's pvar `+0x1f0` is 0: 0x39 here).
+//! On the lava, Clank's body (`0x18c0d4` = 1) dies with 0x7a; Ratchet with no health left with
+//! crate::hero::damage's `lava_death` (the electric 0x7d in Maktar's arena, else 0x79, or 0x39 for a class without
+//! its sequence).
+//!
+//! The levels the port plays: Aranos (0) has no liquid faces; Oozla's swamp (1) is quicksand (surface 3, flat at 108:
+//! the sinking 0x65, the swamp water 0x0a17 only drawn over it); Maktar (2, the arena's moat) and Endako (3) have lava.
+//! The first water to swim in is level 6's (`work/scratch/water_inventory.tsv`).
 
 use super::physics::*;
 use super::Hero;
@@ -62,8 +67,11 @@ impl Hero {
         let s = &mut self.surf;
         match id {
             2 => {
-                s.magnet = true;
-                if self.land_lag == 0 && (self.f16c == 0 || self.height < 2.5) && self.mode == 0 && env.boots { s.boots = 1; }
+                // The flag only near the floor (`0x18b2b7` is set in the condition's chain).
+                if self.land_lag == 0 && (self.f16c == 0 || self.height < 2.5) {
+                    s.magnet = true;
+                    if self.mode == 0 && env.boots { s.boots = 1; }
+                }
             }
             0xe => {
                 s.water = true;
@@ -88,8 +96,11 @@ impl Hero {
         let mut next = None;
         if s.slide && on && !matches!(self.group, 0x10 | 0x14 | 7) {
             next = Some(0x30);
+        } else if s.hot && on && self.mode == 1 && self.state != 0x7a {
+            // Clank's body: the lava death 0x7a.
+            next = Some(0x7a);
         } else if s.hot && on && (self.state != 0x38 || self.jump.descending != 0) {
-            next = Some(if self.hp == 0 { 0x39 } else { 0x38 });
+            next = Some(if self.hp == 0 { self.lava_death(env, anim) } else { 0x38 });
         } else if s.deep && self.state != 0x7c && (s.water_z - (self.pos[2] + 0.25)).abs() < 1.0 && 0.0 < s.water_z - self.pos[2] && (self.disp[2] < 0.0 || self.state == 0x7b) {
             next = Some(0x7c);
         } else if s.sand && !matches!(self.state, 0x65 | 0x78) && (s.sand_z - (self.pos[2] + 0.25)).abs() < 1.0 && 0.0 < s.sand_z - self.pos[2]

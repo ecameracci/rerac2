@@ -5,10 +5,12 @@
 //!
 //! **Where the water is.** The ground probe (`0x2b4a08`, crate::hero::physics): a surface-0 face under the feet sets
 //! the water level `0x18a150` to the face's height through `0x31d7a0` (the ripple module's patch height `0x37dc10`
-//! when the level has one — G-REN-009, not ported: the face's own height is used — else a flat plane `0x1b25bc`
-//! nothing writes on L00, else the face's height) and the line goes on through it; a deep liquid (0xd) sets it too, the
-//! quicksand (3) and a pit (0xb) set `0x18a154`. The surface step (`0x2aca80`, crate::hero::surface) turns the surface
-//! id into this tick's flags, the depth `0x18c2e4` and the wading `0x18c0d9`.
+//! when the level has one — G-REN-009, not ported: the face's own height is used — else a flat plane `0x1b25bc..cc`
+//! (on, centre, height, radius: within 0.5 of its height and its radius) that only the level start clears on levels
+//! 0–3 (L01 `0x313828` / `0x1b2cfc`, L02 `0x321af8` / `0x1b3d3c`), else the face's height) and the line goes on
+//! through it; a deep liquid (0xd) sets it too, the quicksand (3) and a pit (0xb) set `0x18a154`. The surface step
+//! (`0x2aca80`, crate::hero::surface) turns the surface id into this tick's flags, the depth `0x18c2e4` and the wading
+//! `0x18c0d9`.
 //!
 //! **In and out.** Falling into water deeper than 0.8 with the feet within the vertical speed (+0.07, at least 0.2)
 //! of 0.45 below its surface, or sinking 0.8 below it, gives 0x36 (with no health 0x67). Every 16th frame (not on
@@ -42,8 +44,9 @@
 //!
 //! Not ported: the ripple disturbances (`0x37d5a0`, with the ripple module: G-REN-009), the fast swim's jets
 //! (`0x18a858`: four bubbles a time from Clank's joints 0 / 1 while the back item is class 0x261 — the back slot's moby
-//! is not ported), the splash moby 0x307 (in no level's class table: the game spawns none either), the dive's gate on
-//! Ratchet's pvar `+0x134` and the scripted no-jump / no-dive timers `0x18a018` / `0x18a01e` (always allowed here),
+//! is not ported), the splash moby 0x307 (in no level's class table: the game spawns none either), the scripted no-jump
+//! / no-dive flags `0x18a018` / `0x18a01e` (always allowed here; Oozla's swamp water 0x0a17 sets `0x18a01e` to 2 out of
+//! its dry cuboids, but Oozla has no water to swim in),
 //! the swim's voice `0x2d6cc8(0x16)`, the swim stats counters (G-HERO-005), the help flag `0x18cf10`, the body lean's
 //! records (`0x25bea0..`, `0x2ab138`: G-HERO-002), the pressure buttons (the ramps are used: no pressure-mode pad
 //! `0x13835c` = 0x79), the vehicle's water.
@@ -135,6 +138,10 @@ impl Hero {
         f * STROKE[i] + (1.0 - f) * STROKE[j]
     }
 
+    /// The dives' gate: Ratchet's class has the dive's sequence 0x3b (the class's pointer `+0x134`, which `0x2c8f38`
+    /// and the surface states' transitions test).
+    fn can_dive(anim: &dyn AnimCtl) -> bool { anim.frame_count(0x3b) != 0 }
+
     /// The prologue's water checks (`0x2c9098`, `0x2c8f38`). Returns whether a state was set.
     pub fn water_checks(&mut self, env: &Env, anim: &mut dyn AnimCtl) -> bool {
         if self.state == 0x74 || self.state == 0x67 { return false; }
@@ -178,7 +185,7 @@ impl Hero {
             self.underwater_write = Some(false);
             return self.set_state(anim, env, 6, true);
         }
-        if self.group != 0x12 { return false; }
+        if !Self::can_dive(anim) || self.group != 0x12 { return false; }
         let a = [self.pos[0], self.pos[1], wz + 0.01];
         let b = [self.pos[0], self.pos[1], wz + 0.31];
         if env.line(a, b, 2).is_none() { return false; }
@@ -602,7 +609,7 @@ impl Hero {
             }
             0x35 => {
                 if Self::cross_within(env, 8) { return Some(0x12); }
-                if env.pad.pressed_within(button::SQUARE, 7).is_some() { return Some(fast_or(self)); }
+                if Self::can_dive(anim) && env.pad.pressed_within(button::SQUARE, 7).is_some() { return Some(fast_or(self)); }
                 if self.surf.wading && self.surf.depth < 0.7 && self.set_state(anim, env, 0x70, false) {
                     self.set_anim(anim, 17.0, 0x59, 0);
                     self.disp[2] = 0.0;
@@ -616,7 +623,7 @@ impl Hero {
                 if Self::cross_within(env, 8) && 10 < self.timer { return Some(0x12); }
                 // Treading keeps the △ menu away (`0x18c0d7` = 1 every tick).
                 self.no_menu = 1;
-                let dive = env.pad.pressed_within(button::SQUARE, 7).is_some() || (env.clank && env.pad.pressed_within(FAST, 7).is_some());
+                let dive = Self::can_dive(anim) && (env.pad.pressed_within(button::SQUARE, 7).is_some() || (env.clank && env.pad.pressed_within(FAST, 7).is_some()));
                 if dive { return Some(fast_or(self)); }
                 if self.surf.wading && self.surf.depth < 0.4 && self.set_state(anim, env, 0, false) {
                     let seq = self.idle_seq();

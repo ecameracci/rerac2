@@ -5,11 +5,13 @@
 //!
 //! The other deaths and sinks: the quicksand 0x65 (group 0x19: sinking 1/240 a tick while less than half a metre per
 //! earlier sink is above him, else 1/60; ✕ after 10 + 7·n ticks jumps out with 0x66 for the first three; under 1.2
-//! below the sand or after 171 ticks: dead) and its death 0x78 (151 ticks), the lava death 0x7a (the vehicle's), the
+//! below the sand or after 171 ticks: dead) and its death 0x78 (151 ticks), the lava death 0x7a (Clank's body's), the
 //! drowning 0x7c (in a deep liquid: the speed ×0.92, dead after 221 ticks), the electric death 0x7d, the burns 0x67 /
 //! 0x7f (the momentum eases out by 1/900, the fall springs to −0.025).
 //!
-//! The water hurts 0x72 / 0x73 are crate::hero::water's, as are 0x7c's bob and 0x67's breath bubbles.
+//! The water hurts 0x72 / 0x73 are crate::hero::water's, as are 0x7c's bob and 0x67's breath bubbles. Which death the
+//! lava gives with no health left is `Hero::lava_death`; 0x79 and 0x7a keep their start height in `0x18a154`, the
+//! quicksand's (crate::hero::surface).
 //!
 //! Not ported: Clank's hurts (0x42, 0x43), the per-level death counters, the hurt sounds and voice (`0x2d6cc8(0x12)`,
 //! `0x2b9c90(0x14)`), the drowning's bubbles moby (class 0x52a: in no level's class table, so the game's `CreateMoby`
@@ -48,8 +50,6 @@ pub struct DamageBlock {
     pub dead: bool,
     /// The hit record was read this tick: the moby world clears it.
     pub took: bool,
-    /// `0x18a154`: the height the death 0x79 started at.
-    pub death_z: f32,
     /// `0x18a85c`: the burns' fall speed.
     pub fall_v: f32,
     /// `0x18c2bc`: the moby whose hit he took this tick (the enemies read it).
@@ -68,6 +68,13 @@ impl Hero {
         }
         self.hp = (self.hp - n).max(0);
         self.show_health = Some(0x168);
+    }
+
+    /// The death on the lava with no health left (`0x2aca80`, and the lava hop 0x38's entry in `0x2c4560`): on level 2
+    /// while the arena master is out of its desk state (`0x1a9010`) the electric 0x7d; else 0x79 when Ratchet's class
+    /// has its sequence 0x6a (the class's pointer `+0x1f0`, the one 0x79 plays), else 0x39.
+    pub(super) fn lava_death(&self, env: &Env, anim: &dyn AnimCtl) -> i32 {
+        if env.level == 2 && env.arena_on { 0x7d } else if anim.frame_count(0x6a) != 0 { 0x79 } else { 0x39 }
     }
 
     /// `0x2b2dd0(1)`: a hit on Ratchet's moby (flag 1 or 8) outside the deaths and hurts, while not invincible:
@@ -231,7 +238,8 @@ impl Hero {
                 // 0x79.
                 self.group = 0x14;
                 self.cam_mode = 0;
-                self.damage.death_z = self.ground_z;
+                // `0x18a154` (the quicksand's height, which the shadow seeds from too): where it started.
+                self.surf.sand_z = self.ground_z;
                 self.hp = 0;
                 if play { Entry::Anim(8.0, 0x6a, 0) } else { Entry::Done }
             }
@@ -335,7 +343,7 @@ impl Hero {
                 None
             }
             _ => {
-                if self.pos[2] < self.damage.death_z - 1.2 || 0x65 <= self.timer { self.die(); }
+                if self.pos[2] < self.surf.sand_z - 1.2 || 0x65 <= self.timer { self.die(); }
                 None
             }
         }

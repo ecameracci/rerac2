@@ -29,20 +29,38 @@
 //! (256, 346); the rows from y 112, 19 apart, in font 2: the cheat's name at x 43 and "on" / "off" centred at 405, or
 //! "????" and what unlocks it ("That's impossible!", or "<n> Skill Points") in grey; the selected row orange.
 //!
+//! **Movies** (page `0x284b40`, `0x1aaf88`: update `0x34a9c8`, draw `0x34ad60`, enter `0x34b0c0`): five rows
+//! (`0x1ac0c0`, a cursor `gp−0x326c`, back to 0 when the page is left; Up / Down wrap, sound 3), each unlocked by the
+//! enter's flags (`gp−0x3268..`: the movie list always; the second and the last row in the challenge mode; the third
+//! once every weapon with a mega upgrade is had, the fourth once their mods are all bought too: the Specials enter's
+//! tally `0x349b10` into `gp−0x4860` / `gp−0x4858`; the enter only ever sets them). ✕ on an unlocked row: the movie
+//! list (sound 4), mode 9 (the second row, `0x32c5f0(9, 1)`), or its movies queued and started (`0x2f4ee8` /
+//! `0x2f5030`: 0xbf; 0xbd and 0xbe; 0xc1; sound 4), the pause coming back on the page after them (`0x1fecc0`); a
+//! locked row sound 5. Drawn as the Skill Points page: the sprites 0xd7, 0xd8, 0xd9, 0xdd at (256, 208), "Movies"
+//! centred at (179, 27), "△ Exit" at (353, 375) and `0x2c0b` at (181, 375), the scroll bar, the five rows around the
+//! cursor (white, fading out from the boxed middle one, "????" when locked); the row's picture (the panel `0x284c70`:
+//! `BONUS.WAD`'s table `0x14d7f0`, row k) in the page's rect 1 when unlocked.
+//!
+//! **The movie list** (page `0x284cd8`, `0x1aafb8`: update `0x34b128`, draw `0x34b390`, enter `0x34b6f8`): the game's
+//! 33 movies (`0x28a278`, `{text, id, shown}`; a cursor `gp−0x3250`), the first always shown, the others once seen
+//! (the scene bit `0x139768` of the id, set by the movie's start `0x371bd8`) or in the challenge mode. ✕ on a shown
+//! one queues and starts it (sound 4), else sound 5. Drawn as Movies with the first row's name for its title and its
+//! own pictures (`0x284e08`: `0x14d818`, row k).
+//!
 //! Positions are the NTSC ones (`0x1b2680` 0, `0x1b2684` 1.0: the Progressive Scan mode `0x1a7b98` stretches and
 //! moves some, `0x42cbd8`).
 //!
-//! Not ported: the pages behind Movies (`0x284b40`), Short Cuts (`0x284e70`), Random Stuff (`0x285008`) and First
-//! Person Mode (`0x285718`): ✕ on them plays sound 5 as on a locked row; the enter's tally of the weapons had and
-//! upgraded (`0x349b10` into `gp−0x4860..−0x4858`, read by those pages). The cheats' effects, the port having none of
-//! the systems they switch: Ratchet's, Clank's, the actors' and the enemies' big heads (bytes 1, 3, 0, 7; Ratchet's is
-//! hero posture list 24's scale, crate::hero::posture), the mirrored levels (4), the left-handed Ratchet (5), the
-//! health's invincibility at the maximum (6: crate::moby::classes::nanotech), the sheep cars (8), and the bodies — the
-//! tux, the funny side, Beach Boy, Snow Dude (10, 9, 11, 2: the armour rows 5..8 of `0x2fe988`, put on at once by
-//! `0x2fecd0` when toggled; the engine attaches armour row 0 only).
+//! The cheat bytes are the game's (crate::cheats): the page writes the save's copy it draws from and tells the game
+//! ([`Out::Cheat`]), which re-dresses Ratchet for a body (`0x2fecd0`).
+//!
+//! Not ported: the pages behind Short Cuts (`0x284e70`), Random Stuff (`0x285008`) and First Person Mode
+//! (`0x285718`): ✕ on them plays sound 5 as on a locked row; the Movies page's second row, mode 9 (`0x2e2550` /
+//! `0x2e3270`, no port of the mode: sound 5); the screen kept behind the pause through a movie (`0x344638`); the
+//! panels' wait for the cursor to rest before showing a picture (`0x284cb4`).
 
-use super::{gui, options, pad, Assets, Ctx, Menus, Out, Page, Quad, Tex, View};
+use super::{gui, options, pad, record, Assets, Ctx, Menus, Out, Page, Quad, Tex, View};
 use crate::save::{SaveData, Scope};
+use rc_formats::disc::menu_tables::MenuTables;
 use rc_formats::disc::toc::PictureTable;
 
 /// The challenge mode (`0x1a7a12`).
@@ -64,11 +82,12 @@ const TITLE: u32 = 0x3094;
 const EXIT_AT: [f32; 2] = [455.0, 256.0];
 const KEYFRAME: f32 = 2.0;
 
-/// The Specials Menu's row `row`: its page, if the port has it (Cheats, Skill Points).
+/// The Specials Menu's row `row`: its page, if the port has it (Cheats, Skill Points, Movies).
 fn row_page(row: usize) -> Option<Page> {
     match row {
         0 => Some(Page::Cheats),
         1 => Some(Page::SkillPoints),
+        2 => Some(Page::Movies),
         _ => None,
     }
 }
@@ -172,6 +191,79 @@ pub mod cheats {
     ];
 }
 
+/// The Movies page (`0x34a9c8` / `0x34ad60`) and its movie list (`0x34b128` / `0x34b390`).
+pub mod movies {
+    /// The pages' sprites at (256, 208) (`gp−0x3254`, `gp−0x324c`), keyframe 0.
+    pub const AT: [f32; 2] = [256.0, 208.0];
+    pub const SPRITES: [(u32, u32); 4] = [(0xd7, 0x6044_2d00), (0xd8, 0x6024_1700), (0xd9, 0x55f0_c070), (0xdd, 0x55f0_c070)];
+    /// "Movies" (the list's title is its first row's name), "△ Exit" and `0x2c0b`: font 1, centred.
+    pub const TITLE: (u32, [f32; 2]) = (0x3095, [179.0, 27.0]);
+    pub const EXIT_AT: [f32; 2] = [353.0, 375.0];
+    pub const PLAY: (u32, [f32; 2]) = (0x2c0b, [181.0, 375.0]);
+    /// The rows: as the Skill Points list (five around the cursor centred on 256 from y 274, 20 apart, font 2), white.
+    pub const COLOUR: u32 = 0xf0f0f0;
+    /// The picture panels' box (the pages' rect 1, `{255, 151, 310, 180}` centred).
+    pub const PICTURE: [f32; 4] = [100.0, 61.0, 310.0, 180.0];
+    /// The page's rows (`0x1ac0c0`'s texts): the movie list, mode 9, and three sets of movies.
+    pub const ROWS: [u32; 5] = [0x2ca9, 0x2ca7, 0x2cad, 0x3117, 0x2cab];
+    /// What each row's ✕ plays (`0x34a9c8`).
+    pub const ROW_MOVIES: [&[i32]; 5] = [&[], &[], &[0xbf], &[0xbd, 0xbe], &[0xc1]];
+    /// The list (`0x28a278`): each movie's name and id; the first is always shown.
+    pub const LIST: [(u32, i32); 33] = [
+        (0x30c0, 0xb1), (0x3024, 0x15), (0x3029, 0x16), (0x302a, 0x01), (0x302b, 0x02), (0x302c, 0x17), (0x302d, 0x03),
+        (0x302e, 0x04), (0x302f, 0x05), (0x3030, 0x06), (0x3031, 0x18), (0x3032, 0x07), (0x3033, 0x00), (0x3034, 0x08),
+        (0x3035, 0x09), (0x3036, 0x19), (0x3037, 0x0a), (0x3038, 0x0b), (0x3039, 0x1a), (0x303a, 0x0c), (0x303b, 0x0d),
+        (0x303c, 0x1b), (0x303d, 0x0e), (0x303e, 0x0f), (0x303f, 0x10), (0x3040, 0x11), (0x3041, 0x1c), (0x3042, 0x12),
+        (0x3043, 0x13), (0x3044, 0x14), (0x3045, 0x1d), (0x3046, 0x1e), (0x3047, 0x1f),
+    ];
+}
+
+/// `0x349b10`'s tally (`gp−0x4860`, `gp−0x4858`): every item with a mega upgrade (its record's `−0x10`) but 9 and 10
+/// had (`0x1a7b00`), and every mod slot of theirs with a price (`+0x88 + 4k`) bought (`0x1a7a88[i]` bit `2k`).
+fn weapons_tally(tables: &MenuTables, save: &SaveData) -> (bool, bool) {
+    let (mut had, mut modded) = (true, true);
+    for i in 0..0x38 {
+        let Some(r) = record(tables, save, i).filter(|r| r.mega && i != 9 && i != 10) else { continue };
+        if save.u8(Scope::Global, 0x1a7b00 + i as u32) == 0 {
+            (had, modded) = (false, false);
+            continue;
+        }
+        let bought = save.u8(Scope::Global, 0x1a7a88 + i as u32);
+        for (k, &price) in r.mods.iter().enumerate() {
+            if price != 0 && bought & 1 << (2 * k) == 0 { modded = false; }
+        }
+    }
+    (had, modded)
+}
+
+/// `0x34b0c0`: the Movies page's row unlocked.
+fn movies_unlocked(row: usize, tables: &MenuTables, save: &SaveData) -> bool {
+    match row {
+        0 => true,
+        1 | 4 => challenge(save),
+        2 => weapons_tally(tables, save).0,
+        3 => weapons_tally(tables, save).1,
+        _ => false,
+    }
+}
+
+/// `0x34b6f8`: movie list row `k` shown: the first always, the others seen (`0x139768`) or in the challenge mode.
+fn movie_shown(k: usize, save: &SaveData) -> bool {
+    let Some(&(_, id)) = movies::LIST.get(k) else { return false };
+    let seen = save.i32(Scope::Global, 0x139768 + (id as u32 & !3)) as u32 & 1 << (id & 31) != 0;
+    k == 0 || challenge(save) || seen
+}
+
+/// The Movies page's picture: an unlocked row's (row k).
+pub fn movies_picture(k: usize, tables: &MenuTables, save: &SaveData) -> Option<(PictureTable, u16)> {
+    (k < movies::ROWS.len() && movies_unlocked(k, tables, save)).then_some((PictureTable::Movies, k as u16))
+}
+
+/// The movie list's picture: a shown movie's (row k).
+pub fn movie_list_picture(k: usize, save: &SaveData) -> Option<(PictureTable, u16)> {
+    movie_shown(k, save).then_some((PictureTable::MovieList, k as u16))
+}
+
 /// The save's skill point bytes.
 fn points(save: &SaveData) -> [u8; crate::skill_points::LEN] {
     let mut b = [0; crate::skill_points::LEN];
@@ -224,6 +316,18 @@ fn fill(fmt: &[u8], ints: &[i32], strs: &[&[u8]]) -> Vec<u8> {
         i += 1;
     }
     out
+}
+
+/// `0x349898`: the box around a list's middle row (the Skill Points and the Movies pages).
+fn draw_box(out: &mut Vec<Quad>, a: &Assets, name: &[u8], colour: u32) {
+    use skill::{AT, BOX_PAD, BOX_Y};
+    let half = (gui::text_width(&a.glyphs_2, name, 1.0) >> 1) + BOX_PAD;
+    let (l, r, c) = (AT[0] as i32 - half, AT[0] as i32 + half, gui::rgba(colour));
+    let [t0, t1, b0, b1] = BOX_Y;
+    gui::rect(out, t0, t1, l - 2, r + 4, c);
+    gui::rect(out, b0, b1, l - 2, r + 4, c);
+    gui::rect(out, t0 + 1, b0 + 1, l - 2, l, c);
+    gui::rect(out, t0 + 1, b0 + 1, r + 2, r + 4, c);
 }
 
 /// Text in font 1 (`0x2ea570` centred) or font 2 (`0x2ea608` centred, `0x2e9f68` left) at `(x, y)`.
@@ -305,6 +409,8 @@ impl Menus {
             let at = CHEAT_BYTES + c.cheat as u32;
             let on = cx.save.u8(Scope::Global, at) != 0;
             cx.save.set_u8(Scope::Global, at, !on as u8);
+            // The game's byte (and a body's re-dress, `0x2fecd0`: crate::cheats).
+            out.push(Out::Cheat { cheat: c.cheat as usize, on: !on });
         } else {
             out.push(Out::Sound(5));
         }
@@ -339,23 +445,109 @@ impl Menus {
             let p = (k + COUNT + i - 2) % COUNT;
             let name = a.strings.get(POINTS[p].0);
             let colour = (if earned(v.save, p) { EARNED } else { NOT_EARNED }) | alpha << 24;
-            if i == 2 {
-                // `0x349898`: the box around the middle row.
-                let half = (gui::text_width(&a.glyphs_2, name, 1.0) >> 1) + BOX_PAD;
-                let (l, r, c) = (AT[0] as i32 - half, AT[0] as i32 + half, gui::rgba(colour));
-                let [t0, t1, b0, b1] = BOX_Y;
-                gui::rect(out, t0, t1, l - 2, r + 4, c);
-                gui::rect(out, b0, b1, l - 2, r + 4, c);
-                gui::rect(out, t0 + 1, b0 + 1, l - 2, l, c);
-                gui::rect(out, t0 + 1, b0 + 1, r + 2, r + 4, c);
-            }
+            if i == 2 { draw_box(out, a, name, colour); }
             text(out, a, true, name, [AT[0], LIST_Y + LIST_STEP * i as f32], true, colour);
         }
         self.draw_description(out, a, DESCRIPTION);
         self.draw_picture(out, v, PICTURE);
     }
 
-    /// `0x3493c8`: the skill list's scroll bar: the arrows (sprite 0x4a with its x and z swapped, the second also
+    /// The Movies page (`0x34a9c8`): △ back, Start / Select close (the cursor back to 0); Up / Down wrap over the five
+    /// (sound 3); ✕ an unlocked row's: the movie list, or its movies (sound 4); a locked row, or mode 9, sound 5.
+    pub(super) fn movies_tick(&mut self, keys: u16, cx: &Ctx, out: &mut Vec<Out>) {
+        let n = movies::ROWS.len();
+        if keys & pad::TRIANGLE != 0 {
+            self.movie_row = 0;
+            return self.back(out);
+        }
+        if keys & (pad::START | pad::SELECT) != 0 {
+            self.movie_row = 0;
+            return self.close(out);
+        }
+        if keys & pad::UP != 0 {
+            out.push(Out::Sound(3));
+            self.movie_row = (self.movie_row + n - 1) % n;
+        } else if keys & pad::DOWN != 0 {
+            out.push(Out::Sound(3));
+            self.movie_row = (self.movie_row + 1) % n;
+        }
+        if keys & pad::CROSS == 0 { return; }
+        let k = self.movie_row;
+        if k == 0 {
+            out.push(Out::Sound(4));
+            self.go(Page::MovieList, out);
+        } else if k == 1 || !movies_unlocked(k, cx.tables, cx.save) {
+            out.push(Out::Sound(5));
+        } else {
+            out.extend(movies::ROW_MOVIES[k].iter().map(|&id| Out::Movie(id)));
+            out.push(Out::Sound(4));
+        }
+    }
+
+    /// The movie list (`0x34b128`): △ back, Start / Select close (the cursor back to 0); Up / Down wrap over the 33
+    /// (sound 3); ✕ a shown movie (sound 4), else sound 5.
+    pub(super) fn movie_list_tick(&mut self, keys: u16, cx: &Ctx, out: &mut Vec<Out>) {
+        let n = movies::LIST.len();
+        if keys & pad::TRIANGLE != 0 {
+            self.movie_list_row = 0;
+            return self.back(out);
+        }
+        if keys & (pad::START | pad::SELECT) != 0 {
+            self.movie_list_row = 0;
+            return self.close(out);
+        }
+        if keys & pad::UP != 0 {
+            out.push(Out::Sound(3));
+            self.movie_list_row = (self.movie_list_row + n - 1) % n;
+        } else if keys & pad::DOWN != 0 {
+            out.push(Out::Sound(3));
+            self.movie_list_row = (self.movie_list_row + 1) % n;
+        }
+        if keys & pad::CROSS == 0 { return; }
+        if movie_shown(self.movie_list_row, cx.save) {
+            out.push(Out::Sound(4));
+            out.push(Out::Movie(movies::LIST[self.movie_list_row].1));
+        } else {
+            out.push(Out::Sound(5));
+        }
+    }
+
+    /// The Movies page's draw (`0x34ad60`, see the module docs), then its picture.
+    pub(super) fn draw_movies(&self, out: &mut Vec<Quad>, a: &Assets, v: &View) {
+        let names: Vec<u32> = (0..movies::ROWS.len()).map(|k| if movies_unlocked(k, v.tables, v.save) { movies::ROWS[k] } else { LOCKED }).collect();
+        self.draw_movie_page(out, a, movies::TITLE.0, &names, self.movie_row);
+        self.draw_picture(out, v, movies::PICTURE);
+    }
+
+    /// The movie list's draw (`0x34b390`), then its picture.
+    pub(super) fn draw_movie_list(&self, out: &mut Vec<Quad>, a: &Assets, v: &View) {
+        let names: Vec<u32> = movies::LIST.iter().enumerate().map(|(k, &(t, _))| if movie_shown(k, v.save) { t } else { LOCKED }).collect();
+        self.draw_movie_page(out, a, movies::ROWS[0], &names, self.movie_list_row);
+        self.draw_picture(out, v, movies::PICTURE);
+    }
+
+    /// The two pages' common draw: the sprites, the title, "△ Exit" and `0x2c0b`, the scroll bar, then the five rows
+    /// around `cursor` (wrapping), the middle one boxed.
+    fn draw_movie_page(&self, out: &mut Vec<Quad>, a: &Assets, title: u32, names: &[u32], cursor: usize) {
+        use movies::*;
+        for (id, c) in SPRITES {
+            if let Some(s) = a.sprites.get(&id) { gui::sprite(out, s, AT, 0.0, [1.0, 1.0], gui::rgba(c)); }
+        }
+        let white = 0x80f0_f0f0;
+        text(out, a, false, a.strings.get(title), TITLE.1, true, white);
+        text(out, a, false, a.strings.get(options::EXIT_TEXT), EXIT_AT, true, white);
+        text(out, a, false, a.strings.get(PLAY.0), PLAY.1, true, white);
+        self.draw_skill_scroll(out, a);
+        let n = names.len();
+        for (i, alpha) in skill::ALPHAS.into_iter().enumerate() {
+            let name = a.strings.get(names[(cursor + n + i - 2) % n]);
+            let colour = COLOUR | alpha << 24;
+            if i == 2 { draw_box(out, a, name, colour); }
+            text(out, a, true, name, [AT[0], skill::LIST_Y + skill::LIST_STEP * i as f32], true, colour);
+        }
+    }
+
+    /// `0x3493c8`: the skill and movie lists' scroll bar: the arrows (sprite 0x4a with its x and z swapped, the second also
     /// negated; white while ↑ / ↓ are held), then the box's four lines.
     fn draw_skill_scroll(&self, out: &mut Vec<Quad>, a: &Assets) {
         use skill::*;
@@ -414,6 +606,18 @@ mod tests {
         assert_eq!(cheats::ROWS.iter().filter(|c| c.needs == cheats::HIDDEN).count(), 3);
         assert_eq!(row_page(0), Some(Page::Cheats));
         assert_eq!(row_page(1), Some(Page::SkillPoints));
-        assert_eq!(row_page(2), None);
+        assert_eq!(row_page(2), Some(Page::Movies));
+        assert_eq!(row_page(3), None);
+    }
+
+    #[test]
+    fn movies_rows_and_list() {
+        assert_eq!(movies::LIST.len(), 33);
+        // The list's ids are the 32 movies 0..0x1f once each, and 0xb1 first.
+        let mut ids: Vec<i32> = movies::LIST[1..].iter().map(|m| m.1).collect();
+        ids.sort();
+        assert_eq!(ids, (0..0x20).collect::<Vec<_>>());
+        assert_eq!(movies::LIST[0].1, 0xb1);
+        assert_eq!(movies::ROW_MOVIES[3], &[0xbd, 0xbe]);
     }
 }

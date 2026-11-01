@@ -1912,6 +1912,42 @@ impl MobyOcclusion {
     /// The `MobyAnim` instance of gameplay instance `ii` (None without geometry).
     pub fn anim_index(&self, ii: usize) -> Option<usize> { self.anim_index.get(ii).copied().flatten() }
 
+    /// Class `ci`'s packets were replaced (Ratchet re-dressed: crate::armour_dress): its parts are rebuilt, every
+    /// instance of it loses its entities (despawned; `update_moby_occlusion` spawns the group it shows anew) and gets
+    /// its metal entities again (hidden: the update shows them with the metal pass).
+    #[allow(clippy::too_many_arguments)]
+    pub fn rebuild_class(&mut self, commands: &mut Commands, level: &LoadedLevel, ci: usize, meshes: &mut Assets<Mesh>, images: &mut Assets<Image>, metal_materials: &mut Assets<MobyMetalMaterial>) {
+        let Some(c) = level.mobys.classes.get(ci) else { return };
+        let high = build_parts(c, &c.class.high_lod, false, glow_from(c, false), meshes).0;
+        let low = if self.lod_on && !c.class.low_lod.is_empty() { build_parts(c, &c.class.low_lod, c.class.header.low_lod_joint_count == 0, glow_from(c, true), meshes).0 } else { Vec::new() };
+        self.class_parts.insert(ci, [high, low]);
+        let metal = build_metal_parts(c, meshes).0;
+        for ii in 0..self.draws.len() {
+            let d = &mut self.draws[ii];
+            if d.input.is_none() || d.class != ci { continue; }
+            for e in std::mem::take(&mut d.groups).into_values().flatten().chain(std::mem::take(&mut d.metal)) { commands.entity(e).despawn(); }
+            let t = Transform::from_translation(d.translation);
+            for part in &metal {
+                let (image, texel_alpha) = metal_image(level, part.kind, images);
+                for pass in metal_passes(texel_alpha) {
+                    let mat = metal_materials.add(MobyMetalMaterial {
+                        texture: image.clone(),
+                        fog: crate::game_camera::fog_buffer(),
+                        instances: self.instances.clone(),
+                        palette: self.cache.proto.palette.clone(),
+                        normal_table: self.cache.proto.normal_table.clone(),
+                        lods: self.lods.clone(),
+                        pass,
+                        caster: part.caster,
+                        order: None,
+                    });
+                    let name = Name::new(format!("moby {ii} class {} metal {} {pass:?}", c.o_class, part.kind));
+                    d.metal.push(commands.spawn((Mesh3d(part.mesh.clone()), MeshMaterial3d(mat), t, MeshTag(ii as u32), NoFrustumCulling, Visibility::Hidden, name)).id());
+                }
+            }
+            self.shown[ii] = None;
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------------------------------
