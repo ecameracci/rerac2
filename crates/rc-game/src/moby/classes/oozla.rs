@@ -2158,7 +2158,7 @@ pub fn update_061c(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 /// the slot off for good) and the slot is not spent (kind 0: never shown; else not off): kind 0 once; kind 1 again,
 /// but not within 0x439 ticks of its last showing (`+4`); kind 2 the first time only marked (shown once, here, this
 /// level, `+4` now), then as kind 1; kind 3 once its levels' word has bit 31.
-fn zone_help(ctx: &mut Ctx, text: i32, slot: i32, kind: i32, zone: i32, off: i32) {
+pub(crate) fn zone_help(ctx: &mut Ctx, text: i32, slot: i32, kind: i32, zone: i32, off: i32) {
     let k = slot.max(0) as usize;
     let count = ctx.game.help_counts.get(k).copied().unwrap_or(-1);
     let spent = if kind == 0 { count as u16 >= 1 } else { count == -1 };

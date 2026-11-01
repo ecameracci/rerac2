@@ -43,6 +43,8 @@ pub mod teleport;
 pub mod tie_lights;
 pub mod telepad;
 pub mod maktar;
+pub mod maktar_hints;
+pub mod maktar_pads;
 pub mod tractor;
 pub mod vendor;
 pub mod weather;
@@ -194,7 +196,12 @@ pub fn update_for(o_class: i16) -> Option<UpdateFn> {
         death_fade::CLASS => Some(death_fade::update),
         0x0825 => Some(dynamo::update),
         0x00bc => Some(tractor::update),
-        0x0acb | 0x0acc => Some(tractor::update_box),
+        0x0acb | 0x0acc | 0x0e2a => Some(tractor::update_box),
+        0x0af3 => Some(maktar::update_0af3),
+        0x0e9c => Some(maktar::update_0e9c),
+        0x0c24 => Some(maktar_hints::update_0c24),
+        maktar_pads::CRITTER => Some(maktar_pads::update_critter),
+        maktar_pads::PAD => Some(maktar_pads::update_pad),
         0x0afc => Some(maktar::update_0afc),
         0x0b25 => Some(maktar::update_0b25),
         0x0aaf => Some(maktar::update_0aaf),

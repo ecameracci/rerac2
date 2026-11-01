@@ -11,7 +11,8 @@
 //! nearest box (or Maktar's bomb 0x09c8, which drags the same way) in the target list within its range ahead of
 //! Ratchet (±60°) with a clear line; kept while ○ is held.
 //!
-//! **A box** (`0x3d40e8`; `+0x50` its drag block, `0x31bd40`): every 16 ticks a target (mode 0x1000) while Ratchet
+//! **A box** (`0x3d40e8`; Maktar's 0x0e2a is the same code at L02 `0x42a0d8`, its range `+0x88` 12 at its start;
+//! `+0x50` its drag block, `0x31bd40`; held on level 2, the help slot 0x48 is turned off): every 16 ticks a target (mode 0x1000) while Ratchet
 //! is within `+0x88`. Held, a line to Ratchet that meets anything lets it go; it is pulled toward the point `+0x84`
 //! (4) from Ratchet halfway between its side and his facing, at `dist / 15` a tick (at most 2/15, flag 4: `dist·8/15`,
 //! 4/15) with the change capped at 1/180 a tick (flag 4: 1/72); let go, its speed falls by 1/360 a tick. Moving, it
@@ -30,8 +31,9 @@
 use crate::hero::physics::{add, dist, dot, len, scale, set_len, sub, V3};
 use crate::moby::{carry_hero, mode, Ctx, MobyWorld};
 
-/// The boxes' classes, and the other things it picks (Maktar's bomb 0x09c8, crate::moby::classes::maktar).
-const BOXES: [i16; 3] = [0x0acb, 0x0acc, crate::moby::classes::maktar::BOMB];
+/// The boxes' classes (Maktar's 0x0e2a too), and the other things it picks (Maktar's bomb 0x09c8,
+/// crate::moby::classes::maktar; its critter 0x09bc, crate::moby::classes::maktar_pads).
+const BOXES: [i16; 5] = [0x0acb, 0x0acc, 0x0e2a, crate::moby::classes::maktar::BOMB, crate::moby::classes::maktar_pads::CRITTER];
 /// The beam's pvar holding its target + 1 (the port's `0x18a3e0`).
 const TARGET: usize = 0x60;
 
@@ -59,7 +61,9 @@ fn pick(w: &MobyWorld, ctx: &Ctx) -> Option<usize> {
         let mut d = sub(m.pos, hero);
         d[2] = 0.0;
         let l = len(d);
-        if m.pv_f(0x88) < l || (0.1 < l && dot(d, fwd) < 0.5 * l) { continue; }
+        // The range: the drag block's `+0x38` (the critter's block is at `+0x140`).
+        let range = if m.o_class == crate::moby::classes::maktar_pads::CRITTER { m.pv_f(0x178) } else { m.pv_f(0x88) };
+        if range < l || (0.1 < l && dot(d, fwd) < 0.5 * l) { continue; }
         let from = [hero[0], hero[1], hero[2] + 1.0];
         if w.coll_line(ctx, from, [m.pos[0], m.pos[1], m.pos[2] + 0.5], 2, Some(i)).is_some_and(|o| o.moby != ctx.hero_moby) { continue; }
         if best.is_none_or(|(b, _)| l < b) { best = Some((l, i)); }
@@ -188,23 +192,27 @@ fn push_out(w: &mut MobyWorld, id: usize, ctx: &Ctx, from: V3, to: V3) {
     m.pos[2] = z;
 }
 
-/// `0x31bd40(height, r, h2, m, block, path)` (L02 `0x32af70`): the drag (see the module).
-pub(crate) fn drag(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, r: f32, path: i32) {
+/// `0x31bd40(height, r, h2, m, block, path)` (L02 `0x32af70`): the drag (see the module), the block at `+0x50`.
+pub(crate) fn drag(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, r: f32, path: i32) { drag_at(w, id, ctx, r, path, 0x50) }
+
+/// The drag with its block at pvars `+base`: the velocity `+0`, the flags `+0x20`, the hold distance `+0x34`, the
+/// range `+0x38`, the sound's handle `+0x40` (Maktar's critter 0x09bc keeps it at `+0x140`).
+pub(crate) fn drag_at(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, r: f32, path: i32, base: usize) {
     let hero = ctx.hero.pos;
     let m = &mut w.mobys[id];
     if (ctx.game.frame & 0xf) as usize == id & 0xf {
-        let near = dist(hero, m.pos) < m.pv_f(0x88);
+        let near = dist(hero, m.pos) < m.pv_f(base + 0x38);
         if near { m.mode |= mode::TARGET } else { m.mode &= !mode::TARGET }
     }
     let start = w.mobys[id].pos;
-    let mut v = w.mobys[id].pv_v(0x50);
-    let flags = w.mobys[id].pv_i(0x70);
+    let mut v = w.mobys[id].pv_v(base);
+    let flags = w.mobys[id].pv_i(base + 0x20);
     if held(w) == Some(id) {
         let p = w.mobys[id].pos;
         if w.coll_line(ctx, [p[0], p[1], p[2] + 0.5], [hero[0], hero[1], hero[2] + 1.0], 2, Some(id)).is_some_and(|o| o.moby != ctx.hero_moby) {
             release(w);
         }
-        let d = match w.mobys[id].pv_f(0x84) { x if x != 0.0 => x, _ => 4.0 };
+        let d = match w.mobys[id].pv_f(base + 0x34) { x if x != 0.0 => x, _ => 4.0 };
         let a = add(hero, set_len(sub(p, hero), d));
         let mut b = add(hero, set_len(ctx.hero.rows[0], d));
         b[2] = a[2];
@@ -266,21 +274,21 @@ pub(crate) fn drag(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, r: f32, path: i3
             v[1] = moved[1];
         }
     }
-    // Its slide's sound (`+0x90`): looped while it moves.
-    let h = w.mobys[id].pv_i(0x90);
+    // Its slide's sound (`+0x40`): looped while it moves.
+    let h = w.mobys[id].pv_i(base + 0x40);
     if [v[0], v[1]] != [0.0, 0.0] && 0.001 < len(v) {
         if h == -1 || !ctx.host.sound_playing(h) {
             let h = ctx.host.play_sound(&w.mobys[id], 0, 4);
-            w.mobys[id].set_pv_i(0x90, h);
+            w.mobys[id].set_pv_i(base + 0x40, h);
         }
     } else if h != -1 {
         ctx.host.stop_sound(h);
-        w.mobys[id].set_pv_i(0x90, -1);
+        w.mobys[id].set_pv_i(base + 0x40, -1);
     }
-    w.mobys[id].set_pv_v(0x50, v);
+    w.mobys[id].set_pv_v(base, v);
 }
 
-/// 0x0acb / 0x0acc (`0x3d40e8`): see the module.
+/// 0x0acb / 0x0acc (`0x3d40e8`) and Maktar's 0x0e2a (L02 `0x42a0d8`, the same code): see the module.
 pub fn update_box(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let class_scale = w.class(w.mobys[id].o_class).map_or(1.0, |c| c.scale);
     let (old, yaw) = (w.mobys[id].pos, w.mobys[id].rot[2]);
@@ -297,6 +305,8 @@ pub fn update_box(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             let s = if class_scale != 0.0 { m.scale / class_scale } else { 1.0 };
             let (r, path) = (m.pv_f(0xe4) * s, m.pv_i(0xe0));
             drag(w, id, ctx, r, path);
+            // Held on Maktar: the Tractor Beam's zone hint (slot 0x48, crate::moby::classes::maktar_hints) off.
+            if held(w) == Some(id) && ctx.game.level == 2 { ctx.game.help_counts[0x48] = -1; }
         }
         _ => {}
     }

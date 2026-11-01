@@ -37,25 +37,41 @@
 //!
 //! * 0x0b25 (`0x3f6820`): the upper area's gravity sphere about (500, 200, 500) ([`update_0b25`], crate::gravity).
 //!
-//! Not ported (no visible effect here, or a missing system): 0x0af3 (`0x3efea8`, four: a camera guide along its path `+0`, every placed one has −1 and deletes
-//! itself on its first tick); of 0x0b25, the tfrags and shrubs below or above z 420 moved out (`0x2ee5a0`), the
+//! * 0x0af3 (`0x3efea8`, four): a camera guide along its path `+0`; every placed one has −1 there and deletes itself
+//!   on its first tick ([`update_0af3`]).
+//! * 0x0e9c (`0x4305f8`, one): its tie group `+0` turned π/400 a tick with a texture's scroll; the placed one has no
+//!   group (−1), so it never leaves its state 0 ([`update_0e9c`]).
+//! * The hint manager 0x0c24 is crate::moby::classes::maktar_hints; the Tractor Beam's critter 0x09bc and its pads
+//!   0x0a61 are crate::moby::classes::maktar_pads; the box 0x0e2a is crate::moby::classes::tractor's.
+//!
+//! Not ported (no visible effect here, or a missing system): of 0x0b25, the tfrags and shrubs below or above z 420 moved out (`0x2ee5a0`), the
 //! area's music (`0x335928`, once), `0x18c0e2` (a hero byte its readers `0x31adc0` / `0x3d26a8` take), its tie
 //! group's 32 instances turned while in view (`0x3f6900` / `0x3f6a48`) and a texture's scroll (`0x3f6c30`). 0x0f15,
 //! the arena's scene props, is crate::moby::classes::arena's.
 //!
 //! Not ported: 0x0adf's lift (`0x3ece68`, its update when the cuboid's z scale is 2: up and down to Ratchet's level
 //! as he rides it); 0x0e96 (`0x4301b0`, the arena crowd: it waits for its controller past state 1, cheers by the
-//! controller's pvars `+0x6c` and waves about (500, 600); the controller is not ported); 0x0e9c (`0x4305f8`: its tie
-//! group's instances turned π/400 a tick and a texture's scroll `+0x74`; the engine draws the ties static); 0x0ccc
+//! controller's pvars `+0x6c` and waves about (500, 600); the controller is not ported); 0x0ccc
 //! (`0x417bf0`, moves a moby another class links in); 0x000b (`0x396448`, the ship's pad: its hologram 0x477 and the
-//! △ prompt that starts the travel, the main dev's progression), 0x12cf (`0x38b458`, that count), 0x0c24
-//! (`0x40b4c0`, the help voice lines).
+//! △ prompt that starts the travel, the main dev's progression), 0x12cf (`0x38b458`, that count).
 
 use crate::moby::{carry_hero, mode, Ctx, MobyWorld};
 use crate::shadow_volumes::probe_near;
 
 /// 0x0afc.
 pub fn update_0afc(_w: &mut MobyWorld, _id: usize, _ctx: &mut Ctx) {}
+
+/// 0x0af3 (`0x3efea8`), state 0: no path (`+0` = −1) deletes it (`0x3157a0`). Not ported: the rest (its path's set-up
+/// `0x3f0048`, the guide along it `0x3f01c8` / `0x3f0340` and its view test `0x3f0528`): no placed one has a path.
+pub fn update_0af3(w: &mut MobyWorld, id: usize, _ctx: &mut Ctx) {
+    if w.mobys[id].state == 0 && w.mobys[id].pv_i(0) == -1 { w.delete(id); }
+}
+
+/// 0x0e9c (`0x4305f8`), state 0: with a tie group (`+0` ≠ −1) its ties' spheres doubled, update distance 0xff, state 1
+/// (each tick its ties turned π/400 about their up axis, `0x2f35d8` / `0x2f3920`, and the scroll `0x22fd40 + 0x74`
+/// stepped by `$gp+0x3484`/60, wrapped at 1). The placed one has none (−1): it stays in state 0 doing nothing, so the
+/// rest is not ported.
+pub fn update_0e9c(_w: &mut MobyWorld, _id: usize, _ctx: &mut Ctx) {}
 
 /// The upper area's sphere: its centre (`0x189ed0` and the heights' `0x1b3210`, w 1: down toward it).
 const SPHERE: [f32; 3] = [500.0, 200.0, 500.0];
@@ -660,6 +676,9 @@ pub struct Globals {
     pub odds_raised: bool,
     /// `$gp+0x193c` spent: the bolts the broken machines have thrown (of 300).
     pub coins_out: i32,
+    /// `$gp+0x1748`: Ratchet has stepped on one of the critter's pads (crate::moby::classes::maktar_pads; the first
+    /// time he walks to its middle).
+    pub pad_walked: bool,
 }
 
 /// `$gp+0x1d2c`: the beam's pulse, degrees a second.
@@ -1112,7 +1131,8 @@ pub fn update_0c1b(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 ///   (`0x3ea400`); once past the catapult it is unhooked and launched ([`launch_bomb`]) (1).
 ///
 /// While it turns faster than ¼° a tick its sound 1 loops. Not ported: its draw `0x3eae18`, the camera while aiming
-/// (`0x451ee0`, `0x451bb0`, `0x451af8`), the cannonball 0x09bc and its pad 0x0a61.
+/// (`0x451ee0`, `0x451bb0`, `0x451af8`). (The critter 0x09bc and its pads 0x0a61 are another puzzle:
+/// crate::moby::classes::maktar_pads.)
 pub fn update_0aa6(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     use crate::hero::physics::{add_rot, atan2, dist, dist2, sub_rot, turn_ease};
     use std::f32::consts::{FRAC_PI_2, PI};
