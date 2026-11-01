@@ -67,10 +67,18 @@ pub fn search(w: &MobyWorld, ctx: &Ctx, cone: Cone, from: V3, dir: V3, crates: b
         let ease = 1.0 - (1.0 - k) * (1.0 - k) * (1.0 - k);
         // A near limit of 0 keeps the far one all the way (the eased limit only with a near limit above 0).
         let limit = |near: f32, far: f32| if 0.0 < near { near + (far - near) * ease } else { far };
-        let yaw_off = rot_dist(atan2(d[0], d[1]), dir_yaw);
-        if limit(cone.near_yaw, cone.yaw) <= yaw_off { continue; }
-        let pitch_off = rot_dist(atan2(len2(d), d[2]), dir_pitch);
-        if limit(cone.near_pitch, cone.pitch) <= pitch_off { continue; }
+        // Limits of π both ways (`0x40490fdc`, not below the compare's π): no cone, the offs taken as 0 (the
+        // Chopper's blade's search all round).
+        let all_round = std::f32::consts::PI < cone.yaw && std::f32::consts::PI < cone.pitch;
+        let (yaw_off, pitch_off) = if all_round {
+            (0.0, 0.0)
+        } else {
+            let yaw_off = rot_dist(atan2(d[0], d[1]), dir_yaw);
+            if limit(cone.near_yaw, cone.yaw) <= yaw_off { continue; }
+            let pitch_off = rot_dist(atan2(len2(d), d[2]), dir_pitch);
+            if limit(cone.near_pitch, cone.pitch) <= pitch_off { continue; }
+            (yaw_off, pitch_off)
+        };
         let mut score = yaw_off * 3.0 + pitch_off * dist * 0.2 + dist * 0.1;
         if crate_ { score *= 0.8 * cone.range; }
         if best.is_some_and(|(b, _)| b <= score) { continue; }

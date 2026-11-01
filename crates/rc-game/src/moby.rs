@@ -33,6 +33,7 @@
 //! pvar pool.
 
 pub mod classes;
+pub mod afterimage;
 pub mod ai;
 pub mod aim;
 pub mod attach;
@@ -550,6 +551,8 @@ pub struct MobyWorld {
     pub gravity_bomb: classes::gravity_bomb::Effect,
     /// The Spiderbot's blast sphere: its mesh and wobbles (classes::spiderbot::draw_blast).
     pub spiderbot: classes::spiderbot::Blast,
+    /// The Chopper's trail slots (classes::chopper).
+    pub chopper: classes::chopper::Pool,
     /// The frame's blob shadows (`0x1be840`, crate::shadows), asked for by the updates and drawn with crate::fx's quads.
     pub shadows: crate::shadows::Shadows,
     /// The dying mobys' fades and their manager (crate::moby::classes::death_fade).

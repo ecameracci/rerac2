@@ -7,6 +7,7 @@ pub mod beast;
 pub mod bolt;
 pub mod bosses;
 pub mod carriers;
+pub mod chopper;
 pub mod chute;
 pub mod crate_;
 pub mod critter;
@@ -81,6 +82,8 @@ pub fn update_for(o_class: i16) -> Option<UpdateFn> {
         gravity_bomb::BLAST_CLASS => Some(gravity_bomb::update_blast),
         spiderbot::HAND_CLASS => Some(spiderbot::update_hand),
         spiderbot::BOT_CLASS => Some(spiderbot::update_bot),
+        chopper::HAND_CLASS => Some(chopper::update),
+        chopper::BLADE => Some(chopper::update_blade),
         swingshot::HAND_CLASS => Some(swingshot::update),
         swingshot::HOOK_CLASS => Some(swingshot::update_hook),
         0xbfe => Some(shot::update),

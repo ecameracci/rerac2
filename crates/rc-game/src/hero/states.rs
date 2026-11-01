@@ -183,6 +183,7 @@ impl Hero {
         if self.transitions_prologue(env, anim) { return; }
         if self.swingshot_trigger(env, anim) { return; }
         if self.melee_trigger(env, anim) { return; }
+        if self.chopper_trigger(env, anim) { return; }
         if self.charge_trigger(env, anim) { return; }
         if self.water_checks(env, anim) { return; }
         // △ (the quick select and the health and bolt counters) is the engine's (its gates are the game's).

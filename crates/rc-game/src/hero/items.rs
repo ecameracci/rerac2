@@ -43,6 +43,9 @@ pub const SPIDERBOT_CLASS: i16 = 0x907;
 /// The Swingshot: item 0xd, class 0xd0 (L03 item table, row `0x267910`; crate::moby::classes::swingshot).
 pub const SWINGSHOT: i32 = 0xd;
 pub const SWINGSHOT_CLASS: i16 = crate::moby::classes::swingshot::HAND_CLASS;
+/// The Chopper: item 0x16, class 0x879 (L00 row `0x263840`; crate::moby::classes::chopper).
+pub const CHOPPER: i32 = 0x16;
+pub const CHOPPER_CLASS: i16 = crate::moby::classes::chopper::HAND_CLASS;
 
 /// An item record (`0x262500 + 0xe0·row`, row `0x139568[item]` = the item): the fields the port reads.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -71,8 +74,8 @@ pub struct ItemRow {
 }
 
 /// The rows the port has (L00 `0x262dc0`, `0x263f40`, `0x2649c0`; the Dynamo's from Oozla's live table; the
-/// Electrolyzer's and the Spiderbot Glove's from L02's; the Swingshot's from L03's).
-pub const ROWS: [ItemRow; 8] = [
+/// Electrolyzer's and the Spiderbot Glove's from L02's; the Swingshot's from L03's; the Chopper's L00 `0x263840`).
+pub const ROWS: [ItemRow; 9] = [
     ItemRow { item: WRENCH, attach: 0, class: WRENCH_CLASS, stance: 0, icon: 0, use_seq: 0, keep: false, fire_seq: [0, 0], speed: 0.0, rate: 0.0, damage: 1.0, ammo: false, max_ammo: 0, start_ammo: 0 },
     ItemRow { item: LANCER, attach: 0, class: LANCER_CLASS, stance: 1, icon: 0xea64, use_seq: 0x38, keep: true, fire_seq: [-1, 0x3e], speed: 60.0, rate: 7.0, damage: 0.5, ammo: true, max_ammo: 200, start_ammo: 200 },
     ItemRow { item: DYNAMO, attach: 1, class: DYNAMO_CLASS, stance: 1, icon: 0xea7f, use_seq: 0x8d, keep: false, fire_seq: [0x8e, 0x8d], speed: 0.0, rate: 0.0, damage: 0.0, ammo: false, max_ammo: 0, start_ammo: 0 },
@@ -81,6 +84,7 @@ pub const ROWS: [ItemRow; 8] = [
     ItemRow { item: ELECTROLYZER, attach: 0, class: ELECTROLYZER_CLASS, stance: 1, icon: 0xea81, use_seq: 0, keep: false, fire_seq: [0, 0], speed: 0.0, rate: 0.0, damage: 0.0, ammo: false, max_ammo: 0, start_ammo: 0 },
     ItemRow { item: SPIDERBOT, attach: 6, class: SPIDERBOT_CLASS, stance: 0, icon: 0xea6e, use_seq: 0x2c, keep: false, fire_seq: [0x42, 0x2c], speed: 0.0, rate: 0.0, damage: 12.0, ammo: true, max_ammo: 8, start_ammo: 8 },
     ItemRow { item: SWINGSHOT, attach: 1, class: SWINGSHOT_CLASS, stance: 1, icon: 0xea8b, use_seq: 0, keep: false, fire_seq: [0, 0], speed: 0.0, rate: 0.0, damage: 0.0, ammo: false, max_ammo: 0, start_ammo: 0 },
+    ItemRow { item: CHOPPER, attach: 6, class: CHOPPER_CLASS, stance: 0, icon: 0xea66, use_seq: 0x8f, keep: false, fire_seq: [0x8f, 0x8f], speed: 30.0, rate: 1.8, damage: 1.0, ammo: true, max_ammo: 35, start_ammo: 35 },
 ];
 
 /// Item `item`'s row.
@@ -175,6 +179,12 @@ pub struct ItemBlock {
     pub next_create: i32,
     /// `0x18b058`: 0xff when the item has ammo and none is left.
     pub empty: u8,
+    /// `0x2d43e0(item)`: the held item's ammo not out, as the last item pass left it (the hero's triggers read it:
+    /// the port's hero tick has no game state).
+    pub ammo_left: bool,
+    /// The Chopper's trigger with no blades left: its class sound 0 at Ratchet (`0x360698(0, 0, Ratchet, class)`),
+    /// played by the item pass.
+    pub empty_click: bool,
     /// `0x18c0db`: the held item's stance type (its row's `+0x0c`: 1 one hand, 2 both; crate::hero::layers).
     pub stance: u8,
     /// `0x18c0df`: the hand item tucked away (some states' entries; every change clears it).
@@ -477,6 +487,11 @@ fn hand_pass(world: &mut MobyWorld, ctx: &mut Ctx) {
     if world.mobys[id].state < 0xfe {
         if let Some(f) = world.mobys[id].update { f(world, id, ctx); }
     }
+    let it = &mut ctx.hero.items;
+    it.ammo_left = it.has_ammo(ctx.game);
+    if std::mem::take(&mut it.empty_click) {
+        if let (Some(h), Some(r)) = (ctx.hero_moby, row(it.item)) { ctx.host.play_sound_of(&world.mobys[h], r.class, 0, 0); }
+    }
 }
 
 /// `0x2a7ed8`: the hand item's glow, once it has been in the hand 0x17 ticks (not while hidden or in state 0x61). By
@@ -533,6 +548,7 @@ fn create_hand(world: &mut MobyWorld, ctx: &mut Ctx) {
     it.item = item;
     it.ready = 2;
     it.empty = if r.ammo && ctx.game.ammo.get(item as usize).is_some_and(|&a| a == 0) { 0xff } else { 0 };
+    it.ammo_left = it.empty == 0;
     if item == WRENCH {
         it.trigger = 0x80;
         ctx.host.set_anim(&world.mobys[id], 1, 0, 1);

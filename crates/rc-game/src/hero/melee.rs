@@ -553,5 +553,24 @@ impl Hero {
     }
 }
 
+impl Hero {
+    /// `0x2c96d0`'s case 0x16 / 0x41 (the Chopper in hand): not in the look stance 1; not in its twin 0x1d, nor out of
+    /// the groups 0 / 1 / 0xc and a landed jump, nor with another item to hold (`0x18c104`); ○ held (`0x20`, not the
+    /// trigger word), the item in the hand 0x17 ticks: with blades left the throw 0x83 (its blade goes at frame 33,
+    /// crate::moby::classes::chopper), else on the press its class sound 0 (the item pass plays it). Returns whether a
+    /// state was set.
+    pub fn chopper_trigger(&mut self, env: &Env, anim: &mut dyn AnimCtl) -> bool {
+        let it = &self.items;
+        if it.no_use != 0 || it.hand.is_none() || it.thrown != 0 || it.ready != 2 { return false; }
+        if it.item != super::items::CHOPPER || self.state == 1 { return false; }
+        let group_ok = self.group < 2 || self.group == 0xc || (self.group == 4 && self.jump.landed != 0);
+        if self.state == 0x1d || !group_ok || (it.selected != 0 && it.selected != 0x16 && it.selected != 0x41) { return false; }
+        if env.pad.held & button::CIRCLE == 0 || it.item_ticks < 0x17 { return false; }
+        if it.ammo_left { return self.set_state(anim, env, 0x83, true); }
+        if env.pad.pressed & button::CIRCLE != 0 { self.items.empty_click = true; }
+        false
+    }
+}
+
 /// `0x2b3aa0(f)`: the frame passed `f` this tick.
 pub fn passed(v: &crate::hero::anim::AnimView, f: f32) -> bool { f < v.frame && v.frame - f <= v.frame_step }

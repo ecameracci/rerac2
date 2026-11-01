@@ -12,6 +12,7 @@
 //! | `0x3a17f0` | the nanotech cluster 0x326 (the first list) | its sphere, halo and crate glass ([`crate::moby::classes::nanotech::draw`]) |
 //! | `0x3efd68` | the Gravity Bomb in the hand 0xce3 | where its throw lands ([`crate::moby::classes::gravity_bomb::draw_marker`]) |
 //! | `0x3f0e80` | the Gravity Bomb's blast 0xce5 | its shockwave and flares ([`crate::moby::classes::gravity_bomb::draw_blast`]) |
+//! | `0x41f9a8` | the Chopper's blade 0x087a with a trail | its trail and the Mega's lightning ([`crate::moby::classes::chopper::draw`]) |
 //! | `0x3c6eb8` (L02) | the Spiderbot Glove in the hand 0x0907 | where its throw lands ([`crate::moby::classes::spiderbot::draw_marker`]) |
 //! | `0x3cac30` | Oozla's conveyor 0x0a7b out | its belt of light ([`crate::moby::classes::oozla::draw_0a7b`]) |
 //! | `0x3d2ea8` | Oozla's hatch 0x0a9d open | its light ([`crate::moby::classes::oozla::draw_0a9d`]) |
@@ -302,6 +303,7 @@ fn one(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut crate::ga
         crate::moby::classes::nanotech::CLASS => crate::moby::classes::nanotech::draw(w, id, cam, out),
         crate::moby::classes::gravity_bomb::HAND_CLASS => crate::moby::classes::gravity_bomb::draw_marker(w, id, hero_state, game.frame, out),
         crate::moby::classes::gravity_bomb::BLAST_CLASS => crate::moby::classes::gravity_bomb::draw_blast(w, id, view, cam, out),
+        crate::moby::classes::chopper::BLADE => crate::moby::classes::chopper::draw(w, id, game, cam, out),
         crate::moby::classes::spiderbot::HAND_CLASS => crate::moby::classes::spiderbot::draw_marker(w, id, hero_state, game.scenes.mode, game.frame, out),
         0x0a7b => crate::moby::classes::oozla::draw_0a7b(w, id, out),
         0x0a9d => crate::moby::classes::oozla::draw_0a9d(w, id, out),
