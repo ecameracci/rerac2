@@ -122,7 +122,7 @@ pub mod rec {
     pub const NECK: usize = 12;
     /// Lists 25..28: the ears and the tail.
     pub const SECONDARY: usize = 13;
-    /// List 24: scaled 0.875 (1.57 with the big-head cheat `0x1a7a49`, [`Env::big_head`]).
+    /// List 24: scaled 0.875 (1.57 with the big-head cheat `0x1a7a49`, crate::cheats::cheat::BIG_HEAD).
     pub const SCALED: usize = 17;
 }
 
@@ -163,8 +163,13 @@ pub struct Posture {
     pub feet: Feet,
     /// `0x18a008`: ticks since the last strafing tick.
     pub not_strafing: i32,
-    /// `$gp − 0x72fc`: the scaled joint's scale, easing to 0.875 (1.57 with the big-head cheat).
+    /// `$gp − 0x72fc`: the scaled joint's scale, easing to 0.875 (1.57 with the big-head cheat); a scene's Ratchet
+    /// sets it outright (`0x2d51f8`, crate::scene::Scenes::actor_heads).
     pub head_scale: f32,
+    /// `$gp − 0x72f8`: Clank's head scale (1.0 at boot), easing to 1.0 as Clank (`0x2a5840`; 1.8 with Clank's
+    /// big-head cheat, byte 3) and set outright by a scene's Ratchet (`0x2d51f8`); a scene's Clank wears it
+    /// (`0x2a7170`, crate::scene::Scenes::actor_heads).
+    pub clank_head: f32,
     /// The idle look: `0x18afc0` its timer, `0x18afb4` / `0x18afb8` the head's y / z, `0x18afc4` / `0x18afc8` its
     /// spring.
     pub look_timer: i32,
@@ -190,6 +195,7 @@ impl Default for Posture {
             feet: Feet::default(),
             not_strafing: 0,
             head_scale: 0.875,
+            clank_head: 1.0,
             look_timer: 0,
             look: [0.0; 2],
             look_spring: [0.007, 0.3],
@@ -383,7 +389,7 @@ impl Hero {
         let p = &mut self.posture;
         p.recs[rec::SCALED].scale = p.head_scale;
         // The big-head cheat (`0x1a7a49`): toward 1.57 (`0x3fc8f5c3`) instead.
-        approach(if env.big_head { f32::from_bits(0x3fc8_f5c3) } else { 0.875 }, 0.05, &mut p.head_scale);
+        approach(if env.cheat(crate::cheats::cheat::BIG_HEAD) { f32::from_bits(0x3fc8_f5c3) } else { 0.875 }, 0.05, &mut p.head_scale);
         if p.not_strafing <= 0x13 { return; }
         // A weapon in use or aiming (`0x18c0d8`, `0x18aa18`): the look and the twitches cleared (`0x2ab458`), the
         // head and the chest on soft springs, the next look and fidget 90..120 ticks off.
@@ -576,6 +582,12 @@ impl Hero {
 
     /// The posture's tick (module docs), after the transitions.
     pub(super) fn posture_tick(&mut self, env: &Env, anim: &mut dyn AnimCtl) {
+        // `0x2a5840` (Clank's body, `0x2a65d8`): his head's scale toward 1.0, or 1.8 (`0x3fe66666`) with Clank's
+        // big-head cheat (`0x1a7a4b`), 0.05 a tick. Not ported: the rest of `0x2a5840` (his glow, his blink).
+        if self.mode == 1 {
+            let t = if env.cheat(crate::cheats::cheat::CLANK_HEAD) { f32::from_bits(0x3fe6_6666) } else { 1.0 };
+            approach(t, 0.05, &mut self.posture.clank_head);
+        }
         if self.mode != 0 { return; }
         self.feet_tilt();
         self.head_idle(env, anim);

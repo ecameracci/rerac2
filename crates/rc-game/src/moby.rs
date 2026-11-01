@@ -199,6 +199,10 @@ pub struct Moby {
     /// Its class manipulators (`0x308238`: a record on joint list `list`, its rotation `quat` (x, y, z, w) composed
     /// over the target joint's key): the engine applies them when it poses the moby.
     pub manips: Vec<(u8, [f32; 4])>,
+    /// Joint-modifier nodes of a scale alone (`0x312480(moby, list, node)` with the node's scale): on joint list `list`,
+    /// scaled `s` on every axis — a scene actor's big head (crate::scene::Scenes::actor_heads). The engine applies them
+    /// with [`Moby::manips`].
+    pub joint_scales: Vec<(u8, f32)>,
     /// `+0x38`: the light word (byte 0 the directional light set, byte 1 the second, byte 2 their cross-fade) and
     /// `+0x3c` the ambient (r, g, b; 0x80 = 1), as MobyProc lights the moby.
     pub light: u32,
@@ -340,7 +344,7 @@ impl Moby {
             index, bsphere: [0.0; 4], pos: [0.0; 3], state: 0, group: -1, slot: 0, alpha: 0x80, scale: 0.0, update_dist: 0,
             drawn: 0, draw_dist: 0, mode: 0, update: None, pvars: Vec::new(), has_collision: false, coll_disable: 0,
             grid_rect: GRID_NONE, o_class, rebuilds: 0, mission: 0, sub_index: 0, uid: 0, rows: [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],
-            rot: [0.0; 3], instance: None, hit_slot: -1, parent: None, pvar_index: -1, bolts: 0, xp: 0, timer: 0, drops: 0, prev_state: 0, sub_state: 0, state_ticks: 0, once: 0, drive: false, manips: Vec::new(), serial: 0, freed_at: 0,
+            rot: [0.0; 3], instance: None, hit_slot: -1, parent: None, pvar_index: -1, bolts: 0, xp: 0, timer: 0, drops: 0, prev_state: 0, sub_state: 0, state_ticks: 0, once: 0, drive: false, manips: Vec::new(), joint_scales: Vec::new(), serial: 0, freed_at: 0,
             // `0x311418`: `+0x38` = 0x40404000000000.
             light: 0, ambient: [0x40; 3], glow: 0, piece: None, bangles: 0, shine: 0, shadow_range: 0, shadow_slab: [0.0; 2], shadow_dir: 0,
         };
@@ -538,6 +542,8 @@ pub struct MobyWorld {
     pub nanotech: classes::nanotech::Globals,
     /// The Gravity Bomb's blast effect (classes::gravity_bomb).
     pub gravity_bomb: classes::gravity_bomb::Effect,
+    /// The Spiderbot's blast sphere: its mesh and wobbles (classes::spiderbot::draw_blast).
+    pub spiderbot: classes::spiderbot::Blast,
     /// The frame's blob shadows (`0x1be840`, crate::shadows), asked for by the updates and drawn with crate::fx's quads.
     pub shadows: crate::shadows::Shadows,
     /// The dying mobys' fades and their manager (crate::moby::classes::death_fade).

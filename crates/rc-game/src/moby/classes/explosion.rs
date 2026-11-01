@@ -25,17 +25,21 @@
 //! 1.5·alpha, FX 0x39 at s; s 1 → 4 over B, alpha 255 fading as t² over B's last 40 ticks, faded out within 11 of
 //! the camera) and three facing the camera a quarter unit toward it (angles 4, 5, 1: FX 0x39 at s and 0.75·s, FX
 //! 0x38 at 1.5·s and a fifth); while the glare runs, its four-pointed star 2 units in front of the camera (FX 0xb)
-//! when it is on the screen ([`glare`]).
+//! when it is on the screen ([`glare`]); while the shimmer runs, the last finished frame blended back in through a
+//! soft mask in front of the camera ([`shimmer`], a crate::fx::FrameQuad).
 //!
 //! The particles are the L02 copies of the shared spawners: `0x33c6d0` = crate::particles::puff (L00 `0x335bb8`, its
 //! update `0x33c898` = L00 `0x335d80`), `0x345ac0` = crate::particles::sprite (L00 `0x33ef78`, update `0x345c68`),
 //! `0x346640` = crate::particles::streak (L00 `0x33f940`, update `0x346758`), `0x3468b8` the cinder (type 0x5b).
 //!
-//! Not ported: the screen flash (`+0x34`, FX 0xb on ALPHA row 4 `(Cd − Cs)·FIX + Cs` with FIX 0x80, which leaves the
-//! frame as it was) and the heat shimmer (`+0x40`: FX 0x36 as a mask, then a quad of the frame itself, `0x2ea6c8(−7)`,
-//! drawn back with the screen positions of its corners — a pass that samples the frame, as the blasts' shimmer in
-//! crate::moby::blast); the gravity-boots bends (`0x388638`, `0x388688`). The glare's screen test uses the game's
-//! 512×448 screen and view tangents (0.63, 0.63·0.775) for `0x2e7c70`'s projection.
+//! Not ported: the screen flash (`+0x34`: FX 0xb, 0.075 across, 0.1 in front of the camera, on ALPHA row 4
+//! `(Cd − Cs)·FIX + Cs` with FIX 0x80, which leaves the frame's colour as it was: it only writes the frame's alpha,
+//! which the shimmer's mask overwrites and nothing else reads); the gravity-boots bends (`0x388638`, `0x388688`).
+//! The shimmer's last frame is the port's frame before its HUD (crate::fx::FrameSource::Shown), sampled where it lies
+//! on the screen: the game's TEX0 for the buffer on show is 512×512 (TH 9) while its screen places are fractions of
+//! the 512×416 screen, so on the PS2 the rows it reads may sit lower than the pixels it covers (not checked against
+//! the console); its fog and ZTST ALWAYS are kept, its alpha above 0x80 is clamped (crate::display_blend). The glare's
+//! screen test uses the game's 512×448 screen and view tangents (0.63, 0.63·0.775) for `0x2e7c70`'s projection.
 
 use crate::hero::physics::{add, add_rot, atan2, cross, dist, dot, len, scale, set_len, sub, unit, V3};
 use crate::moby::{countdown, Ctx, MobyWorld};
@@ -351,8 +355,47 @@ fn disc(out: &mut Vec<crate::fx::FxQuad>, fx: usize, axis: V3, b: V3, c: V3, a: 
     out.push(crate::fx::FxQuad { fx, additive: true, corners: TEMPLATE.map(corner), st: TEMPLATE_ST, rgba: [rgba; 4] });
 }
 
+/// `$gp+0x319c` / `+0x31a0` / `+0x31a4`: the shimmer's half-size at its end and at its start, its mask's FX texture;
+/// 0.3 (`0x3e99999a`): how far in front of the camera it hangs; 0.9 (`0x3f666666`): its screen places' limit.
+const SHIMMER_END: f32 = 0.0;
+const SHIMMER_START: f32 = 0.5;
+const SHIMMER_FX: usize = 0x36;
+const SHIMMER_AT: f32 = f32::from_bits(0x3e99_999a);
+const SHIMMER_CLAMP: f32 = f32::from_bits(0x3f66_6666);
+
+/// The heat shimmer (`0x426410` while `+0x40` is 1..=15, k = `+0x40`·`+0x44` from 1 to 1/15): a square 0.3 in front
+/// of the camera toward the explosion, across the view (`up × v` and `v × that`, up (0, 0, 1) as at the start),
+/// `0.5 + (0 − 0.5)·k` to each side. The game draws it twice: FX 0x36 at ALPHA 0x4a (`(0 − 0)·As + Cd`: the colour
+/// kept) under TEST 0x31001 (ATST NEVER, AFAIL FB_ONLY, ZTST ALWAYS), which writes `At·Av` (Av = 255·k) into the
+/// frame's alpha only; then under TEST 0x33001 (RGB only) the same corners textured with the last finished frame
+/// (`0x2ea6c8(−7)`, TEX1 0xff9000000260) at their own screen places (`0x2ea5b8`, held to 0..0.9) and ALPHA 0x54
+/// (`(Cs − Cd)·Ad + Cd`): the last frame blended in by that mask. Here one [`crate::fx::FrameQuad`] does both (the
+/// mask's alpha as the blend's); the mask's untouched corners never reach the frame.
+fn shimmer(m: &crate::moby::Moby, cam: V3, frame: &mut Vec<crate::fx::FrameQuad>) {
+    let s = m.pv_i(SHIMMER);
+    if s == 0 || SHIMMER_TICKS < s { return; }
+    let k = s as f32 * m.pv_f(INV_SHIMMER);
+    let size = SHIMMER_START + (SHIMMER_END - SHIMMER_START) * k;
+    let v = set_len(sub(m.pos, cam), SHIMMER_AT);
+    let at = add(cam, v);
+    // `0x2f2e88(out, a, b)` is `b × a`.
+    let f = set_len(cross([0.0, 0.0, 1.0], v), size);
+    let e = set_len(cross(v, f), size);
+    let corners = [add(add(at, e), f), sub(add(at, e), f), add(sub(at, e), f), sub(sub(at, e), f)];
+    let rgba = ((255.0 * k) as i32 as u32) << 24 | 0x80_8080;
+    frame.push(crate::fx::FrameQuad {
+        source: crate::fx::FrameSource::Shown,
+        mask: Some(SHIMMER_FX),
+        corners,
+        st: [[0.0, 0.0], [0.0, 1.0], [1.0, 0.0], [1.0, 1.0]],
+        offset: [[0.0; 2]; 4],
+        clamp: SHIMMER_CLAMP,
+        rgba: [rgba; 4],
+    });
+}
+
 /// `0x426410`, the draw (module docs). The glare's timer counts down here, as the game's.
-pub fn draw(w: &mut MobyWorld, id: usize, cam: V3, cam_rows: [V3; 3], out: &mut Vec<crate::fx::FxQuad>) {
+pub fn draw(w: &mut MobyWorld, id: usize, cam: V3, cam_rows: [V3; 3], out: &mut Vec<crate::fx::FxQuad>, frame: &mut Vec<crate::fx::FrameQuad>) {
     let m = &mut w.mobys[id];
     let (pos, dir, side, up) = (m.pos, m.pv_v(DIR), m.pv_v(SIDE), m.pv_v(UP));
     let ang: [f32; 6] = std::array::from_fn(|k| m.pv_f(4 * k));
@@ -389,6 +432,7 @@ pub fn draw(w: &mut MobyWorld, id: usize, cam: V3, cam_rows: [V3; 3], out: &mut 
         let k = m.pv_s(GLARE) as f32 * m.pv_f(INV_GLARE);
         glare(out, pos, u, cam, cam_rows, (64.0 * k) as i32 as u32);
     }
+    shimmer(&w.mobys[id], cam, frame);
 }
 
 /// The glare's star (`0x426410` while `+0x36` runs): `0x2e7c70`'s screen position of the explosion (GS units, 1/16 of a

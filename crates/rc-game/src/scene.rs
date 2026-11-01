@@ -26,13 +26,22 @@
 //!
 //! Not ported: the speech (`0x32ea38`, the scene's audio start), the music pause and resume, the subtitles' other
 //! languages, the attract-mode list (`0x1bef40` word 0), the end's teleport (`0x1bca86`) and callback (`0x1a8fd0`),
-//! the scene lighting and shadows of the actors, the modes 3..9.
+//! the scene lighting and shadows of the actors, the modes 3..9, the class 0xf6b actor's head node (`0x2d51f8`: 0.92 on
+//! list 24), the glow and sparkle of the scene's Clank (`0x2a7170`'s `+0x78`, `0x2a7e60`).
 
 use crate::hero::physics::*;
 use rc_formats::scene::{Scene, Subtitle};
 use crate::pad::{button, PadState};
 use crate::scene_camera::{scene_camera, SceneCamera};
 use std::sync::Arc;
+
+/// `0x2a0e40`: the actors' big heads (cheat byte 0): class, joint list, scale.
+pub const ACTOR_HEADS: [(i16, u8, f32); 12] = [
+    (0x0a9a, 0, 2.5), (0x0b2a, 8, 2.5), (0x1314, 0, 2.5), (0x0c49, 1, 2.5), (0x0ce0, 1, 2.5), (0x0e23, 1, 2.5),
+    (0x09b5, 7, 2.5), (0x0b0a, 5, 2.5), (0x09ca, 4, 2.5), (0x0d0e, 4, 2.5), (0x0ea3, 1, 2.5), (0x0ccf, 0, 2.0),
+];
+/// `0x22f580`: the pool of their nodes (7 of 0x40).
+const HEAD_NODES: usize = 7;
 
 pub const PLAY: i32 = 0;
 pub const MOVIE: i32 = 1;
@@ -119,6 +128,12 @@ pub struct Player {
     pub done: bool,
     /// `0x1bcbcc`: the actors' mobys and their class slots.
     pub actors: Vec<(usize, u8)>,
+    /// The big-head nodes linked this scene ([`Scenes::actor_heads`]): the actors' pool `0x22f580` (7) used, and
+    /// Clank's node `0x1b1690` taken.
+    pub head_nodes: usize,
+    pub clank_node: bool,
+    /// `0x1a8fc8`: the camera drawn back along its forward row by this (0 none; [`Scenes::actor_heads`]).
+    pub cam_back: f32,
 }
 
 impl Player {
@@ -287,7 +302,8 @@ impl Scenes {
         // A ship scene (`0x361d08`) has no letterbox.
         self.letterbox = self.space.is_none();
         self.bars = if self.space.is_none() { 0x34 } else { 0 };
-        self.player = Some(Player { id, scene, tick: 0, chunk_tick: 0, chunk: 0, done: false, actors });
+        // `0x370e08`: the nodes cleared (`0x1b1650` / `0x1b1690` / `0x22f580`), `0x1a8fc8` = 0.
+        self.player = Some(Player { id, scene, tick: 0, chunk_tick: 0, chunk: 0, done: false, actors, head_nodes: 0, clank_node: false, cam_back: 0.0 });
     }
 
     /// `0x371bd8`, a movie's start: its id marked seen (below 0xb1, the scene bits `0x139768`: the pause's movie list
@@ -369,7 +385,15 @@ impl Scenes {
             let chunk = &p.scene.chunks[p.chunk];
             let ct = p.chunk_tick;
             let rec = chunk.camera.get(ct as usize).or(chunk.camera.last())?;
-            let camera = scene_camera(rec);
+            let mut camera = scene_camera(rec);
+            // `0x371538` with the actors' big heads (`0x1a7a48`): drawn back along its forward row by `0x1a8fc8`
+            // (`0x2ef138(len, v, v)`, `0x2eeea0`), as the last tick's `0x2fd5b0` left it.
+            if p.cam_back != 0.0 {
+                let f = camera.rows[0];
+                let l = (f[0] * f[0] + f[1] * f[1] + f[2] * f[2]).sqrt();
+                let k = if 0.0 < l { p.cam_back / l } else { 0.0 };
+                camera.eye = std::array::from_fn(|i| camera.eye[i] + f[i] * k);
+            }
             let mut poses = Vec::with_capacity(p.actors.len());
             for (k, &(moby, slot)) in p.actors.iter().enumerate() {
                 let Some(a) = chunk.actors.get(k) else { continue };
@@ -390,6 +414,44 @@ impl Scenes {
         }
         self.pop(hp);
         None
+    }
+
+    /// The heads in a scene's tick (`0x3716f8`, after the actors are posed), with the cheat bytes: each actor in order
+    /// — Ratchet (class 0) sets his head's scale `$gp − 0x72fc` to 0.875, or 1.57 with byte 1, and Clank's `$gp −
+    /// 0x72f8` to 1.0, or 1.8 with byte 3 (`0x2d51f8`; the scene's Ratchet wears the first as his head's node: the
+    /// engine's `scene_hero_mods`); with byte 3 the first of Clank's classes (10, 0x1159, 0x57, 0xd6b) takes Clank's
+    /// node, `$gp − 0x72f8` on its list 5 (0x57) or 2 (`0x2a7170`); then, with byte 0, every actor without a node yet
+    /// whose class is in [`ACTOR_HEADS`] takes a node of the pool (7 a scene) at its list and scale (`0x2fd818` →
+    /// `0x2fd5b0`), and on level 6 in the level's scene 1 the camera draws back 0.25 (`0x1a8fc8`, read by the next
+    /// tick's camera). The nodes are the actors' [`crate::moby::Moby::joint_scales`].
+    pub fn actor_heads(&mut self, world: &mut crate::moby::MobyWorld, posture: &mut crate::hero::posture::Posture, cheats: &[u8; crate::cheats::LEN], level: i32) {
+        use crate::cheats::cheat;
+        let Some(p) = self.player.as_mut().filter(|p| !p.done) else { return };
+        let on = |b: usize| cheats[b] != 0;
+        for &(id, _) in &p.actors {
+            let Some(m) = world.mobys.get_mut(id) else { continue };
+            match m.o_class {
+                0 => {
+                    posture.head_scale = if on(cheat::BIG_HEAD) { f32::from_bits(0x3fc8_f5c3) } else { 0.875 };
+                    posture.clank_head = if on(cheat::CLANK_HEAD) { f32::from_bits(0x3fe6_6666) } else { 1.0 };
+                }
+                c @ (10 | 0x1159 | 0x57 | 0xd6b) if on(cheat::CLANK_HEAD) && !p.clank_node => {
+                    p.clank_node = true;
+                    m.joint_scales.push((if c == 0x57 { 5 } else { 2 }, posture.clank_head));
+                }
+                _ => {}
+            }
+        }
+        if !on(cheat::ACTOR_HEADS) { return; }
+        for &(id, _) in &p.actors {
+            let Some(m) = world.mobys.get_mut(id) else { continue };
+            if !m.joint_scales.is_empty() || !m.manips.is_empty() { continue; }
+            let Some(&(_, list, scale)) = ACTOR_HEADS.iter().find(|h| h.0 == m.o_class) else { continue };
+            if HEAD_NODES <= p.head_nodes { continue; }
+            p.head_nodes += 1;
+            m.joint_scales.push((list, scale));
+        }
+        if level == 6 && rc_formats::disc::scene::record_of(p.id) == 1 { p.cam_back = -0.25; }
     }
 
     /// `0x3711e8`: the scene's end on the game's side (module docs): Ratchet idle, on the ground under him. The

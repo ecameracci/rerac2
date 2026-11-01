@@ -843,11 +843,14 @@ impl CreatedDraw {
             let look = moby_render::SlotLook { model, alpha: m.alpha, fading: false, mode: m.mode, glow: m.glow, shine, e, late: mobys.shadow_casters.contains(&id), piece: m.piece, bangles: m.bangles };
             self.extra.show_slot(commands, level, slot, Some((class, look)), meshes, images, materials, buffers);
             shown.push(slot);
-            // Its manipulators (rc_game::moby::Moby::manips) on their lists' target joints.
+            // Its manipulators (rc_game::moby::Moby::manips) and scale nodes (`joint_scales`) on their lists' target
+            // joints.
+            let target = |l: u8| mobys.targets.get(&m.o_class)?.get(l as usize).filter(|&&j| j != 0xff).copied();
             let mods: Vec<moby_anim::JointModifier> = m
                 .manips
                 .iter()
-                .filter_map(|&(l, quat)| Some(moby_anim::JointModifier { quat, ..moby_anim::JointModifier::compose(*mobys.targets.get(&m.o_class)?.get(l as usize).filter(|&&j| j != 0xff)?) }))
+                .filter_map(|&(l, quat)| Some(moby_anim::JointModifier { quat, ..moby_anim::JointModifier::compose(target(l)?) }))
+                .chain(m.joint_scales.iter().filter_map(|&(l, s)| Some(moby_anim::JointModifier { scale: [s; 3], ..moby_anim::JointModifier::compose(target(l)?) })))
                 .collect();
             let pose = |ac: &MobyAnimClass| if mods.is_empty() { moby_anim::evaluate_with_snapshot(ac, &c.state, c.snapshot.as_ref()) } else { moby_anim::evaluate_posed(ac, &c.state, c.snapshot.as_ref(), &[], &mods) };
             if let Some(f) = mobys.skinned.get(&id).cloned().or_else(|| lv.anim.get(c.class).map(pose)) {

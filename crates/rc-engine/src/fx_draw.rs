@@ -2,7 +2,8 @@
 //! frame's second list, after the particles; the callbacks are rc_game::fx). One material for all of them
 //! ([`FxPrimMaterial`], `fx_prim.wgsl`: `0x2eb998` quads and strips with an FX texture, MODULATE, fog, ALPHA 0x44 /
 //! 0x48 on the frame's display bytes through crate::display_blend) and one vertex builder ([`PrimBuf`]); crate::play
-//! draws the tick's quads through [`FxSlots`].
+//! draws the tick's quads through [`FxSlots`]. The quads textured with the frame's own image (rc_game::fx::FrameQuad,
+//! crate::frame_copy) use the same material with the frame image bound ([`FxSlots::show_frame`]).
 
 use crate::game_camera::TfragFog;
 use bevy::asset::RenderAssetUsages;
@@ -19,6 +20,8 @@ const SHADER_PATH: &str = "shaders/fx_prim.wgsl";
 pub const LIST1_BIAS: f32 = 9.0e5;
 /// The second list's (`0x2e7920`): after the particles (1e6).
 pub const LIST2_BIAS: f32 = 1.1e6;
+/// The callbacks' frame quads (rc_game::fx::FrameQuad): after the second list's draws.
+pub const FRAME_BIAS: f32 = 1.15e6;
 
 /// Static uniform of one draw group.
 #[derive(Clone, Copy, Debug, Default, ShaderType)]
@@ -27,27 +30,37 @@ pub struct FxPrimParams {
     /// `Cd − Cs·As` (ALPHA 0x62 with As = FIX: [`FxPrimParams::subtract`]; a pipeline key). w = 1: an opaque world
     /// surface ([`FxPrimParams::opaque`]; the pipeline key).
     pub misc: Vec4,
+    /// A quad of the frame's own image ([`FxPrimParams::frame`], crate::frame_copy; a pipeline key): x = 1 its
+    /// colour from the [`FxPrimMaterial::frame`] image at the corners' screen places (+ UV_1) held to 0..y; z = 1
+    /// its alpha the FX texture's (the mask) × the vertex alpha, else 0x80 (it replaces the frame).
+    pub frame: Vec4,
 }
 
 impl FxPrimParams {
-    pub fn blend(additive: bool) -> Self { FxPrimParams { misc: Vec4::new(additive as u32 as f32, 0.0, 0.0, 0.0) } }
+    pub fn blend(additive: bool) -> Self { FxPrimParams { misc: Vec4::new(additive as u32 as f32, 0.0, 0.0, 0.0), frame: Vec4::ZERO } }
 
     /// ALPHA 0x62 (`(0 − Cs)·FIX + Cd`) with As = FIX through the vertex alpha: the colour taken off the frame.
-    pub fn subtract() -> Self { FxPrimParams { misc: Vec4::new(0.0, 1.0, 0.0, 0.0) } }
+    pub fn subtract() -> Self { FxPrimParams { misc: Vec4::new(0.0, 1.0, 0.0, 0.0), frame: Vec4::ZERO } }
+
+    /// rc_game::fx::FrameQuad: the frame image's colour, masked (ALPHA 0x44 by the mask's alpha) or not (replaced),
+    /// its screen places held to `0..clamp`.
+    pub fn frame(masked: bool, clamp: f32) -> Self { FxPrimParams { misc: Vec4::ZERO, frame: Vec4::new(1.0, clamp, masked as u32 as f32, 0.0) } }
 
     fn is_opaque(&self) -> bool { self.misc.w > 0.5 }
     fn is_subtract(&self) -> bool { self.misc.y > 0.5 }
+    fn is_frame(&self) -> bool { self.frame.x > 0.5 }
 }
 
-/// The pipeline key: an effect (display blend, no Z) or an opaque world surface.
+/// The pipeline key: an effect (display blend, no Z) or an opaque world surface; a frame quad (UV_1).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct FxPrimKey {
     opaque: bool,
     subtract: bool,
+    frame: bool,
 }
 
 impl From<&FxPrimMaterial> for FxPrimKey {
-    fn from(m: &FxPrimMaterial) -> Self { FxPrimKey { opaque: m.params.is_opaque(), subtract: m.params.is_subtract() } }
+    fn from(m: &FxPrimMaterial) -> Self { FxPrimKey { opaque: m.params.is_opaque(), subtract: m.params.is_subtract(), frame: m.params.is_frame() } }
 }
 
 /// One draw group of a callback: an FX texture, the fog, one of the two ALPHA equations, its Transparent3d order.
@@ -62,6 +75,10 @@ pub struct FxPrimMaterial {
     pub fog: TfragFog,
     #[uniform(3)]
     pub params: FxPrimParams,
+    /// The frame image a frame quad samples (crate::frame_copy; None: the fallback, unread).
+    #[texture(4)]
+    #[sampler(5)]
+    pub frame: Option<Handle<Image>>,
     /// Transparent3d sort bias (the callback list's band + the draw's position in it).
     pub order: f32,
 }
@@ -90,11 +107,17 @@ impl Material for FxPrimMaterial {
             crate::display_blend::specialize(descriptor);
             if key.bind_group_data.subtract { crate::display_blend::specialize_subtract(descriptor); }
         }
-        descriptor.vertex.buffers = vec![layout.0.get_layout(&[
+        let mut attrs = vec![
             Mesh::ATTRIBUTE_POSITION.at_shader_location(0),
             Mesh::ATTRIBUTE_UV_0.at_shader_location(1),
             Mesh::ATTRIBUTE_COLOR.at_shader_location(2),
-        ])?];
+        ];
+        if key.bind_group_data.frame {
+            attrs.push(Mesh::ATTRIBUTE_UV_1.at_shader_location(3));
+            descriptor.vertex.shader_defs.push("FX_FRAME".into());
+            if let Some(f) = descriptor.fragment.as_mut() { f.shader_defs.push("FX_FRAME".into()); }
+        }
+        descriptor.vertex.buffers = vec![layout.0.get_layout(&attrs)?];
         Ok(())
     }
 }
@@ -130,6 +153,8 @@ pub struct PrimBuf {
     uv: Vec<[f32; 2]>,
     color: Vec<[f32; 4]>,
     idx: Vec<u32>,
+    /// A frame quad's screen-place offsets (UV_1; empty for the others).
+    uv1: Vec<[f32; 2]>,
 }
 
 impl PrimBuf {
@@ -150,6 +175,13 @@ impl PrimBuf {
         self.idx.extend([b, b + 1, b + 2, b + 1, b + 2, b + 3]);
     }
 
+    /// A frame quad (rc_game::fx::FrameQuad): as [`PrimBuf::quad`], with each corner's screen-place offset.
+    pub fn frame_quad(&mut self, p: [[f32; 3]; 4], st: [[f32; 2]; 4], offset: [[f32; 2]; 4], rgba: [u32; 4]) {
+        if rgba.iter().all(|c| c >> 24 == 0) { return; }
+        self.quad(p, st, rgba);
+        self.uv1.extend(offset);
+    }
+
     pub fn is_empty(&self) -> bool { self.idx.is_empty() }
 
     /// Whether `mesh` already holds these primitives (crate::asset_write: a rewrite is an upload).
@@ -159,6 +191,7 @@ impl PrimBuf {
             && matches!(mesh.try_attribute_option(Mesh::ATTRIBUTE_UV_0), Ok(Some(V::Float32x2(v))) if *v == self.uv)
             && matches!(mesh.try_attribute_option(Mesh::ATTRIBUTE_COLOR), Ok(Some(V::Float32x4(v))) if *v == self.color)
             && matches!(mesh.try_indices_option(), Ok(Some(Indices::U32(v))) if *v == self.idx)
+            && (self.uv1.is_empty() || matches!(mesh.try_attribute_option(Mesh::ATTRIBUTE_UV_1), Ok(Some(V::Float32x2(v))) if *v == self.uv1))
     }
 
     /// Writes into mesh `h` unless it already holds these primitives.
@@ -171,6 +204,7 @@ impl PrimBuf {
         mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, self.pos);
         mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, self.uv);
         mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, self.color);
+        if !self.uv1.is_empty() { mesh.insert_attribute(Mesh::ATTRIBUTE_UV_1, self.uv1); }
         mesh.insert_indices(Indices::U32(self.idx));
     }
 }
@@ -242,7 +276,7 @@ impl FxSlots {
                         let mut m = Mesh::new(PrimitiveTopology::TriangleList, RenderAssetUsages::default());
                         g.prims.write(&mut m);
                         let mesh = a.meshes.add(m);
-                        let mat = a.materials.add(FxPrimMaterial { texture: img, fog: a.fog, params, order: band + k as f32 });
+                        let mat = a.materials.add(FxPrimMaterial { texture: img, fog: a.fog, params, frame: None, order: band + k as f32 });
                         let e = commands
                             .spawn((
                                 Mesh3d(mesh.clone()),
@@ -251,6 +285,70 @@ impl FxSlots {
                                 NoFrustumCulling,
                                 Visibility::Inherited,
                                 crate::display_blend::DisplayEffect,
+                                Name::new(format!("{name} draw {k}")),
+                            ))
+                            .id();
+                        if let Some(l) = &self.layer { commands.entity(e).insert(l.clone()); }
+                        self.slots[k] = Some((e, mesh, mat, true));
+                        continue;
+                    }
+                }
+            }
+            set_visible(vis, &mut self.slots[k], show);
+        }
+        for s in self.slots.iter_mut().skip(n) { set_visible(vis, s, false); }
+    }
+
+    /// Shows the frame quads (rc_game::fx::FrameQuad) in slots 0.. (bias `band + slot`): one group per frame image,
+    /// mask and limit in the order they came, sampling `frames` (crate::frame_copy; the entities carry its
+    /// `FrameSample`). Use slots of their own (their meshes carry UV_1).
+    #[allow(clippy::too_many_arguments)]
+    pub fn show_frame(&mut self, commands: &mut Commands, vis: &mut Query<&mut Visibility>, a: &mut FxAssets, quads: &[rc_game::fx::FrameQuad], frames: &crate::frame_copy::FrameImages, band: f32, name: &str) {
+        let mut keyed: Vec<((rc_game::fx::FrameSource, Option<usize>, u32), PrimBuf)> = Vec::new();
+        for q in quads {
+            let k = (q.source, q.mask, q.clamp.to_bits());
+            let i = keyed.iter().position(|(kk, _)| *kk == k).unwrap_or_else(|| { keyed.push((k, PrimBuf::default())); keyed.len() - 1 });
+            keyed[i].1.frame_quad(q.corners, q.st, q.offset, q.rgba);
+        }
+        let n = keyed.len();
+        if n > 0 { bevy::log::info_once!("{name}: the first quads of the frame's own image ({} quads)", quads.len()); }
+        for (k, ((source, mask, clamp), prims)) in keyed.into_iter().enumerate() {
+            // The mask's FX texture (unread without one: any FX image binds).
+            let img = self.image(a, mask.unwrap_or(0));
+            if self.slots.len() <= k { self.slots.push(None); }
+            let show = !prims.is_empty() && img.is_some();
+            if show {
+                let img = img.expect("checked");
+                let params = FxPrimParams::frame(mask.is_some(), f32::from_bits(clamp));
+                let frame = Some(frames.get(source));
+                match &mut self.slots[k] {
+                    Some((e, mesh, mat, _)) => {
+                        prims.update(a.meshes, mesh);
+                        let need = a.materials.get(&*mat).is_none_or(|m| m.texture != img || m.params.frame != params.frame || m.frame != frame || m.fog != a.fog);
+                        if need {
+                            if let Some(mut m) = a.materials.get_mut(&*mat) {
+                                m.texture = img;
+                                m.params = params;
+                                m.frame = frame;
+                                m.fog = a.fog;
+                            }
+                            commands.entity(*e).insert(crate::frame_copy::FrameSample(source));
+                        }
+                    }
+                    None => {
+                        let mut m = Mesh::new(PrimitiveTopology::TriangleList, RenderAssetUsages::default());
+                        prims.write(&mut m);
+                        let mesh = a.meshes.add(m);
+                        let mat = a.materials.add(FxPrimMaterial { texture: img, fog: a.fog, params, frame, order: band + k as f32 });
+                        let e = commands
+                            .spawn((
+                                Mesh3d(mesh.clone()),
+                                MeshMaterial3d(mat.clone()),
+                                Transform::IDENTITY,
+                                NoFrustumCulling,
+                                Visibility::Inherited,
+                                crate::display_blend::DisplayEffect,
+                                crate::frame_copy::FrameSample(source),
                                 Name::new(format!("{name} draw {k}")),
                             ))
                             .id();

@@ -30,7 +30,9 @@
 //! come before the list-1 water strips).
 //!
 //! **Cost.** When a view has effect items: two full-frame conversion passes (and the MSAA resolve of the effect
-//! target); none otherwise. Measured in docs/plan/particles.md "Display-space blending".
+//! target); none otherwise. Measured in docs/plan/particles.md "Display-space blending". On the world camera the
+//! effect target is also copied into crate::frame_copy's images: at the end of the pass (the last finished frame),
+//! and before the first item that samples the frame's copy (the pass split there).
 
 use bevy::core_pipeline::core_3d::{main_transparent_pass_3d, Transparent3d};
 use bevy::core_pipeline::{Core3d, Core3dSystems, FullscreenShader};
@@ -232,7 +234,8 @@ fn prepare_targets(
                 },
             )
         };
-        let res = desc("effects: display target", 1, TextureUsages::RENDER_ATTACHMENT | TextureUsages::TEXTURE_BINDING);
+        // COPY_SRC: crate::frame_copy's images are copied from it.
+        let res = desc("effects: display target", 1, TextureUsages::RENDER_ATTACHMENT | TextureUsages::TEXTURE_BINDING | TextureUsages::COPY_SRC);
         let ms = (samples > 1).then(|| desc("effects: display target (MSAA)", samples, TextureUsages::RENDER_ATTACHMENT));
         commands.entity(e).insert(EffectTargets { ms, res });
     }
@@ -261,13 +264,13 @@ fn split_effects(
 /// Draws the view's stashed effect items on the frame's display bytes (module doc, step 2).
 fn effect_pass(
     world: &World,
-    view: ViewQuery<(&ExtractedCamera, &ViewTarget, &ViewDepthTexture, Option<&EffectTargets>)>,
+    view: ViewQuery<(&ExtractedCamera, &ViewTarget, &ViewDepthTexture, Option<&EffectTargets>, Has<crate::frame_copy::FrameCopyView>)>,
     pipes: Option<Res<EffectPipelines>>,
     cache: Res<PipelineCache>,
     mut ctx: RenderContext,
 ) {
     let view_entity = view.entity();
-    let (camera, target, depth, targets) = view.into_inner();
+    let (camera, target, depth, targets, frame_view) = view.into_inner();
     let stash = world.resource::<EffectStash>();
     let guard = stash.0.lock().unwrap_or_else(|e| e.into_inner());
     let Some(phase) = guard.get(&view_entity).filter(|p| !p.items.is_empty()) else { return };
@@ -302,8 +305,24 @@ fn effect_pass(
         pass.set_bind_group(0, &from_frame, &[]);
         pass.draw(0..3, 0..1);
     }
-    // 2. The effects, blended by the hardware on those bytes, depth-tested against the scene.
-    {
+    // 2. The effects, blended by the hardware on those bytes, depth-tested against the scene. On the world camera the
+    //    pass stops before the first item that samples the frame's copy (crate::frame_copy), the target (resolved)
+    //    is copied, and the rest follows; at the end the target is kept as the last finished frame.
+    let n = phase.items.len();
+    let split = world
+        .get_resource::<crate::frame_copy::CopySamplers>()
+        .filter(|s| frame_view && !s.0.is_empty())
+        .and_then(|s| phase.items.keys().position(|k| s.0.contains(&k.1)));
+    // (An empty first range still resolves the MSAA target before the copy.)
+    let ranges = match split {
+        Some(k) => {
+            bevy::log::info_once!("effects: the frame copied before effect item {k} of {n} (crate::frame_copy)");
+            vec![0..k, k..n]
+        }
+        None => vec![0..n],
+    };
+    for (i, range) in ranges.into_iter().enumerate() {
+        if i > 0 { crate::frame_copy::copy_into(&mut ctx, world, &t.res.texture, crate::frame_copy::FrameSource::Copy); }
         let mut pass = ctx.begin_tracked_render_pass(RenderPassDescriptor {
             label: Some("effects: display-space blend"),
             color_attachments: &[Some(RenderPassColorAttachment { view: color, depth_slice: None, resolve_target: resolve.map(|v| &**v), ops: Operations { load: LoadOp::Load, store: StoreOp::Store } })],
@@ -313,8 +332,9 @@ fn effect_pass(
             multiview_mask: None,
         });
         if let Some(v) = camera.viewport.as_ref() { pass.set_camera_viewport(v); }
-        if let Err(err) = phase.render(&mut pass, world, view_entity) { error!("effects: {err:?}"); }
+        if let Err(err) = phase.render_range(&mut pass, world, view_entity, range) { error!("effects: {err:?}"); }
     }
+    if frame_view { crate::frame_copy::copy_into(&mut ctx, world, &t.res.texture, crate::frame_copy::FrameSource::Shown); }
     // 3. Back into the view target.
     let mut pass = ctx.begin_tracked_render_pass(RenderPassDescriptor {
         label: Some("effects: display bytes to frame"),

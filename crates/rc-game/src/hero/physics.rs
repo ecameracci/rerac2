@@ -73,8 +73,8 @@ pub struct Env<'a> {
     pub level: i32,
     /// `0x1a9010`: Maktar's arena master out of its desk state (crate::game::GameState::arena_on).
     pub arena_on: bool,
-    /// `0x1a7a49`: the big-head cheat (crate::cheats::cheat::BIG_HEAD; the head's scale `0x2ab498`).
-    pub big_head: bool,
+    /// `0x1a7a48`: the cheat bytes (crate::cheats; [`Env::cheat`]).
+    pub cheats: [u8; crate::cheats::LEN],
     /// Every moby's o_class by its index (the ground moby's class).
     pub classes: &'a [i16],
     /// The Swingshot nodes (class 0x2f6), the hook nodes (0x323) and the pull targets (0x99d).
@@ -96,6 +96,8 @@ impl Env<'_> {
     pub fn sphere(&self, c: V3, r: f32, flags: u32) -> Option<CollOutput> { coll_sphere_m(self.coll, self.scene, c, r, QueryFlags(flags), self.hero_moby) }
     /// `0x2e05c8(r, h, base, flags, Ratchet)`: the capsule query.
     pub fn capsule(&self, base: V3, h: f32, r: f32, flags: QueryFlags) -> Option<CollOutput> { coll_capsule_m(self.coll, self.scene, base, h, r, flags, self.hero_moby) }
+    /// Cheat byte `b` on (`0x1a7a48[b]`, crate::cheats::cheat).
+    pub fn cheat(&self, b: usize) -> bool { self.cheats.get(b).is_some_and(|&c| c != 0) }
 }
 
 // ------------------------------------------------------------------------------------------------

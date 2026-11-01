@@ -28,12 +28,17 @@
 //!
 //! Not ported: the ride of a free cluster on a moving moby (`0x3222a8` / `0x3223e8` / `0x322570`: crates on movers
 //! are not ported either), the loaded-area test (`0x321a78` → state 5, back to 2 when the area is loaded again),
-//! the cheat `0x1a7a4e` (taken at full health while `0x189ffc` is 0, which it sets to 600; the flight held at 250),
 //! the challenge mode's four times the health (`0x1a7a12`), the orbs kept on the cluster out of view (`0x1adb0c`).
+//!
+//! **The invincibility cheat** (byte 6, `0x1a7a4e`; the same three reads in the level copies L01 `0x396b30`, L02
+//! `0x3aa4a8`, L03 `0x3a6768`): a cluster is taken at full health too while Ratchet is not invincible (`0x189ffc`, his
+//! [`crate::hero::damage::DamageBlock::invincible`]), and taking one makes him invincible for 600 ticks; in the flight,
+//! at full health and invincible, the cluster's timer is held at 250 (its ring's timers held with it), so it lingers.
 
 use crate::fx::FxQuad;
 use crate::hero::physics::{add, add_rot, cross, dist, dist2, euler_rows, len, scale, set_len, sub, V3};
 use crate::moby::aim::is_crate;
+use crate::cheats::cheat::INVINCIBLE;
 use crate::moby::{countdown, Ctx, MobyWorld};
 use crate::particles::{self, rec};
 
@@ -83,6 +88,9 @@ const TRAIL_SIZE: f32 = 10000.0;
 const ORB_SPIN: u8 = 4;
 /// `$gp+0x458` the flight's ticks; `+0x460` / `+0x464` an orb's; `+0x470` the chest's height; `+0x46c` the fan.
 const FLIGHT: i16 = 300;
+/// The invincibility cheat's hold of the flight (L00 `gp+0x45c`, L02 `gp+0x53c`) and its invincibility.
+const CHEAT_HOLD: i16 = 250;
+const CHEAT_INVINCIBLE: i16 = 600;
 const ORB_FLIGHT: (i32, i32) = (20, 80);
 const CHEST: f32 = 0.75;
 const FAN: f32 = 5.0;
@@ -426,7 +434,8 @@ fn heal_test(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let Some(master) = w.nanotech.master else { return };
     let hp = ctx.hero.hp;
     if hp == 0 { return; }
-    if max_health(ctx) <= hp + w.mobys[master].pv_b(pv::PENDING) as i32 { return; }
+    // At the limit, only with the invincibility cheat while he is not invincible (`0x1a7a4e`, `0x189ffc`).
+    if max_health(ctx) <= hp + w.mobys[master].pv_b(pv::PENDING) as i32 && (!ctx.game.cheat(INVINCIBLE) || ctx.hero.damage.invincible != 0) { return; }
     if (0..8).all(|k| orb_of(w, id, k).is_none()) { return; }
     let at = w.mobys[id].pos;
     if 10.0 <= dist(at, ctx.hero.pos) { return; }
@@ -435,6 +444,7 @@ fn heal_test(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     w.mobys[id].state = 3;
     let n = w.mobys[master].pv_b(pv::PENDING).wrapping_add(1);
     w.mobys[master].set_pv_b(pv::PENDING, n);
+    if ctx.game.cheat(INVINCIBLE) { ctx.hero.damage.invincible = CHEAT_INVINCIBLE; }
     w.mobys[id].set_pv_s(pv::TIMER, FLIGHT);
     let mut d = sub(chest(ctx), at);
     d[2] -= 0.5;
@@ -462,6 +472,12 @@ fn fly(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     if w.mobys[id].pv_b(pv::HEALED) != 0 {
         w.mobys[id].pos = chest(ctx);
         if ring(w, id, ctx) && ctx.game.rng.randi(5) == 0 { glints(w, id, ctx); }
+    }
+    // The invincibility cheat: at the limit and invincible, the timer held at 250 and the ring's 4 timers with it.
+    if ctx.hero.hp == max_health(ctx) && ctx.hero.damage.invincible != 0 && ctx.game.cheat(INVINCIBLE) && w.mobys[id].pv_s(pv::TIMER) < CHEAT_HOLD {
+        let m = &mut w.mobys[id];
+        m.set_pv_s(pv::TIMER, CHEAT_HOLD);
+        for k in 0..4 { m.set_pv_s(pv::RING_T + 2 * k, m.pv_s(pv::RING_T + 2 * k).wrapping_add(1)); }
     }
     let mut t = w.mobys[id].pv_s(pv::TIMER) as i32;
     let out = countdown(&mut t);

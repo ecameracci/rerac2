@@ -24,7 +24,15 @@
 //! | `0x3d7858` / `0x3dc2d0` | Maktar's arena bosses 0x09f8 / 0x0a44 | their lights (crate::moby::classes::bosses) |
 //! | `0x423e10` | 0x0a44's shot 0x0d08 (the first list) | its glow and sparks (crate::moby::classes::bosses::draw_shot) |
 //! | `0x4137d0` | the space fights' laser 0xffa | a streak ([`crate::ship::draw_laser`]) |
-//! | `0x426410` (L02) | the big explosion 0x0d4e | its discs and glare ([`crate::moby::classes::explosion::draw`]) |
+//! | `0x426410` (L02) | the big explosion 0x0d4e | its discs and glare ([`crate::moby::classes::explosion::draw`]); its shimmer ([`FrameQuad`]) |
+//! | `0x3fac68` (L02) | the Spiderbot 0x0b58 | its blast's sphere ([`FrameQuad`], [`crate::moby::classes::spiderbot::draw_blast`]) |
+//!
+//! **The frame's own image** (`0x2ea6c8(n)` for n < 0: a texture of a GS buffer instead of an FX texture): −1 queues a
+//! GS copy of the frame as it stands (the draw buffer `0x1a72dc` scaled by the sprites `0x138ad0` into a 256×256 CT16
+//! texture at the next texture page; made once a frame, `gp−0x6520` cleared by the frame start `0x2ea390`), −7 the
+//! buffer on show (`0x1a72d8`, DISPFB: the last finished frame) as it is. The quads that sample them are
+//! [`FrameQuad`]s ([`Lists::frame`]): the engine draws them after the second list's quads, the copy taken before the
+//! first of them (a full-size copy here, not the 256×256 CT16 one).
 //!
 //! Before them, the frame's blob shadows (`0x2e7ab0`, crate::shadows: FX 0, ALPHA 0x44) go first into the same quads.
 //!
@@ -48,6 +56,38 @@ pub struct FxQuad {
     pub corners: [V3; 4],
     pub st: [[f32; 2]; 4],
     pub rgba: [u32; 4],
+}
+
+/// The frame image a [`FrameQuad`] samples (module docs).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum FrameSource {
+    /// `0x2ea6c8(−1)`: the frame as it stands when the quad draws (made once a frame, before the first such quad).
+    Copy,
+    /// `0x2ea6c8(−7)`: the last finished frame (the buffer on show).
+    Shown,
+}
+
+/// A quad textured with the frame's own image (`0x2eb998` with a [`FrameSource`]'s TEX0): each corner samples the
+/// image at its own screen place (`0x2ea5b8`: 0..1 across and down the screen) plus `offset`, held to `0..clamp` (the
+/// engine takes the place per pixel and interpolates the offsets, so that a quad reaching past the screen or near the
+/// camera does not smear the image across it; the game interpolates the corners' clamped places as ST/Q).
+/// `mask`: the FX texture whose alpha (at `st`, MODULATE with the vertex alpha) blends it over the frame (ALPHA 0x44);
+/// None: it replaces the frame (`(Cd − Cd)·As + Cs`, ALPHA 0x05). Its colour is MODULATEd by `rgba` and fogged.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct FrameQuad {
+    pub source: FrameSource,
+    pub mask: Option<usize>,
+    pub corners: [V3; 4],
+    pub st: [[f32; 2]; 4],
+    pub offset: [[f32; 2]; 4],
+    pub clamp: f32,
+    pub rgba: [u32; 4],
+}
+
+/// `0x2eef20`'s rejection of a quad with a corner past the front clip plane, as the game's near distance (`0x18cda0`,
+/// 32 / 1024): true when every corner is in front of the camera (`rows[0]` its forward row) by more than it.
+pub fn in_front(corners: &[V3; 4], cam: V3, forward: V3) -> bool {
+    corners.iter().all(|c| crate::hero::physics::dot(sub(*c, cam), forward) > 32.0 / 1024.0)
 }
 
 const ST: [[f32; 2]; 4] = [[0.0, 0.0], [1.0, 0.0], [0.0, 1.0], [1.0, 1.0]];
@@ -229,26 +269,30 @@ fn draw_0b0b(w: &MobyWorld, host: &dyn crate::moby::MobyHost, id: usize, rng: &m
 pub struct Lists {
     pub first: Vec<FxQuad>,
     pub second: Vec<FxQuad>,
+    /// The quads of either list that sample the frame's own image (module docs, [`FrameQuad`]), in call order.
+    pub frame: Vec<FrameQuad>,
 }
 
 pub fn callbacks(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut crate::game::GameState, hero_state: i32, view: &crate::particles::BSphereView, cam: V3) -> Lists {
     let mut first = Vec::new();
+    let mut frame = Vec::new();
     // The ship's shadow (`0x361af8`, a first-list callback; crate::travel).
     crate::travel::draw_ship_shadow(game, view, &mut first);
-    for id in w.draws_first.clone() { one(w, host, game, hero_state, view, cam, id, true, &mut first); }
+    for id in w.draws_first.clone() { one(w, host, game, hero_state, view, cam, id, true, &mut first, &mut frame); }
     let mut out = Vec::new();
     // The blob shadows first (`0x2e7ab0` runs before the callbacks' list, `0x2e7970`).
     crate::shadows::draw(&w.shadows, &mut out);
-    for id in w.draws.clone() { one(w, host, game, hero_state, view, cam, id, false, &mut out); }
-    Lists { first, second: out }
+    for id in w.draws.clone() { one(w, host, game, hero_state, view, cam, id, false, &mut out, &mut frame); }
+    Lists { first, second: out, frame }
 }
 
 /// One registered callback (the class's).
 #[allow(clippy::too_many_arguments)]
-fn one(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut crate::game::GameState, hero_state: i32, view: &crate::particles::BSphereView, cam: V3, id: usize, first: bool, out: &mut Vec<FxQuad>) {
+fn one(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut crate::game::GameState, hero_state: i32, view: &crate::particles::BSphereView, cam: V3, id: usize, first: bool, out: &mut Vec<FxQuad>, frame: &mut Vec<FrameQuad>) {
     use crate::moby::classes::tie_lights;
     if w.mobys.get(id).is_none_or(|m| 0x80 <= m.state) { return; }
     match w.mobys[id].o_class {
+        crate::moby::classes::spiderbot::BOT_CLASS => crate::moby::classes::spiderbot::draw_blast(w, id, cam, host.camera_rows(), frame),
         0x0ce9 => tie_lights::draw(w, id, view, cam, out),
         0x0b0a => draw_0b0a(w, id, &mut game.rng, cam, out),
         0x0b0b | 0x0b22 => draw_0b0b(w, host, id, &mut game.rng, cam, out),
@@ -283,7 +327,7 @@ fn one(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut crate::ga
         crate::moby::classes::bosses::SHOT => crate::moby::classes::bosses::draw_shot(w, id, &mut game.rng, cam, out),
         crate::moby::classes::keeper::SHOT => crate::moby::classes::keeper::draw_shot(w, id, &mut game.rng, cam, out),
         crate::moby::classes::teleport::CLASS => crate::moby::classes::teleport::draw(w, id, &host.camera_rows(), out),
-        crate::moby::classes::explosion::CLASS => crate::moby::classes::explosion::draw(w, id, cam, host.camera_rows(), out),
+        crate::moby::classes::explosion::CLASS => crate::moby::classes::explosion::draw(w, id, cam, host.camera_rows(), out, frame),
         0x00bc => crate::moby::classes::tractor::draw(w, id, cam, -0.3 * (game.frame % 27) as f32, out),
         crate::ship::LASER_CLASS => crate::ship::draw_laser(w, id, cam, out),
         _ => {}

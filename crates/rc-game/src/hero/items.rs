@@ -463,8 +463,8 @@ fn switch(world: &mut MobyWorld, ctx: &mut Ctx) {
 }
 
 /// The worn feet (slot 1): `0x2afc68` creates both when there are none — the item [`FEET_ITEM`]'s row's classes
-/// `+0x04` / `+0x08` (draw distance 0x20, drawn, lit as Ratchet, ready) — not on armour 4 or with the cheats' bodies
-/// (the port wears armour 0). `0x2b09e0` then puts the first at the row's attachment and the second at
+/// `+0x04` / `+0x08` (draw distance 0x20, drawn, lit as Ratchet, ready) — not in armour 4 or with a body cheat, which
+/// delete them (crate::cheats::worn_hidden). `0x2b09e0` then puts the first at the row's attachment and the second at
 /// [`FEET_SECOND_ATTACH`], each posed from his feet ([`FEET_JOINTS`], `0x2aa278`: the engine draws them so). While they
 /// are worn his own feet are scaled to 0.01 (`0x2ac218`, crate::hero::posture).
 ///
@@ -475,6 +475,13 @@ pub fn feet_pass(world: &mut MobyWorld, ctx: &mut Ctx) {
     for (k, slot) in it.feet.iter_mut().enumerate() {
         let class = row.classes[k] as i16;
         if slot.is_some_and(|id| world.mobys.get(id).is_none_or(|m| m.state >= 0xfe || m.o_class != class)) { *slot = None; }
+    }
+    // `0x2afc68`: armour 4 or a body cheat deletes both (`0x311688`) and makes none.
+    if ctx.game.worn_hidden() {
+        for slot in it.feet.iter_mut() {
+            if let Some(id) = slot.take() { world.delete(id); }
+        }
+        return;
     }
     if it.feet[0].is_none() {
         for k in 0..2 {
@@ -508,8 +515,8 @@ pub fn feet_pass(world: &mut MobyWorld, ctx: &mut Ctx) {
 
 /// The head item (slot 2): `0x2afc68` creates it when there is none (item `0x1a73a0`, else 0x2f: class
 /// [`HEAD_CLASS`]; draw distance 0x20, drawn, ready), in play and, through `0x2d4fc8`, in a scene (on the scene's
-/// Ratchet: the host's hero pose). Not on armour 4 or with the cheats' bodies (`0x1a7a51` / `0x4a` / `0x53` / `0x52`):
-/// the port wears armour 0. `0x2b09e0` then puts it at Ratchet's attachment [`HEAD_ATTACH`] (his head), out of the
+/// Ratchet: the host's hero pose). Not in armour 4 or with a body cheat (`0x1a7a51` / `0x4a` / `0x53` / `0x52`), which
+/// delete it (crate::cheats::worn_hidden). `0x2b09e0` then puts it at Ratchet's attachment [`HEAD_ATTACH`] (his head), out of the
 /// moby loop; its pose is built from his (`0x2aa278`: joint 0 at rest, joints 1 and 2 his [`HEAD_JOINTS`]; the
 /// engine draws it so). Shown (`0x2d4fc8` clears bit 0 in a scene). Its visor (`0x2b13c8`, slot 2: `+0x7c` = 1, its
 /// piece 0 drawn on top, crate::moby::Moby::bangles) is down while Ratchet swims (movement group 0x11), in the
@@ -517,6 +524,11 @@ pub fn feet_pass(world: &mut MobyWorld, ctx: &mut Ctx) {
 pub fn head_pass(world: &mut MobyWorld, ctx: &mut Ctx) {
     let it = &mut ctx.hero.items;
     if it.head.is_some_and(|id| world.mobys.get(id).is_none_or(|m| m.state >= 0xfe || m.o_class != HEAD_CLASS)) { it.head = None; }
+    // `0x2afc68`: armour 4 or a body cheat deletes it (`0x311688`) and makes none.
+    if ctx.game.worn_hidden() {
+        if let Some(id) = it.head.take() { world.delete(id); }
+        return;
+    }
     if it.head.is_none() && world.class(HEAD_CLASS).is_some() {
         let id = world.create(HEAD_CLASS);
         let m = &mut world.mobys[id];

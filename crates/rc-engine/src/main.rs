@@ -32,6 +32,7 @@ mod display;
 mod display_blend;
 mod disc_source;
 mod fly_cam;
+mod frame_copy;
 mod fx_draw;
 mod game_camera;
 mod gs_state;
@@ -169,6 +170,7 @@ fn main() -> anyhow::Result<()> {
     .add_plugins(world_lights::WorldLightsPlugin)
     .add_plugins(sky_render::SkyRenderPlugin)
     .add_plugins(display_blend::DisplayBlendPlugin)
+    .add_plugins(frame_copy::FrameCopyPlugin)
     .add_plugins(particle_render::ParticlePlugin)
     .add_plugins(fx_draw::FxDrawPlugin)
     .add_plugins(hud_render::HudPlugin)

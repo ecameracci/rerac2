@@ -219,6 +219,8 @@ pub(crate) struct Play {
     fx_quads: Vec<rc_game::fx::FxQuad>,
     /// The first list's callbacks' quads (`0x2e7718`, drawn before the particles; rc_game::fx::Lists).
     fx_quads_first: Vec<rc_game::fx::FxQuad>,
+    /// The callbacks' quads of the frame's own image (rc_game::fx::FrameQuad; crate::frame_copy).
+    frame_quads: Vec<rc_game::fx::FrameQuad>,
     /// The ship's exhaust and smoke (rc_game::exhaust).
     exhaust: rc_game::exhaust::Exhaust,
     scene_wad: Option<(Vec<u8>, rc_formats::disc::scene::SceneWad)>,
@@ -406,6 +408,14 @@ fn tick(
                 Some(d) => println!("play: the Gravity Bomb's shockwave mesh: {} quads, {} vertices", d.quads.len(), d.verts.len()),
                 None => eprintln!("play: the Gravity Bomb's shockwave tables not found in the level's overlay: no shockwave mesh"),
             }
+            mesh.map(std::sync::Arc::new)
+        }).flatten();
+        // The Spiderbot's blast sphere (rc_game::moby::classes::spiderbot::draw_blast): its tables at this level's copy
+        // of Aranos's addresses, on the levels that have the bot's class.
+        m.world.spiderbot.mesh = m.world.class(rc_game::moby::classes::spiderbot::BOT_CLASS).is_some().then(|| {
+            let code = crate::level_code::LevelCode::load(&crate::level_load::extracted_root(), crate::level_load::level_index()).ok()?;
+            let mesh = code.with_reader(|read| rc_game::moby::classes::spiderbot::SphereMesh::read(read));
+            if mesh.is_none() { eprintln!("play: the Spiderbot's sphere tables not found in the level's overlay: no blast sphere"); }
             mesh.map(std::sync::Arc::new)
         }).flatten();
         // `0x3012a0`: Ratchet's parked ship from the level settings (rc_game::travel).
@@ -713,9 +723,11 @@ fn tick(
                 (g.on, g.inward, g.centre, g.height_centre) = (true, true, [v[0], v[1], v[2]], [v[0], v[1], v[2]]);
             }
         }
+        // The left-handed cheat (byte 5): his SetAnim swaps the sequences 0x31 / 0x32 (`0x2d2508`).
+        p.anim.mirror = p.game.cheat(rc_game::cheats::cheat::LEFT_HANDED);
         let env = Env {
             coll, pad: &p.pad, cam_yaw: p.camera.yaw(), cam_pos: p.camera.pos, cam_rows: p.camera.rows, mirror: false, scene: scene.as_ref(), hero_moby: mobys.hero_moby, targets: &targets, hit, death_z,
-            clank: p.game.clank, pack: p.game.pack(), boots: p.game.boots, charge_boots: p.game.charge_boots, grind_boots: p.game.grind_boots, rails: &mobys.rails, level: p.game.level, arena_on: p.game.arena_on, big_head: p.game.cheat(rc_game::cheats::cheat::BIG_HEAD), classes: &classes, nodes: &nodes, hooks: &hooks, pulls: &pulls,
+            clank: p.game.clank, pack: p.game.pack(), boots: p.game.boots, charge_boots: p.game.charge_boots, grind_boots: p.game.grind_boots, rails: &mobys.rails, level: p.game.level, arena_on: p.game.arena_on, cheats: p.game.cheats, classes: &classes, nodes: &nodes, hooks: &hooks, pulls: &pulls,
         };
         let before = rc_game::hero::anim::AnimCtl::view(&p.anim.ctl(class));
         let mut ctl = p.anim.ctl(class);
@@ -829,7 +841,7 @@ fn tick(
         let [fwd, left, up] = p.camera.rows;
         let view = rc_game::particles::BSphereView::from_camera(p.camera.pos, fwd, left, up, tx, ty);
         let lists = rc_game::fx::callbacks(&mut mobys.world, &host, &mut p.game, p.hero.state, &view, p.camera.pos);
-        (p.fx_quads_first, p.fx_quads) = (lists.first, lists.second);
+        (p.fx_quads_first, p.fx_quads, p.frame_quads) = (lists.first, lists.second, lists.frame);
     }
     // The point lights the mobys merge (crate::moby_render).
     if let Some(l) = lights.as_deref_mut() {
@@ -1105,7 +1117,7 @@ fn puzzle_frame(p: &mut Play, lv: &crate::level_load::LoadedLevel, occl: Option<
     let class = &lv.mobys.anim[p.class];
     let hero_view = rc_game::hero::anim::AnimCtl::view(&p.anim.ctl(class));
     let Some(mobys) = p.mobys.as_mut() else { return };
-    (p.fx_quads_first, p.fx_quads) = (Vec::new(), Vec::new());
+    (p.fx_quads_first, p.fx_quads, p.frame_quads) = (Vec::new(), Vec::new(), Vec::new());
     p.game.markers.clear();
     if let Some(s) = parts.as_deref_mut() {
         let aux = rc_game::particles::PartAux { cam_yaw: p.camera.yaw(), water_z: p.hero.surf.water_z, coll: Some(coll), rain: mobys.world.weather.aux(&mobys.level, &p.game) };
@@ -1808,11 +1820,14 @@ fn scene_tick(p: &mut Play, lv: &mut crate::level_load::LoadedLevel, commands: &
         let serial = m.serial;
         mobys.created.insert(pose.moby, crate::mobys::Created { class: ci, state, snapshot: None, serial });
     }
+    // The heads (`0x2d51f8`, `0x2a7170`, `0x2fd5b0`): Ratchet's and Clank's scales, the cheats' big heads on the actors.
+    let cheats = p.game.cheats;
+    p.game.scenes.actor_heads(&mut mobys.world, &mut p.hero.posture, &cheats, level);
     // `0x2d51f8` → `0x2d4fc8`: the head item on the scene's Ratchet (at his track with the scene's sequence and
     // his head's scale), else on Ratchet as he stands.
     {
         let (pos, rows, state, snapshot, mods) = match hero_pose {
-            Some((pos, state)) => (pos, identity, state, None, scene_hero_mods(&mobys.hero_targets, p.hero.items.feet[0].is_some())),
+            Some((pos, state)) => (pos, identity, state, None, scene_hero_mods(&mobys.hero_targets, p.hero.items.feet[0].is_some(), p.hero.posture.head_scale)),
             None => (p.hero.pos, p.hero.rows, p.anim.state, p.anim.snapshot.clone(), p.hero.posture.modifiers(&mobys.hero_targets)),
         };
         // The scene's Ratchet takes none of play's pose layers (below).
@@ -1862,7 +1877,7 @@ fn scene_tick(p: &mut Play, lv: &mut crate::level_load::LoadedLevel, commands: &
             if let Some(i) = a.instances.get_mut(k) { i.state = s; }
             if hero_pose.is_some() {
                 if let Some(slot) = a.snapshots.get_mut(k) { *slot = None; }
-                if let Some(mods) = a.mods.get_mut(k) { *mods = scene_hero_mods(&mobys.hero_targets, p.hero.items.feet[0].is_some()); }
+                if let Some(mods) = a.mods.get_mut(k) { *mods = scene_hero_mods(&mobys.hero_targets, p.hero.items.feet[0].is_some(), p.hero.posture.head_scale); }
                 // The scene's Ratchet is his moby made anew (`0x305428`: `0x311418(moby, 0)`), posed by the scene alone:
                 // none of play's pose layers (the weapon's hold, the face's look at an enemy) go with him.
                 if let Some(l) = a.layers.get_mut(k) { l.clear(); }
@@ -1888,7 +1903,7 @@ fn scene_tick(p: &mut Play, lv: &mut crate::level_load::LoadedLevel, commands: &
         let [fwd, left, up] = frame.camera.rows;
         let view = rc_game::particles::BSphereView::from_camera(frame.camera.eye, fwd, left, up, tx, ty);
         let lists = rc_game::fx::callbacks(&mut mobys.world, &host, &mut p.game, p.hero.state, &view, frame.camera.eye);
-        (p.fx_quads_first, p.fx_quads) = (lists.first, lists.second);
+        (p.fx_quads_first, p.fx_quads, p.frame_quads) = (lists.first, lists.second, lists.frame);
         // The flight's draw (`0x363ba0`): on the variant's first actor, the ship without the trip's own moby (kind 0),
         // at `+0x95` past 0x10 (0xe8, fading with the arrival), its exhaust (`0x362ac8`) and its smoke (`0x3684b0`).
         use rc_game::moby::MobyHost;
@@ -1910,12 +1925,13 @@ fn scene_tick(p: &mut Play, lv: &mut crate::level_load::LoadedLevel, commands: &
     p.scene_listener = Some(rc_game::audio::voices::Listener { pos: frame.camera.eye, rows: frame.camera.rows, underwater: false, water_height: 0.0 });
 }
 
-/// The scene's Ratchet's joint modifiers: his head's scale (list 24: 0.849 × 0.849 × 0.875) and, under the worn feet,
-/// his feet hidden (`0x2ac218`'s 0.01 on the feet records, lists 22 / 23).
-fn scene_hero_mods(targets: &[u8], feet: bool) -> Vec<rc_formats::moby_anim::JointModifier> {
+/// The scene's Ratchet's joint modifiers: his head's scale (`0x2d51f8`'s node `0x1b1650` on list 24: `head` × 0.97,
+/// × 0.97, × 1; `head` is `$gp − 0x72fc`, 0.875 or 1.57 with the big-head cheat) and, under the worn feet, his feet
+/// hidden (`0x2ac218`'s 0.01 on the feet records, lists 22 / 23).
+fn scene_hero_mods(targets: &[u8], feet: bool, head: f32) -> Vec<rc_formats::moby_anim::JointModifier> {
     use rc_formats::moby_anim::JointModifier;
     let t = |l: usize| targets.get(l).copied().filter(|&t| t != 0xff);
-    let mut mods: Vec<JointModifier> = t(24).map(|j| JointModifier { scale: [0.848_75, 0.848_75, 0.875], ..JointModifier::compose(j) }).into_iter().collect();
+    let mut mods: Vec<JointModifier> = t(24).map(|j| JointModifier { scale: [head * 0.97, head * 0.97, head], ..JointModifier::compose(j) }).into_iter().collect();
     if feet { mods.extend([22, 23].into_iter().filter_map(t).map(|j| JointModifier { scale: [0.01; 3], ..JointModifier::compose(j) })); }
     mods
 }
@@ -2577,6 +2593,8 @@ struct ShotDraw {
     /// The second list's (after the particles) and the first list's (before them).
     slots: crate::fx_draw::FxSlots,
     first: crate::fx_draw::FxSlots,
+    /// The quads of the frame's own image (rc_game::fx::FrameQuad), after the second list's.
+    frame: crate::fx_draw::FxSlots,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -2590,6 +2608,7 @@ fn draw_shots(
     mut images: ResMut<Assets<Image>>,
     mut materials: ResMut<Assets<crate::fx_draw::FxPrimMaterial>>,
     mut vis: Query<&mut Visibility>,
+    frames: Option<Res<crate::frame_copy::FrameImages>>,
 ) {
     // The callbacks' quads by list, one group per texture and blend in the order they came.
     let group = |quads: &[rc_game::fx::FxQuad]| {
@@ -2607,6 +2626,10 @@ fn draw_shots(
     let mut a = crate::fx_draw::FxAssets { meshes: &mut meshes, images: &mut images, materials: &mut materials, fx: tex, fog };
     draw.first.show(&mut commands, &mut vis, &mut a, first, crate::fx_draw::LIST1_BIAS, "draw list 1");
     draw.slots.show(&mut commands, &mut vis, &mut a, second, crate::fx_draw::LIST2_BIAS, "draw list 2");
+    if let Some(f) = frames {
+        let quads = play.as_ref().map_or(&[][..], |p| &p.frame_quads[..]);
+        draw.frame.show_frame(&mut commands, &mut vis, &mut a, quads, &f, crate::fx_draw::FRAME_BIAS, "frame image");
+    }
 }
 
 /// `0x2e54a0`'s mode (`GameState::occlusion`, `0x1b19d0`) onto the occlusion frame: 0 everything visible, 2 the
@@ -2652,7 +2675,7 @@ fn start(lv: &crate::level_load::LoadedLevel) -> Option<Play> {
     Some(Play {
         anim: RatchetAnim { curves: &rc_game::hero::CURVES, ..RatchetAnim::new(&m.anim[class]) },
         hero, class, instance, scale, pad: PadState::default(), camera, ship: None, chain: false, mobys: None, game: Default::default(), hud: rc_game::hud::Hud::new(rc_game::game::GameState::default().max_health), ticks: 0, loaded: false,
-        fx_quads: Vec::new(), fx_quads_first: Vec::new(), exhaust: Default::default(), scene_wad: None, shared_scenes: None, scene_slots: Vec::new(), movie: None, movie_picture: None, leaving: None, scene_listener: None, movie_started: false, hero_loops: [-1; 9], pause: None, pause_opened: false, death_fade: None, qs: Default::default(), qs_paused: false, vendor: Default::default(), space_scene: None, flight: None, flight_cam: None, flight_quads: Vec::new(),
+        fx_quads: Vec::new(), fx_quads_first: Vec::new(), frame_quads: Vec::new(), exhaust: Default::default(), scene_wad: None, shared_scenes: None, scene_slots: Vec::new(), movie: None, movie_picture: None, leaving: None, scene_listener: None, movie_started: false, hero_loops: [-1; 9], pause: None, pause_opened: false, death_fade: None, qs: Default::default(), qs_paused: false, vendor: Default::default(), space_scene: None, flight: None, flight_cam: None, flight_quads: Vec::new(),
         help: Default::default(), boxes: Default::default(), glyphs: None, texts: rc_formats::strings::parse_strings(&lv.gameplay, rc_formats::strings::lang::ENGLISH).map_err(|e| eprintln!("play: no help texts ({e:#})")).unwrap_or_default(),
         trace: std::env::var("RC_PLAY_TRACE").is_ok_and(|v| v.trim() == "1"),
     })

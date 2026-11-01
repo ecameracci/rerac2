@@ -290,9 +290,14 @@ impl Hero {
             }
             0xf => Entry::Anim(5.0, 0x15, 0),
             0xb => {
-                // The flip's sequence by its direction (0x1c left, 0x1d right, 0x1e ahead, 0x1f back; the option
-                // `0x1a7a4d` swaps left and right: not ported); chained from a jump it starts at frame 1, takeoff 1.
-                let seq = 0x1c + self.jump.flip_dir as u8;
+                // The flip's sequence by its direction (0x1c left, 0x1d right, 0x1e ahead, 0x1f back; the
+                // left-handed cheat `0x1a7a4d` swaps left and right); chained from a jump it starts at frame 1,
+                // takeoff 1.
+                let seq = match 0x1c + self.jump.flip_dir as u8 {
+                    0x1c if env.cheat(crate::cheats::cheat::LEFT_HANDED) => 0x1d,
+                    0x1d if env.cheat(crate::cheats::cheat::LEFT_HANDED) => 0x1c,
+                    s => s,
+                };
                 if self.prev_group == 4 {
                     self.set_anim(anim, 4.0, seq, 1);
                     self.jump.takeoff = 1;

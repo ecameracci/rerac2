@@ -67,12 +67,15 @@
 //! it is steered, every other frame the resting bolts within 5 fly to it (crate::moby::classes::bolt::attract_to), and
 //! are counted where they reach it.
 //!
+//! **The blast's sphere** ([`draw_blast`], `0x3fac68` → `0x3facb0`, registered every tick): a lens of the frame
+//! copied as it stands (crate::fx::FrameQuad) around the bot while the blast grows, its 98 wobbles (`0x2496d0`) made
+//! in state 0 and turned by each draw; its mesh the overlay's (Aranos's `0x296760` / `0x296160`).
+//!
 //! Not ported: the upgraded glove (item 0x4e: the hand 0x0e7a `0x42e7a0`, its bot 0x0e79 `0x42b978` with its shells
-//! `0x430a10` / `0x431858`, its end `0x42e670`, which `0x2bd368` also calls: the same machine with its own globals);
-//! the blast's sphere (`0x3facb0`, registered every tick by `0x3fac68` while the reach is under 8: the overlay's mesh
-//! `0x298dc0` / `0x2987c0`, 48 quads 2·reach across, textured with a copy of the frame (`0x2ea6c8(−1)`) at the
-//! screen place of each corner (`0x2ea5b8`) moved by its 98 wobbles `0x2496d0` — a heat shimmer, which needs a copy
-//! of the rendered frame the renderer does not make; its wobbles' random draws in state 0 are kept); the weapon mods
+//! `0x430a10` / `0x431858`, its end `0x42e670`, which `0x2bd368` also calls: the same machine with its own globals,
+//! and its own sphere `0x403540` with the tables `0x29f8a0` / `0x29f2a0` and wobbles `0x2545d0`); the sphere's copy
+//! is the frame at full size (the game's is 256×256 CT16) and its TEST 0x5380b Z writes (ATST GEQUAL 0x80 with the
+//! copy's alpha) are left out (the effects write no Z here); the weapon mods
 //! on the blast's hits (`0x422630`); the gravity frames and moving frames (`0x386d68` / `0x386e48`, `0x388638` /
 //! `0x3886f0`, `0x326450`), the level-specific refusal under 462.43 (`0x1a8ff4`) and the landing on the lava level's
 //! surface 3 (`0x1a79f8`); the camera's blend in (its record's blend kind 1, `0x2db6b8`: a cut here) and its `+0x28` /
@@ -442,11 +445,12 @@ pub fn update_bot(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 m.scale = SCALE_FROM;
                 m.set_pv_i(pv::CLOCK, CLOCK);
                 // The blast sphere's 98 texture wobbles (`0x2496d0`: an angle, a turn of 720..2160° a second with
-                // a random sign), drawn for the order of the draws; the sphere is not ported (module docs).
-                for _ in 0..98 {
-                    ctx.game.rng.rand_angle();
-                    ctx.game.rng.randf_signed(720.0, 2160.0);
-                }
+                // a random sign, × `0x3998825c` = π/180/60 a tick; [`draw_blast`]).
+                let g = &mut ctx.game.rng;
+                w.spiderbot.wobbles = (0..WOBBLES).map(|_| {
+                    let a = g.rand_angle();
+                    [a, g.randf_signed(720.0, 2160.0) * f32::from_bits(0x3998_825c)]
+                }).collect();
                 // `0x311b10(0, 0x3f9818)`: its clock in the HUD's place ([`draw_screen`]).
                 ctx.game.screen_callback = Some(crate::hud::ScreenCallback::Spiderbot);
             }
@@ -528,6 +532,8 @@ pub fn update_bot(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             m.set_pv_f(pv::REACH, 0.0);
         }
     }
+    // `0x2eaef8(0x3fac68, bot)`: its blast's sphere on the frame's second list ([`draw_blast`]).
+    w.register_draw(id);
     // `0x321c88(0.6, bot)`: its blob shadow (from state 2 on the moving frame's carry, not ported, comes first).
     crate::shadows::request(w, ctx, SIZE, id);
     w.rebuild(id, &*ctx.host);
@@ -823,6 +829,87 @@ fn blast(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         let p = x.pos;
         w.deliver_hit_any(t, &tm, [p[0], p[1], p[2], 1.0]);
     }
+}
+
+/// `0x2496d0`'s wobbles (98: `0x3facb0` turns `0x61 + 1` of them).
+const WOBBLES: usize = 98;
+/// `0x3facb0`'s quads (`0x30`).
+const SPHERE_QUADS: usize = 48;
+/// The wobbles' reach at the start of the blast (`0x3facb0`'s 0.0125 under `0x31f9e0`).
+const WOBBLE_REACH: f32 = 0.0125;
+
+/// The blast's sphere (`0x3facb0`'s tables, Aranos's `0x296760` / `0x296160`, L02's `0x298dc0` / `0x2987c0`): 48
+/// quads of four (vertex, wobble) halfword pairs, and the vertices (x toward the camera, y across, z up; w 1).
+#[derive(Clone, Debug, Default)]
+pub struct SphereMesh {
+    pub verts: Vec<V3>,
+    pub quads: Vec<[(u16, u16); 4]>,
+}
+
+impl SphereMesh {
+    /// From the level's overlay through `read(address, length)` of L00's addresses (the engine maps them to the
+    /// level's copy of `0x3e07b0`, L02's `0x3facb0`).
+    pub fn read(read: impl Fn(u32, usize) -> Option<Vec<u8>>) -> Option<SphereMesh> {
+        let q = read(0x0029_6760, SPHERE_QUADS * 16)?;
+        let half = |i: usize| u16::from_le_bytes([q[2 * i], q[2 * i + 1]]);
+        let quads: Vec<[(u16, u16); 4]> = (0..SPHERE_QUADS).map(|i| std::array::from_fn(|k| (half(i * 8 + 2 * k), half(i * 8 + 2 * k + 1)))).collect();
+        if quads.iter().flatten().any(|&(_, b)| WOBBLES <= b as usize) { return None; }
+        let nv = quads.iter().flatten().map(|&(v, _)| v as usize + 1).max()?;
+        let v = read(0x0029_6160, nv * 16)?;
+        let f = |i: usize| f32::from_le_bytes(v[4 * i..4 * i + 4].try_into().unwrap());
+        Some(SphereMesh { verts: (0..nv).map(|i| [f(4 * i), f(4 * i + 1), f(4 * i + 2)]).collect(), quads })
+    }
+}
+
+/// The blast sphere's shared state: its mesh (set by the engine, crate's level code) and the wobbles (`0x2496d0`:
+/// angle, turn a tick; one set for the game, made by a new bot's state 0).
+#[derive(Clone, Debug, Default)]
+pub struct Blast {
+    pub mesh: Option<std::sync::Arc<SphereMesh>>,
+    pub wobbles: Vec<[f32; 2]>,
+}
+
+/// `0x3fac68` → `0x3facb0`, the bot's draw (a second-list callback, every tick): while the blast's reach is under 8,
+/// the sphere — the mesh scaled by 2·reach in the frame facing the camera (x along `camera − bot` made unit, y
+/// `up × x`, z `x × y`; up (0, 0, 1)) at the bot — as 48 quads textured with the frame copied as it stands
+/// (`0x2ea6c8(−1)`, TEX1 0xff9000000260, CLAMP 0), colour `0x80808080` (`gp+0x2154`), ALPHA `1 | 1<<2 | 0<<4 | 0<<6`
+/// (`gp+0x213c..`: `(Cd − Cd)·As + Cs`, the copy put back), drawn after `0x384420`'s TEST 0x5380b; each corner reads
+/// the copy at its screen place (`0x2ea5b8`) moved by its wobble (`(cos a, −sin a)·ease(0.0125·(1 − reach/8))`,
+/// `0x31f9e0` = `1 − (1 − x)²`), held to 0..1: the world behind it seen through a lens that ripples less as it grows.
+/// Then every wobble turns by its rate (`0x2f3de8`). With no reach yet the quads have no area: none are made.
+pub fn draw_blast(w: &mut MobyWorld, id: usize, cam: V3, cam_rows: [V3; 3], out: &mut Vec<crate::fx::FrameQuad>) {
+    let (pos, reach) = (w.mobys[id].pos, w.mobys[id].pv_f(pv::REACH));
+    if BLAST_MAX <= reach { return; }
+    let b = &mut w.spiderbot;
+    if let Some(mesh) = b.mesh.as_deref().filter(|_| 0.0 < reach && b.wobbles.len() == WOBBLES) {
+        let x = unit(sub(cam, pos));
+        let y = unit(cr(x, [0.0, 0.0, 1.0]));
+        let z = cr(y, x);
+        let s = reach + reach;
+        let t = (1.0 - reach / BLAST_MAX) * WOBBLE_REACH;
+        let f = 1.0 - (1.0 - t) * (1.0 - t);
+        for q in &mesh.quads {
+            let corners = q.map(|(v, _)| {
+                let v = mesh.verts.get(v as usize).copied().unwrap_or_default();
+                add(pos, add(add(scale(x, v[0] * s), scale(y, v[1] * s)), scale(z, v[2] * s)))
+            });
+            if !crate::fx::in_front(&corners, cam, cam_rows[0]) { continue; }
+            let offset = q.map(|(_, k)| {
+                let a = b.wobbles[k as usize][0];
+                [a.cos() * f, -a.sin() * f]
+            });
+            out.push(crate::fx::FrameQuad {
+                source: crate::fx::FrameSource::Copy,
+                mask: None,
+                corners,
+                st: [[0.0; 2]; 4],
+                offset,
+                clamp: 1.0,
+                rgba: [0x8080_8080; 4],
+            });
+        }
+    }
+    for wb in &mut b.wobbles { wb[0] = crate::hero::physics::add_rot(wb[0], wb[1]); }
 }
 
 /// The bot's camera (class 0x1b): its record's words the port keeps here (module docs).

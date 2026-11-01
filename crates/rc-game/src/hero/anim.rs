@@ -7,7 +7,7 @@
 //! * always snapshot the current pose into key A (`fun_0020ede8(moby, slot | 0x300)`, seq A = 0xff) —
 //!   unlike the generic `fun_00212f90`, there is no `t > 0.025` test;
 //! * frame B (+0x51) = `frame` (not clamped here), seq B (+0x53) = `seq` (0x31 ↔ 0x32 swapped with the
-//!   mirror option 0x15edb5), `update_moby_animation_state`;
+//!   left-handed cheat `0x1a7a4d`, R&C2's `0x2d2508`), `update_moby_animation_state`;
 //! * playback speed `0x13fde0` = 1; t = 0; `blend > 0`: rate `0x13fde4` = 1 / blend (a blend over `blend`
 //!   ticks), curve `0x13fdf0` = −1; `blend ≤ 0`: rate 1, eased curve `(int)(−blend) − 1` (t table at
 //!   `0x17c270 + 100·curve`, length from the gp table −0x7520), curve position `0x13fdf4` = 0;
@@ -288,7 +288,8 @@ pub struct RatchetAnim {
     /// `0x13fdfc`: see [`AnimView::frame_step`].
     pub frame_step: Pf,
     pub loop_range: Option<(i32, i32)>,
-    /// Option 0x15edb5: swap sequences 0x31 ↔ 0x32.
+    /// The left-handed cheat (`0x1a7a4d`, crate::cheats::cheat::LEFT_HANDED; the engine sets it each tick): `0x2d2508`
+    /// swaps the sequences 0x31 ↔ 0x32.
     pub mirror: bool,
     /// `0x13fe04`: the loop end as last written (kept after the range is cleared; `0x247d18`'s exit target).
     pub loop_end: i32,
