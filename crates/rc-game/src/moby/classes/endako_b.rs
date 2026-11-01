@@ -3,8 +3,8 @@
 //! with the L00 ones the port knows them by where they differ).
 //!
 //! * **0x0c25** ([`update_0c25`], `0x3f2000`, one placed by the ship): the hint manager, and the scene 0x34 that gives
-//!   Ratchet the Swingshot (item 0xd) and the Grind Boots (item 0x14) when he walks into its cuboid `[0x4c]` (the
-//!   Swingshot cannot be held yet: G-WPN-010).
+//!   Ratchet the Swingshot (item 0xd, crate::moby::classes::swingshot) and the Grind Boots (item 0x14) when he walks
+//!   into its cuboid `[0x4c]`.
 //! * **0x0982 / 0x0983** ([`update_lift`], `0x3cc4e8`): the lifts between their floor and the cuboid `[0x60]`'s.
 //! * **0x0e87 / 0x0961** ([`update_0e87`], `0x3cb5c0`), **0x097a** ([`update_097a`], `0x3cc000`), **0x0ef9**
 //!   ([`update_0ef9`], `0x41ac38`): pieces the level's robots (0x093c / 0x0940, not ported) raise, stand on and
@@ -17,13 +17,9 @@
 //! * **0x11c4** ([`update_11c4`], `0x426318`, on nine levels): a nanotech boost (+1 health, `0x1a7a30 + k`).
 //! * **0x12ea** ([`update_12ea`], `0x3854b8`): a box broken open for bolts.
 //!
+//! Clank's rescue **0x0a08** (`0x3d2fd0`) and Clank's body **0x0057** (`0x394728`) are crate::moby::classes::endako_clank.
+//!
 //! Not ported (set B's other classes):
-//! * Clank's rescue **0x0a08** (`0x3d2fd0`) and Clank's body **0x0057** (`0x394728`): Ratchet in the cuboid `[1]`
-//!   plays the scene 0x31 (`0x3d35b8` after it: Ratchet put at `[6]`), the set piece hooked (by the level) plays 0x32
-//!   and Ratchet becomes Clank on the moby `[0]` (`0x3d3620` → `0x2b8508(1, 0x3f, moby)`); Clank standing on it plays
-//!   0x33 and ends it (`0x3d3700`: back to Ratchet `0x2b8718`, the mission `+0xb0` done, Clank on his back — items
-//!   0x02..0x04 and their new marks — the Clank moby deleted); its glow pulses between 0x808c8c8c and 0x80282828
-//!   meanwhile. The body switch is G-HERO-003.
 //! * The panel **0x0b29** (`0x3e5c90`): its puzzle in the game's mode 7 (G-CLS-012).
 //! * The robots **0x093c / 0x0940** (`0x3c31f8`, 49 functions: they walk the network of **0x0f2d** (`0x41b0b0`, built
 //!   by `0x32b318` from its list of paths) and raise 0x0e87 and stand on 0x097a), and the boss **0x0c8a** (`0x3f5c78`:

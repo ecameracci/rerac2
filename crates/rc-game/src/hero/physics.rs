@@ -540,9 +540,10 @@ impl Hero {
     }
 
     /// `0x2b3400`: the capsule targets (top 0.8, bottom 0.7, radius 0.45; fall 6: bottom 0.5; crouch 4: top 0.35;
-    /// groups 0x11/0x12: 0) and their ease (top / bottom by 0.02, the radius spring 0.02 / 0.3 / 1/15).
+    /// groups 0x11/0x12: 0; Clank's body: crate::hero::body::CLANK_CAPSULE) and their ease (top / bottom by 0.02, the
+    /// radius spring 0.02 / 0.3 / 1/15).
     pub fn size_capsule(&mut self) {
-        (self.cap_top_target, self.cap_bottom_target, self.cap_radius_target) = (0.8, 0.7, 0.45);
+        (self.cap_top_target, self.cap_bottom_target, self.cap_radius_target) = if self.mode == 1 { super::body::CLANK_CAPSULE } else { (0.8, 0.7, 0.45) };
         if self.group == 4 {
             if self.jump.takeoff < self.timer && self.jump.descending == 0 { self.cap_bottom_target = self.jump.bottom; }
         } else if self.state == 6 {

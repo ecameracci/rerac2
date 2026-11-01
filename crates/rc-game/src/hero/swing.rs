@@ -23,8 +23,11 @@
 //! * 0x8a / 0x8b: the pull (class 0x99d, `0x2c4340`): aimed while the hook flies (`0x18a93c` set by the hook), then
 //!   held still for 91 ticks.
 //!
-//! Not ported: the hook moby and its line (the item's class), the sounds, the stats counters, the nodes' area test
-//! (`+0x68`[0x1c] ≥ 0 with `0x321858`).
+//! The hand moby (class 0xd0, crate::moby::classes::swingshot) fires the hook from the aim 0x23, 0x8a and 0x2b, sets
+//! the next state (0x24 / 0x25, or the fall / idle when the line is blocked), the hook swing's attachment
+//! (`0x18a8fc`), the pull's hook (`0x18a93c`) and the early let-go (`0x18a8e8`), plays the sounds and draws the line.
+//!
+//! Not ported: the stats counters, the nodes' area test (`+0x68`[0x1c] ≥ 0 with `0x321858`).
 
 use super::physics::*;
 use super::states::Entry;

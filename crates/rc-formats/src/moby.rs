@@ -703,6 +703,9 @@ pub struct LevelMobyClass {
     pub o_class: i32,
     pub entry: ClassEntry,
     pub class: MobyClass,
+    /// Added to every used slot: 0 for the level's own classes; the port's appended gadget classes (whose textures go
+    /// in the game's gadget slots, not the level's table) take theirs past the table, where a byte slot cannot reach.
+    pub texture_base: usize,
 }
 
 impl LevelMobyClass {
@@ -710,7 +713,7 @@ impl LevelMobyClass {
     /// -1/-2/-3 (none/chrome/glass) or an unused slot (0xff).
     pub fn texture_table_index(&self, texture: i32) -> Option<usize> {
         let slot = *self.entry.textures.get(usize::try_from(texture).ok()?)?;
-        (slot != 0xff).then_some(slot as usize)
+        (slot != 0xff).then_some(slot as usize + self.texture_base)
     }
 }
 
@@ -724,7 +727,7 @@ pub fn parse_level_mobys(core: &LevelCore, core_data: &[u8]) -> Result<Vec<Level
         };
         let blob = Buf(core_data).sub(blk.offset, blk.size, "moby class blob")?;
         let class = parse_moby_class(blob.bytes()).map_err(|err| crate::FormatError::Invalid(format!("moby class {}: {err}", e.o_class)))?;
-        out.push(LevelMobyClass { o_class: e.o_class, entry: *e, class });
+        out.push(LevelMobyClass { o_class: e.o_class, entry: *e, class, texture_base: 0 });
     }
     Ok(out)
 }

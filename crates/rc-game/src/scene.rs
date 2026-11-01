@@ -465,7 +465,8 @@ impl Scenes {
         // `0x2d9d68(6)`: back in from black over 6 ticks.
         self.fade = 1.0;
         self.fade_in = 1.0 / 6.0;
-        hero.request_state(0, true);
+        // `0x2c8e30(1)`: the body's idle (Clank's 0x3f as Clank).
+        if let Some(s) = hero.idle_state() { hero.request_state(s, true); }
         if let Some(g) = ground {
             if 2.0 < g && (hero.pos[2] - g).abs() < 4.5 { hero.pos[2] = g; }
         }

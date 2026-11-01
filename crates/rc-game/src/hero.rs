@@ -20,6 +20,7 @@
 
 pub mod air;
 pub mod anim;
+pub mod body;
 pub mod clank;
 pub mod damage;
 pub mod extras;
@@ -395,6 +396,8 @@ pub struct Hero {
     /// (`0x3fb028(0, 0)`); the bot, which [`Self::teleport`] cannot reach, ends itself on a new one
     /// (crate::moby::classes::spiderbot).
     pub warps: u32,
+    /// The body switch's block (`0x18aa34`, `0x18c2f0`, `0x18c312`, `0x18c31c`: [`body`]).
+    pub body: body::BodyBlock,
 }
 
 /// A hit Ratchet's body deals (`0x2e14b0` + `0x31d4c8`): a sphere, the damage, the flags, the direction.
@@ -432,6 +435,7 @@ impl Hero {
             surf: Default::default(), wall: Default::default(), ahead: Default::default(), frame: 0, ground_moby: None, ground_class: -1, wall_moby: None, push_moby: None,
             bounce: [37.0, 13.0], glide_vz: 0.0, glide_sink: 0.0, hot_hops: 0, glide_lag: 0, ice_along: 0.0, ice_slope: 0.0, strafe: 0, strafe_yaw: 0.0, strafe_dir: [1.0, 0.0, 0.0], stick_sector: 2, strafe_back: false, strafe_flip: [0; 2], strafe_yaw_vel: 0.0,
             ground_yaw: 0.0, slide_yaw: 0.0, slide_bank: 0.0, slide_hold: 0, slide_vel: [0.0; 2], slide_speed: 0.0, stagger: 0, rot_vel: [0.0; 2], bonk_yaw: 0.0, push: [0.0; 3], gravity: Default::default(), swing: Default::default(), swing_cooldown: 0, gear: Default::default(), grind: Default::default(), water: Default::default(), no_menu: 0, rng: Default::default(), state_req: None, anim_req: None, walk_to: Default::default(), fidget_rest: [0; 4], fidget_gap: 0, no_update: false, hits_out: Vec::new(), sounds: Vec::new(), level_sounds: Vec::new(), loops: Vec::new(), loop_stops: Vec::new(), loops_off: false, posture: Default::default(), layers: Default::default(), aim_point: [0.0; 3], unported_seen: Vec::new(), warps: 0,
+            body: Default::default(),
         }
     }
 
@@ -619,9 +623,12 @@ pub fn hero_update(hero: &mut Hero, env: &Env, anim: &mut dyn AnimCtl) -> HeroTi
     // `0x2aca80`: the surface under the feet (the lava hop, the slides, the liquids).
     if hero.surface_check(env, anim) { return HeroTick::Ran; }
     // `0x2ad000(pos, rot, 0x18a370)`: the ledge ahead; `0x2adbb8` / `0x2adda8`: a rail and a pole in reach.
-    hero.ledge_tick(env);
-    hero.rail_probe(env);
-    hero.pole_probe(env);
+    // A body's tick (`0x2a65d8`): the ledge for Clank's only (then `0x2b8a38`, not ported), no rail or pole.
+    if hero.mode == 0 || hero.mode == 1 { hero.ledge_tick(env); }
+    if hero.mode == 0 {
+        hero.rail_probe(env);
+        hero.pole_probe(env);
+    }
     hero.transitions(env, anim);
     hero.posture_tick(env, anim);
     HeroTick::Ran

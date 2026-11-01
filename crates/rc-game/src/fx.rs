@@ -38,7 +38,8 @@
 //!
 //! The frame's first list (`0x2e7718`, run by `0x2e7768` before the particles, `0x3311e0`; [`Lists::first`]) holds on
 //! Aranos the arrival ship's draw (`0x362b40`, which the engine's created-moby draw does), the ship's shadow
-//! (`0x361af8`), class 0xd0's ribbon (`0x39ac30`, not placed) and the nanotech clusters' glow; its other users are
+//! (`0x361af8`), class 0xd0's ribbon (`0x39ac30`: the Swingshot's line, crate::moby::classes::swingshot::draw_line)
+//! and the nanotech clusters' glow; its other users are
 //! other levels' classes (G-REN-003).
 //!
 //! Not ported: 0x0b0a's emerge flash
@@ -329,6 +330,7 @@ fn one(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut crate::ga
         crate::moby::classes::teleport::CLASS => crate::moby::classes::teleport::draw(w, id, &host.camera_rows(), out),
         crate::moby::classes::explosion::CLASS => crate::moby::classes::explosion::draw(w, id, cam, host.camera_rows(), out, frame),
         0x00bc => crate::moby::classes::tractor::draw(w, id, cam, -0.3 * (game.frame % 27) as f32, out),
+        crate::moby::classes::swingshot::HAND_CLASS => crate::moby::classes::swingshot::draw_line(w, host, id, cam, out),
         crate::ship::LASER_CLASS => crate::ship::draw_laser(w, id, cam, out),
         _ => {}
     }

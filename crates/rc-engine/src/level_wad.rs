@@ -52,7 +52,7 @@ fn attach_armour_row(root: &Path, core: &level::LevelCore, mobys: &mut crate::mo
 
 /// The hand gadgets the port loads with every level (`G/GADGET.WAD`, rc_formats::disc::gadget): the game streams the
 /// one in Ratchet's hand (`0x306018`) when he takes it; the port has them from the start.
-pub const GADGETS: [i32; 6] = [rc_game::hero::items::LANCER_CLASS as i32, rc_game::hero::items::GRAVITY_BOMB_CLASS as i32, rc_game::hero::items::DYNAMO_CLASS as i32, rc_game::hero::items::TRACTOR_CLASS as i32, rc_game::hero::items::ELECTROLYZER_CLASS as i32, rc_game::hero::items::SPIDERBOT_CLASS as i32];
+pub const GADGETS: [i32; 7] = [rc_game::hero::items::LANCER_CLASS as i32, rc_game::hero::items::GRAVITY_BOMB_CLASS as i32, rc_game::hero::items::DYNAMO_CLASS as i32, rc_game::hero::items::TRACTOR_CLASS as i32, rc_game::hero::items::ELECTROLYZER_CLASS as i32, rc_game::hero::items::SPIDERBOT_CLASS as i32, rc_game::hero::items::SWINGSHOT_CLASS as i32];
 
 /// The hand classes loaded with level `index`: [`GADGETS`] and those of the weapons the level's vendors sell
 /// (`rc_game::vendor::STOCK_LEVELS` up to the level, the item records' `+0x04`): the game loads one as the vendor
@@ -68,7 +68,9 @@ pub fn gadgets(root: &Path, index: u32) -> Vec<i32> {
 }
 
 /// Gadget `o_class` (part A of its `GADGET.WAD` entry): its class and sequences added to the level's moby classes, its
-/// textures appended to the moby texture table (slot `k` = entry `moby_textures.len() + k`, as the armour's).
+/// textures appended to the moby texture table (slot `k` = entry `moby_textures.len() + k`, as the armour's), reached
+/// through the class's texture base (`LevelMobyClass::texture_base`): the game keeps them in its gadget slots, so
+/// they may go past the 255 a byte slot holds on a level whose table is nearly full (Endako).
 fn attach_gadget(root: &Path, core: &level::LevelCore, mobys: &mut crate::moby_render::LevelMobys, textures: &mut Vec<texture::LevelTexture>, o_class: i32) -> Result<()> {
     let blob = gadget_blob(root, o_class)?;
     let (blob, tex) = blob;
@@ -78,11 +80,11 @@ fn attach_gadget(root: &Path, core: &level::LevelCore, mobys: &mut crate::moby_r
     let mut slots = [0xffu8; 16];
     for (k, t) in tex.into_iter().enumerate() {
         let index = base + k;
-        slots[k] = u8::try_from(index).context("moby texture index past 255")?;
+        slots[k] = k as u8;
         textures.push(texture::LevelTexture { table: texture::TextureTable::Moby, index, source: texture::TextureSource::Entry(bytemuck_zeroed()), texture: t });
     }
     mobys.anim.push(rc_formats::moby_anim::MobyAnimClass::new(&class, seqs));
-    mobys.classes.push(rc_formats::moby::LevelMobyClass { o_class, entry: level::ClassEntry { offset_in_asset_wad: 0, o_class, unknown_8: 0, unknown_c: 0, textures: slots }, class });
+    mobys.classes.push(rc_formats::moby::LevelMobyClass { o_class, entry: level::ClassEntry { offset_in_asset_wad: 0, o_class, unknown_8: 0, unknown_c: 0, textures: slots }, class, texture_base: base });
     Ok(())
 }
 
@@ -121,7 +123,7 @@ fn attach_ship_hull(root: &Path, mobys: &mut crate::moby_render::LevelMobys, hul
             // ship (rc_game::travel) and the ship scenes' actors have a class; its texture slots are all 0xff and its
             // entry takes the paint (`+8 ≠ 0`).
             mobys.anim.push(rc_formats::moby_anim::MobyAnimClass::new(&class, seqs));
-            mobys.classes.push(rc_formats::moby::LevelMobyClass { o_class: HULL_CLASS, entry: level::ClassEntry { offset_in_asset_wad: 0, o_class: HULL_CLASS, unknown_8: 1, unknown_c: 0, textures: [0xff; 16] }, class });
+            mobys.classes.push(rc_formats::moby::LevelMobyClass { o_class: HULL_CLASS, entry: level::ClassEntry { offset_in_asset_wad: 0, o_class: HULL_CLASS, unknown_8: 1, unknown_c: 0, textures: [0xff; 16] }, class, texture_base: 0 });
         }
     }
     Ok(())

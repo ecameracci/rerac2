@@ -258,6 +258,93 @@ pub(crate) struct Play {
     flight: Option<FlightRun>,
     flight_cam: Option<([f32; 3], [[f32; 3]; 3], f32)>,
     flight_quads: Vec<rc_game::gui::Quad>,
+    /// The body switch's other side ([`BodyBind`]) while a body plays.
+    body: Option<BodyBind>,
+}
+
+/// The body switch (rc_game::hero::body, `0x2b8508` / `0x2b8718`): while a body plays, the hero moby (`0x18c0b0`) is the
+/// body's — the hero's class, placed instance, scale, animation and moby are its — and Ratchet's are kept here.
+/// `suspended`: a scene plays, which takes Ratchet as its hero (the scene's class-0 actor; the body hidden meanwhile).
+struct BodyBind {
+    class: usize,
+    instance: usize,
+    scale: f32,
+    anim: RatchetAnim,
+    moby: Option<usize>,
+    suspended: bool,
+}
+
+impl BodyBind {
+    /// The hero's side and this one traded.
+    fn swap(&mut self, class: &mut usize, instance: &mut usize, scale: &mut f32, anim: &mut RatchetAnim, moby: &mut Option<usize>) {
+        std::mem::swap(&mut self.class, class);
+        std::mem::swap(&mut self.instance, instance);
+        std::mem::swap(&mut self.scale, scale);
+        std::mem::swap(&mut self.anim, anim);
+        std::mem::swap(&mut self.moby, moby);
+    }
+}
+
+/// The hero's body switches of this tick (rc_game::hero::body::Change), after the moby loop: to a body — its moby
+/// the hero moby (out of the moby loop, mode 6), its class the animation's (from the pose its instance has), its
+/// placed instance drawn as the hero; Ratchet's moby and his items hidden (`0x2d3d88`); back — Ratchet's again, his
+/// moby shown where the player is, the body back in the moby loop. `side`: the hero's class, instance, scale and
+/// animation ([`Play`]'s).
+fn body_changes(bind: &mut Option<BodyBind>, hero: &mut Hero, side: (&mut usize, &mut usize, &mut f32, &mut RatchetAnim), lv: &crate::level_load::LoadedLevel, mobys: &mut crate::mobys::Mobys, occl: Option<&MobyOcclusion>, anim: Option<&MobyAnim>) {
+    use rc_game::hero::body::Change;
+    use rc_game::moby::mode::{NO_MATRIX, NO_UPDATE};
+    let (class, instance, scale, ranim) = side;
+    for c in std::mem::take(&mut hero.body.changes) {
+        match c {
+            Change::To(id) => {
+                if bind.is_some() { continue; }
+                let Some(m) = mobys.world.mobys.get(id) else { continue };
+                let ci = lv.mobys.classes.iter().position(|c| c.o_class == m.o_class as i32);
+                let (Some(ii), Some(ci)) = (m.instance, ci) else {
+                    eprintln!("play: body switch onto moby {id} (class {:#x}): no placed instance or class; the hero keeps Ratchet's", m.o_class);
+                    continue;
+                };
+                let mut a = RatchetAnim { curves: &rc_game::hero::CURVES, ..RatchetAnim::new(&lv.mobys.anim[ci]) };
+                if let (Some(o), Some(an)) = (occl, anim) {
+                    if let Some(k) = o.anim_index(ii) {
+                        if let Some(i) = an.instances.get(k) { a.state = i.state; }
+                        a.snapshot = an.snapshots.get(k).cloned().flatten();
+                    }
+                }
+                let mut b = BodyBind { class: ci, instance: ii, scale: m.scale, anim: a, moby: Some(id), suspended: false };
+                b.swap(&mut *class, &mut *instance, &mut *scale, &mut *ranim, &mut mobys.hero_moby);
+                let it = &hero.items;
+                for h in [b.moby, it.hand, it.head, it.feet[0], it.feet[1]].into_iter().flatten() {
+                    if let Some(m) = mobys.world.mobys.get_mut(h) { m.mode |= 1; }
+                }
+                mobys.world.mobys[id].mode |= NO_UPDATE | NO_MATRIX;
+                *bind = Some(b);
+            }
+            Change::Back => {
+                let Some(mut b) = bind.take() else { continue };
+                if b.suspended { b.swap(&mut *class, &mut *instance, &mut *scale, &mut *ranim, &mut mobys.hero_moby); }
+                let body = mobys.hero_moby;
+                b.swap(&mut *class, &mut *instance, &mut *scale, &mut *ranim, &mut mobys.hero_moby);
+                if let Some(m) = body.and_then(|i| mobys.world.mobys.get_mut(i)) { m.mode &= !(NO_UPDATE | NO_MATRIX | 1); }
+                if let Some(h) = mobys.hero_moby.and_then(|i| mobys.world.mobys.get_mut(i)) {
+                    h.mode &= !1;
+                    h.pos = hero.pos;
+                }
+            }
+        }
+    }
+}
+
+/// A scene starts (`suspend`) or ends while a body plays: the scene's hero is Ratchet (his class, instance and moby),
+/// the body's moby hidden until it ends. `side` as [`body_changes`]'.
+fn body_scene(bind: &mut Option<BodyBind>, side: (&mut usize, &mut usize, &mut f32, &mut RatchetAnim), mobys: &mut crate::mobys::Mobys, suspend: bool) {
+    let Some(b) = bind.as_mut() else { return };
+    if b.suspended == suspend { return; }
+    let body = if suspend { mobys.hero_moby } else { b.moby };
+    if let Some(m) = body.and_then(|i| mobys.world.mobys.get_mut(i)) { if suspend { m.mode |= 1 } else { m.mode &= !1 } }
+    let (class, instance, scale, ranim) = side;
+    b.swap(class, instance, scale, ranim, &mut mobys.hero_moby);
+    b.suspended = suspend;
 }
 
 /// The flight between the planets (`0x367400` → `0x364260` sub 2, `0x363360`; the rules: rc_game::travel::Flight):
@@ -688,6 +775,9 @@ fn tick(
         let mut ctx = rc_game::moby::Ctx { host: &mut host, hero: &mut p.hero, game: &mut p.game, coll: Some(coll), scene: scene.as_ref(), hero_moby: mobys.hero_moby, hero_view, level: &mobys.level, parts: parts.as_deref_mut().map(|s| &mut s.sys), view };
         mobys.world.tick(p.camera.pos, &mut ctx);
     }
+    // The body switches the loop asked for (rc_game::hero::body): the hero's class may be the body's from here.
+    body_changes(&mut p.body, &mut p.hero, (&mut p.class, &mut p.instance, &mut p.scale, &mut p.anim), lv, mobys, occl.as_deref(), anim.as_deref());
+    let class = &lv.mobys.anim[p.class];
     // The collision kernels read the mobys as they are: the hero's queries this tick see where the loop left them
     // (a lift's floor moved this tick), not where the last tick did.
     if mobys.world.changed {
@@ -736,7 +826,8 @@ fn tick(
         p.anim.mirror = p.game.cheat(rc_game::cheats::cheat::LEFT_HANDED);
         let env = Env {
             coll, pad: &p.pad, cam_yaw: p.camera.yaw(), cam_pos: p.camera.pos, cam_rows: p.camera.rows, mirror: false, scene: scene.as_ref(), hero_moby: mobys.hero_moby, targets: &targets, hit, death_z,
-            clank: p.game.clank, pack: p.game.pack(), boots: p.game.boots, charge_boots: p.game.charge_boots, grind_boots: p.game.grind_boots, rails: &mobys.rails, level: p.game.level, arena_on: p.game.arena_on, cheats: p.game.cheats, classes: &classes, nodes: &nodes, hooks: &hooks, pulls: &pulls,
+            // Clank away from his back (`0x18c31c`, rc_game::hero::body): no packs.
+            clank: p.game.clank && !p.hero.body.clank_away, pack: if p.hero.body.clank_away { -1 } else { p.game.pack() }, boots: p.game.boots, charge_boots: p.game.charge_boots, grind_boots: p.game.grind_boots, rails: &mobys.rails, level: p.game.level, arena_on: p.game.arena_on, cheats: p.game.cheats, classes: &classes, nodes: &nodes, hooks: &hooks, pulls: &pulls,
         };
         let before = rc_game::hero::anim::AnimCtl::view(&p.anim.ctl(class));
         let mut ctl = p.anim.ctl(class);
@@ -817,7 +908,8 @@ fn tick(
         if let Some(i) = mobys.hero_moby { mobys.world.rebuild(i, &host); }
         let scene = crate::mobys::scene_of(&mobys.snap, &mobys.coll, &mobys.cache);
         let mut ctx = rc_game::moby::Ctx { host: &mut host, hero: &mut p.hero, game: &mut p.game, coll: Some(coll), scene: scene.as_ref(), hero_moby: mobys.hero_moby, hero_view, level: &mobys.level, parts: parts.as_deref_mut().map(|s| &mut s.sys), view: None };
-        rc_game::hero::items::item_pass(&mut mobys.world, &mut ctx);
+        // A body's tick (`0x2a65d8`) has no item pass: its own hits only (rc_game::hero::body).
+        if ctx.hero.mode == 0 { rc_game::hero::items::item_pass(&mut mobys.world, &mut ctx) } else { rc_game::hero::body::body_pass(&mut mobys.world, &mut ctx) }
         // The swim's effects (crate::hero::water's requests of this tick), into the particle pool.
         rc_game::hero::water::fx_pass(&mobys.world, &mut ctx);
         // Ratchet's shadow and the casters' direction (rc_game::shadow_volumes).
@@ -836,7 +928,7 @@ fn tick(
         p.hero.set_anim(&mut ctl, blend, seq, 0);
     }
     // `0x2afc38`: his pose layers (the holding layers, the face), after the item pass.
-    rc_game::hero::layers::upkeep(&mut p.hero, &p.anim.ctl(class));
+    if p.hero.mode == 0 { rc_game::hero::layers::upkeep(&mut p.hero, &p.anim.ctl(class)); }
     // `UpdateParts` (`0x331150`), after the hero.
     if let Some(s) = parts.as_deref_mut() {
         let aux = rc_game::particles::PartAux { cam_yaw: p.camera.yaw(), water_z: p.hero.surf.water_z, coll: Some(coll), rain: mobys.world.weather.aux(&mobys.level, &p.game) };
@@ -868,7 +960,7 @@ fn tick(
         let mods = p.hero.posture.modifiers(&mobys.hero_targets);
         let hl = mobys.hero_layers(&p.hero.layers);
         let pose = crate::mobys::HeroPose { class: p.class, state: &p.anim.state, snapshot: p.anim.snapshot.as_ref(), pos: p.hero.pos, rows: p.hero.rows, scale: p.scale, mods: &mods, layers: &hl };
-        mobys.skin_worn(lv, &crate::mobys::Mobys::worn(&p.hero.items), Some(&pose));
+        mobys.skin_worn(lv, &crate::mobys::Mobys::worn(&p.hero.items), (p.hero.mode == 0).then_some(&pose));
     }
     if mobys.world.changed {
         let host = crate::mobys::Host { lv: &lv.mobys, occl: occl.as_deref(), anim: anim.as_deref_mut(), created: &mut mobys.created, hero: None, hero_chains: &[], chains: Some(&mobys.chains), camera: p.camera.pos, camera_rows: p.camera.rows, sound: None };
@@ -1088,6 +1180,10 @@ const DEATH_FADE: u32 = 16;
 /// rules (the ones gone for good stay out), Ratchet at the checkpoint (the spawn points', else his start) with full
 /// health; the game keeps the rest (bolts, items, ammo).
 fn death_reset(p: &mut Play, lv: &crate::level_load::LoadedLevel) {
+    // A body playing: Ratchet's class, instance and scale back (his animation starts anew below).
+    if let Some(b) = p.body.take() {
+        if !b.suspended { (p.class, p.instance, p.scale) = (b.class, b.instance, b.scale); }
+    }
     let inst = &lv.mobys.instances[p.instance];
     let armour = p.hero.damage.armour;
     let (at, rot) = p.game.checkpoint.unwrap_or((inst.position, inst.rotation));
@@ -1688,6 +1784,8 @@ fn start_scene(p: &mut Play, lv: &mut crate::level_load::LoadedLevel, id: i32) {
         }
     };
     let Some(mobys) = p.mobys.as_mut() else { return };
+    // A body playing: the scene's hero is Ratchet (rc_game::hero::body).
+    body_scene(&mut p.body, (&mut p.class, &mut p.instance, &mut p.scale, &mut p.anim), mobys, true);
     use rc_game::moby::mode;
     let mut actors = Vec::new();
     for a in &scene.chunks[0].actors {
@@ -1758,7 +1856,11 @@ fn end_scene(p: &mut Play, lv: &mut crate::level_load::LoadedLevel) {
             mobys.created.remove(&m);
         }
         for m in mobys.world.mobys.iter_mut().filter(|m| m.o_class == 0xcb && m.state < 0x80) { m.mode &= !0x80; }
-        if let Some(h) = p.hero.items.hand.and_then(|h| mobys.world.mobys.get_mut(h)) { h.mode &= !1; }
+        // A body playing keeps Ratchet's hand item hidden, and is the hero again.
+        if p.body.is_none() {
+            if let Some(h) = p.hero.items.hand.and_then(|h| mobys.world.mobys.get_mut(h)) { h.mode &= !1; }
+        }
+        body_scene(&mut p.body, (&mut p.class, &mut p.instance, &mut p.scale, &mut p.anim), mobys, false);
     }
     for (ci, slot, before) in p.scene_slots.drain(..).rev() {
         if let Some(q) = lv.mobys.anim.get_mut(ci).and_then(|a| a.sequences.get_mut(slot)) { *q = before; }
@@ -2688,7 +2790,7 @@ fn start(lv: &crate::level_load::LoadedLevel) -> Option<Play> {
     Some(Play {
         anim: RatchetAnim { curves: &rc_game::hero::CURVES, ..RatchetAnim::new(&m.anim[class]) },
         hero, class, instance, scale, pad: PadState::default(), camera, ship: None, chain: false, mobys: None, game: Default::default(), hud: rc_game::hud::Hud::new(rc_game::game::GameState::default().max_health), ticks: 0, loaded: false,
-        fx_quads: Vec::new(), fx_quads_first: Vec::new(), frame_quads: Vec::new(), exhaust: Default::default(), scene_wad: None, shared_scenes: None, scene_slots: Vec::new(), movie: None, movie_picture: None, leaving: None, scene_listener: None, movie_started: false, hero_loops: [-1; 9], pause: None, pause_opened: false, death_fade: None, qs: Default::default(), qs_paused: false, vendor: Default::default(), space_scene: None, flight: None, flight_cam: None, flight_quads: Vec::new(),
+        fx_quads: Vec::new(), fx_quads_first: Vec::new(), frame_quads: Vec::new(), exhaust: Default::default(), scene_wad: None, shared_scenes: None, scene_slots: Vec::new(), movie: None, movie_picture: None, leaving: None, scene_listener: None, movie_started: false, hero_loops: [-1; 9], pause: None, pause_opened: false, death_fade: None, qs: Default::default(), qs_paused: false, vendor: Default::default(), space_scene: None, flight: None, flight_cam: None, flight_quads: Vec::new(), body: None,
         help: Default::default(), boxes: Default::default(), glyphs: None, texts: rc_formats::strings::parse_strings(&lv.gameplay, rc_formats::strings::lang::ENGLISH).map_err(|e| eprintln!("play: no help texts ({e:#})")).unwrap_or_default(),
         trace: std::env::var("RC_PLAY_TRACE").is_ok_and(|v| v.trim() == "1"),
     })

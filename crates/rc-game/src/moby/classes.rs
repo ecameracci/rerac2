@@ -39,6 +39,7 @@ pub mod shot;
 pub mod smash;
 pub mod spawn_point;
 pub mod spiderbot;
+pub mod swingshot;
 pub mod teleport;
 pub mod tie_lights;
 pub mod telepad;
@@ -53,6 +54,7 @@ pub mod wrench;
 pub mod endako_a;
 pub mod endako_a_enemies;
 pub mod endako_b;
+pub mod endako_clank;
 
 use super::UpdateFn;
 
@@ -73,6 +75,8 @@ pub fn update_for(o_class: i16) -> Option<UpdateFn> {
         gravity_bomb::BLAST_CLASS => Some(gravity_bomb::update_blast),
         spiderbot::HAND_CLASS => Some(spiderbot::update_hand),
         spiderbot::BOT_CLASS => Some(spiderbot::update_bot),
+        swingshot::HAND_CLASS => Some(swingshot::update),
+        swingshot::HOOK_CLASS => Some(swingshot::update_hook),
         0xbfe => Some(shot::update),
         flash::CLASS | flash::BOMB_CLASS => Some(flash::update),
         500 | 501 | 505 | 511 => Some(crate_::update),
@@ -251,6 +255,8 @@ pub fn update_for(o_class: i16) -> Option<UpdateFn> {
         endako_a_enemies::CLASS => Some(endako_a_enemies::update),
         // Endako (endakoB).
         0x0c25 => Some(endako_b::update_0c25),
+        0x0a08 => Some(endako_clank::update_0a08),
+        endako_clank::CLANK_CLASS => Some(endako_clank::update_0057),
         0x0982 | 0x0983 | 0x0bf5 => Some(endako_b::update_lift),
         0x0e87 | 0x0961 => Some(endako_b::update_0e87),
         0x097a => Some(endako_b::update_097a),
