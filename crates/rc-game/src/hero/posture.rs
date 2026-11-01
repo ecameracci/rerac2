@@ -122,7 +122,7 @@ pub mod rec {
     pub const NECK: usize = 12;
     /// Lists 25..28: the ears and the tail.
     pub const SECONDARY: usize = 13;
-    /// List 24: scaled 0.875 (1.57 with the big-head cheat `0x1a7a49`).
+    /// List 24: scaled 0.875 (1.57 with the big-head cheat `0x1a7a49`, [`Env::big_head`]).
     pub const SCALED: usize = 17;
 }
 
@@ -163,7 +163,7 @@ pub struct Posture {
     pub feet: Feet,
     /// `0x18a008`: ticks since the last strafing tick.
     pub not_strafing: i32,
-    /// `$gp − 0x72fc`: the scaled joint's scale, easing to 0.875.
+    /// `$gp − 0x72fc`: the scaled joint's scale, easing to 0.875 (1.57 with the big-head cheat).
     pub head_scale: f32,
     /// The idle look: `0x18afc0` its timer, `0x18afb4` / `0x18afb8` the head's y / z, `0x18afc4` / `0x18afc8` its
     /// spring.
@@ -379,10 +379,11 @@ impl Hero {
     /// `0x2ab498`: the scaled joint; and, 20 ticks after the last strafe, idle in the sequences 0..2 or 0x3a, the head
     /// looks somewhere new every 90..280 ticks (−25°..9° down, 20°..57° or 50°..70° near a wall to a random side; a
     /// fidget's look within 20° and 15°) with a random spring, the chest following at half.
-    fn head_idle(&mut self, anim: &mut dyn AnimCtl) {
+    fn head_idle(&mut self, env: &Env, anim: &mut dyn AnimCtl) {
         let p = &mut self.posture;
         p.recs[rec::SCALED].scale = p.head_scale;
-        approach(0.875, 0.05, &mut p.head_scale);
+        // The big-head cheat (`0x1a7a49`): toward 1.57 (`0x3fc8f5c3`) instead.
+        approach(if env.big_head { f32::from_bits(0x3fc8_f5c3) } else { 0.875 }, 0.05, &mut p.head_scale);
         if p.not_strafing <= 0x13 { return; }
         // A weapon in use or aiming (`0x18c0d8`, `0x18aa18`): the look and the twitches cleared (`0x2ab458`), the
         // head and the chest on soft springs, the next look and fidget 90..120 ticks off.
@@ -577,7 +578,7 @@ impl Hero {
     pub(super) fn posture_tick(&mut self, env: &Env, anim: &mut dyn AnimCtl) {
         if self.mode != 0 { return; }
         self.feet_tilt();
-        self.head_idle(anim);
+        self.head_idle(env, anim);
         self.head_look(env, anim);
         self.twitch(anim);
         self.neck_and_blink(anim);

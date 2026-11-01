@@ -73,6 +73,8 @@ pub struct Env<'a> {
     pub level: i32,
     /// `0x1a9010`: Maktar's arena master out of its desk state (crate::game::GameState::arena_on).
     pub arena_on: bool,
+    /// `0x1a7a49`: the big-head cheat (crate::cheats::cheat::BIG_HEAD; the head's scale `0x2ab498`).
+    pub big_head: bool,
     /// Every moby's o_class by its index (the ground moby's class).
     pub classes: &'a [i16],
     /// The Swingshot nodes (class 0x2f6), the hook nodes (0x323) and the pull targets (0x99d).

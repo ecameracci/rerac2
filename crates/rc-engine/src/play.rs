@@ -715,7 +715,7 @@ fn tick(
         }
         let env = Env {
             coll, pad: &p.pad, cam_yaw: p.camera.yaw(), cam_pos: p.camera.pos, cam_rows: p.camera.rows, mirror: false, scene: scene.as_ref(), hero_moby: mobys.hero_moby, targets: &targets, hit, death_z,
-            clank: p.game.clank, pack: p.game.pack(), boots: p.game.boots, charge_boots: p.game.charge_boots, grind_boots: p.game.grind_boots, rails: &mobys.rails, level: p.game.level, arena_on: p.game.arena_on, classes: &classes, nodes: &nodes, hooks: &hooks, pulls: &pulls,
+            clank: p.game.clank, pack: p.game.pack(), boots: p.game.boots, charge_boots: p.game.charge_boots, grind_boots: p.game.grind_boots, rails: &mobys.rails, level: p.game.level, arena_on: p.game.arena_on, big_head: p.game.cheat(rc_game::cheats::cheat::BIG_HEAD), classes: &classes, nodes: &nodes, hooks: &hooks, pulls: &pulls,
         };
         let before = rc_game::hero::anim::AnimCtl::view(&p.anim.ctl(class));
         let mut ctl = p.anim.ctl(class);
