@@ -456,6 +456,11 @@ impl MobyHost for Host<'_> {
         taken
     }
 
+    fn seq_frames(&self, m: &Moby, seq: u8) -> Option<u8> {
+        let (class, _, _) = self.state_of(m)?;
+        self.lv.anim.get(class)?.sequences.get(seq as usize)?.as_ref().map(|q| q.header.frame_count)
+    }
+
     fn sequence_sphere(&self, m: &Moby) -> Option<[f32; 4]> {
         let (class, s, _) = self.state_of(m)?;
         let seqs = &self.lv.anim.get(class)?.sequences;

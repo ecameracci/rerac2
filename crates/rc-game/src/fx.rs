@@ -332,6 +332,7 @@ fn one(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut crate::ga
         0x00bc => crate::moby::classes::tractor::draw(w, id, cam, -0.3 * (game.frame % 27) as f32, out),
         crate::moby::classes::swingshot::HAND_CLASS => crate::moby::classes::swingshot::draw_line(w, host, id, cam, out),
         crate::ship::LASER_CLASS => crate::ship::draw_laser(w, id, cam, out),
+        crate::moby::classes::endako_c::SENTRY => crate::moby::classes::endako_c::draw_beam(w, id, game.frame, cam, out),
         _ => {}
     }
 }

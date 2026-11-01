@@ -521,11 +521,10 @@ pub fn update_09b1(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 
 /// The spills 0x09d4 / 0x09d7 (`0x3d1908`, the update 0x09b1 gives them).
 /// * **0**: tumbling (the shards' body); at rest 1, mode |= 0x2000.
-/// * **1**: one tick in sixteen (by its index), a 0x0ff3 or 0x0ffd within 0.2 takes it (3); 600 ticks in and out of
-///   view, 2.
+/// * **1**: one tick in sixteen (by its index), a 0x0ff3 or 0x0ffd within 0.2 takes it (3); every tick, the end of
+///   0x0ffd's beam within 0.3 across (`$gp+0x1550`, crate::moby::classes::endako_c::Globals::beam_end) too; 600
+///   ticks in and out of view, 2.
 /// * **2** / **3**: it fades 2 / 8 an alpha a tick and goes.
-///
-/// Not ported: taken by the beam of 0x0ffd (its end `$gp+0x1550` within 0.3; that class is not ported).
 pub fn update_spill(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     match w.mobys[id].state {
         0 => {
@@ -540,6 +539,7 @@ pub fn update_spill(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 let near = ctx.scene.map_or(Vec::new(), |sc| crate::collision::coll_sphere_mobys(sc, pos, 0.2, crate::collision::QueryFlags(0), Some(id)));
                 if near.iter().any(|&o| w.mobys.get(o).is_some_and(|o| o.o_class == 0x0ff3 || o.o_class == 0x0ffd)) { w.mobys[id].set_state(3, -1); }
             }
+            if crate::hero::physics::dist2(w.mobys[id].pos, w.endako.beam_end) < 0.3 { w.mobys[id].set_state(3, -1); }
             let m = &mut w.mobys[id];
             let t = m.state_ticks;
             m.state_ticks = t.wrapping_add(1);

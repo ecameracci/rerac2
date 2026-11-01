@@ -657,6 +657,32 @@ pub fn staged_burst(sys: &mut Particles, rng: &mut Rng, spread: f32, speed: f32,
 
 fn scale_v(v: [f32; 3], s: f32) -> [f32; 3] { v.map(|x| x * s) }
 
+/// L03 `0x2edd68(moby, lo, hi, vlo, vhi, count, kind)` (engine code only Endako's build has; its breakables'
+/// smoke, crate::moby::classes::endako_d): `count` staged puffs ([`staged`], def 0x3c additive) at a random point of
+/// the box `lo..hi` in the moby's frame (`rows`, `scale`, `pos`: `0x326610`), moving `vlo..vhi` a second (each axis
+/// drawn on its own, a sixtieth a tick, through the rows); its stages `k·10`, `k·35`, `k·7` ticks with `k` =
+/// 0.5..1.5, its size 0.1..0.4 shrinking to 0.01, sinking 1/720 a tick for each tick of its time by the end; its
+/// colours a random mix within the kind's pairs ([`STAGED_KINDS`], kinds past 3 the first). The draws: the velocity,
+/// the point, `k`, the size, the two colours.
+#[allow(clippy::too_many_arguments)]
+pub fn staged_box(sys: &mut Particles, rng: &mut Rng, rows: &[[f32; 3]; 3], pos: [f32; 3], scale: f32, lo: [f32; 3], hi: [f32; 3], vlo: [f32; 3], vhi: [f32; 3], count: i32, kind: u8) {
+    let through = |v: [f32; 3]| -> [f32; 3] { std::array::from_fn(|k| v[0] * rows[0][k] + v[1] * rows[1][k] + v[2] * rows[2][k]) };
+    let c = STAGED_KINDS.get(kind as usize).copied().unwrap_or(STAGED_KINDS[0]);
+    for _ in 0..count.max(0) {
+        let v: [f32; 3] = std::array::from_fn(|k| rng.randf(vlo[k], vhi[k]) * 0.016_666_668);
+        let o: [f32; 3] = std::array::from_fn(|k| rng.randf(lo[k], hi[k]));
+        let v = through(v);
+        let p = add(scale_v(through(o), scale), pos);
+        let k = rng.randf(0.5, 1.5);
+        let (a, b, e) = ((k * 10.0) as i32, (k * 35.0) as i32, (k * 7.0) as i32);
+        let s = rng.randf(0.1, 0.4);
+        let dz = -f32::from_bits(0x3ab6_0b61) * (a + b + e) as f32;
+        let c0 = tween_color(rng.randf(0.0, 1.0).to_bits(), c[0], c[1]);
+        let c1 = tween_color(rng.randf(0.0, 1.0).to_bits(), c[2], c[3]);
+        staged(sys, rng, p, [v[0], v[1], v[2], s], [v[0], v[1], v[2] + dz, 0.01], c0, c1, a as i16, b as i16, e as i16, 0x1003c);
+    }
+}
+
 /// Type 0x35: a twinkle.
 pub const TWINKLE: u8 = 0x35;
 

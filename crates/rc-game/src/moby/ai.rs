@@ -273,8 +273,8 @@ pub fn fence(points: &[[f32; 4]], r: f32, p: V3) -> Option<V3> {
 pub fn mark_fence(w: &mut MobyWorld, id: usize, ctx: &Ctx, o: usize) {
     let m = &mut w.mobys[id];
     let path = m.pv_i(o + 0x3c);
-    let Some(pts) = usize::try_from(path).ok().and_then(|p| ctx.level.paths.get(p)) else { return };
-    if ctx.level.in_polygon(path, m.pos) && fence(pts, m.pv_f(o), m.pos).is_none() { return; }
+    let Some(pts) = crate::path_network::points_now(ctx.level, &ctx.game.path_openings, path) else { return };
+    if ctx.level.in_polygon(path, m.pos) && fence(&pts, m.pv_f(o), m.pos).is_none() { return; }
     m.set_pv_i(o + 0x9c, m.pv_i(o + 0x9c) | 1);
 }
 
@@ -284,9 +284,9 @@ fn keep_in(w: &mut MobyWorld, id: usize, ctx: &Ctx) -> bool {
     let o = mv(m);
     let path = m.pv_i(o + 0x3c);
     if path == -1 || m.pv_i(o + 0x9c) & 1 != 0 { return false; }
-    let Some(points) = usize::try_from(path).ok().and_then(|p| ctx.level.paths.get(p)) else { return false };
+    let Some(points) = crate::path_network::points_now(ctx.level, &ctx.game.path_openings, path) else { return false };
     let r = m.pv_f(o);
-    let Some(q) = fence(points, r, m.pos) else { return false };
+    let Some(q) = fence(&points, r, m.pos) else { return false };
     let m = &mut w.mobys[id];
     let d = set_len(sub(q, m.pos), r);
     m.set_pv_v(o + 0x60, d);
@@ -388,7 +388,7 @@ fn ground(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, goal: V3, from: V3) {
     if d <= m.pv_f(o + 0x34) { let f = m.pv_i(o + 0x94); m.set_pv_i(o + 0x94, f | 0x80); }
     if m.pv_i(o + 0x9c) & 1 != 0 {
         let path = m.pv_i(o + 0x3c);
-        let inside = usize::try_from(path).ok().and_then(|p| ctx.level.paths.get(p)).is_some_and(|pts| ctx.level.in_polygon(path, m.pos) && fence(pts, m.pv_f(o), m.pos).is_none());
+        let inside = crate::path_network::points_now(ctx.level, &ctx.game.path_openings, path).is_some_and(|pts| ctx.level.in_polygon(path, m.pos) && fence(&pts, m.pv_f(o), m.pos).is_none());
         if inside { m.set_pv_i(o + 0x9c, m.pv_i(o + 0x9c) & !1); } else { let f = m.pv_i(o + 0x94); m.set_pv_i(o + 0x94, f | 0x100); }
     }
     let seq = super::classes::props::seq(w, id, ctx);

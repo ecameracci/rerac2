@@ -433,6 +433,8 @@ pub trait MobyHost {
     fn anim(&self, _m: &Moby) -> Option<AnimState> { None }
     /// `0x31b5f0(moby, seq, frame, blend)`: start sequence `seq` at `frame`, blended over `blend` ticks.
     fn set_anim(&mut self, _m: &Moby, _seq: u8, _frame: u8, _blend: u8) {}
+    /// The frame count of the moby's class's sequence `seq` (its header's `+0x10`: `*(class + 0x48 + 4·seq) + 0x10`).
+    fn seq_frames(&self, _m: &Moby, _seq: u8) -> Option<u8> { None }
     /// The camera's position (`0x1b8d40`).
     fn camera_pos(&self) -> V3 { [0.0; 3] }
     /// The camera's matrix (`0x1b8f70`): rows forward, left, up.
@@ -553,6 +555,8 @@ pub struct MobyWorld {
     pub weather: classes::weather::Weather,
     /// Maktar's globals (classes::maktar::Globals).
     pub maktar: classes::maktar::Globals,
+    /// Endako's globals (classes::endako_c::Globals).
+    pub endako: classes::endako_c::Globals,
     /// The point lights (`0x1c6ec0`), owned by the explosion lights (classes::light); the engine lights the world and
     /// the mobys with them.
     pub point_lights: crate::point_lights::PointLights,

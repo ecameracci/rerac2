@@ -55,6 +55,8 @@ pub mod endako_a;
 pub mod endako_a_enemies;
 pub mod endako_b;
 pub mod endako_clank;
+pub mod endako_c;
+pub mod endako_d;
 
 use super::UpdateFn;
 
@@ -268,6 +270,18 @@ pub fn update_for(o_class: i16) -> Option<UpdateFn> {
         0x11e7 => Some(endako_b::update_11e7),
         0x11c4 => Some(endako_b::update_11c4),
         0x12ea => Some(endako_b::update_12ea),
+        // Endako (endakoC).
+        endako_c::SENTRY => Some(endako_c::update_0ffd),
+        endako_c::FLAMER => Some(endako_c::update_0ffc),
+        endako_c::MINE => Some(endako_c::update_0b23),
+        // Endako (endakoD).
+        0x0f37 => Some(endako_d::update_0f37),
+        0x0f3e => Some(endako_d::update_0f3e),
+        0x0f38 => Some(endako_d::update_0f38),
+        endako_d::ROBOT_93C | endako_d::ROBOT_940 | endako_d::ROBOT_964 | endako_d::ROBOT_A59 => Some(endako_d::update_robot),
+        endako_d::CAGE => Some(endako_d::update_cage),
+        0x0972 => Some(endako_d::update_0972),
+        endako_d::NETWORK => Some(endako_d::update_0f2d),
         _ => None,
     }
 }

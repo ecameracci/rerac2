@@ -19,7 +19,9 @@
 //! * 0x0e (`0x1a7a76`): Maktar's resort down to 10 breakables (0x12cf, L02 `0x38b5e8`, crate::moby::classes::maktar);
 //! * 0x0f (`0x1a7a77`): Oozla's store's breakables all broken (0x12dc, L01 `0x379e6c`, crate::moby::classes::smash);
 //! * 0x13 (`0x1a7a7b`): the arena boss 0x0a44 beaten without Ratchet hurt (L02 `0x3da250`);
-//! * 0x19 (`0x1a7a81`): a slot machine's jackpot (0x0a9c, L02 `0x3e8f04`, crate::moby::classes::maktar).
+//! * 0x19 (`0x1a7a81`): a slot machine's jackpot (0x0a9c, L02 `0x3e8f04`, crate::moby::classes::maktar);
+//! * 0x1c (`0x1a7a84`): Endako's sentry 0x0ffd's death (`0x4201b8`, crate::moby::classes::endako_c::crane_kill) —
+//!   the remote crane that makes the state 0x31 it counts in is not ported yet, so it does not come.
 //!
 //! Not ported (no class or system for them yet): the play frame's checks (`0x2a67f8`, every level's copy: L01
 //! `0x2a8770`, L02 `0x2a9b78`, L03 `0x2ad068`): 0x1d (`0x1a7a85`) once the ship's upgrades `0x1a7af8 & 0xbb50` are
@@ -28,9 +30,8 @@
 //! 0x10's weapon (two hand classes, in every overlay: L00 `0x3c76e0` / `0x406cf8`, L01 `0x3c6f40` / `0x4085f0`, L02
 //! `0x3e0a18` / `0x432288`, L03 `0x3d74a0` / `0x412de8`): 0x16 (`0x1a7a7e`) its 16th class-0xfb4 target on level 0xc
 //! (`$gp+0x1de0`); level 0x10's count (L02 `0x38b3c0`, L03 `0x385200`, no class placed on these levels): 0xb
-//! (`0x1a7a73`) past 13; level 3's 0x12cf count (L03 `0x385298`): 0x15 (`0x1a7a7d`); Endako's classes 0x0ff3
-//! (`0x41d510` → `0x41d838`, `0x41e138` → `0x41e480`) and 0x0ffd (`0x41f9b0` → `0x4201b8`, `0x420598`): 0x1c
-//! (`0x1a7a84`; level 3, Endako); the debug code entry (`0x358550`). The reward flag `0x1a903c` (L01 `0x1a907c`) and its hint
+//! (`0x1a7a73`) past 13; level 3's 0x12cf count (L03 `0x385298`): 0x15 (`0x1a7a7d`); 0x1c from Endako's 0x0ff3
+//! (`0x41d510` → `0x41d838`, `0x41e138` → `0x41e480`: its update does not call the count yet); the debug code entry (`0x358550`). The reward flag `0x1a903c` (L01 `0x1a907c`) and its hint
 //! (`0x2b22d0`: the vendor and armour hints 0x1b90 / 0x1b91 / 0x1b93 after a reward, by the count and the planet, 300
 //! ticks apart). The pause's Skill Points and Cheats pages read the bytes and the count: crate::menus::special.
 
@@ -59,6 +60,8 @@ pub mod point {
     pub const BOSS_A44: usize = 0x13;
     /// A slot machine's jackpot.
     pub const JACKPOT: usize = 0x19;
+    /// Ten Endako enemies killed while Ratchet works the remote crane (state 0x31).
+    pub const CRANE: usize = 0x1c;
 }
 
 impl GameState {

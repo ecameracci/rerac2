@@ -35,9 +35,10 @@
 //!   the first wall crossed (`0x34aa08`, [`first_crossing`]), then kept `r` from the walls (`0x343678`); its height
 //!   `to`'s.
 //!
-//! Not ported: [`steer`]'s yaw offset (its one caller passes 0). The level's path data stays as loaded (shared, read
-//! only): the meeting points' `w` cleared by the build are applied to the walker's own copies of its records' paths
-//! ([`opened`]) — any other moby using those paths as a fence or wall would see them closed (none does on Maktar).
+//! Endako's networks are built from a list of paths ([`build_list`], L03 `0x32b318`) and walked with a yaw offset
+//! ([`steer_offset`]). The level's path data stays as loaded (shared, read only): the meeting points' `w` a build
+//! clears are kept as the level's openings ([`open`], crate::game::GameState::path_openings) that the fences read
+//! ([`points_now`]); Maktar's walker applies them to its own copies of its records' paths ([`opened`]) instead.
 
 use crate::hero::physics::{add, add_rot, atan2, dist, dist2, len2, scale, set_len, sub, sub_rot, V3};
 use crate::level::LevelData;
@@ -161,6 +162,46 @@ pub fn build(level: &LevelData, start: i32, nodes: &mut [Node]) -> usize {
         ring = next;
         if !(more && ring < 0x20) { break; }
     }
+    link_and_measure(level, nodes, count);
+    count
+}
+
+/// L03 `0x32b318(m, list, out, max)`: the network from a list of paths (`max` words, the first −1 ending it; on
+/// Endako the network moby 0x0f2d's, crate::moby::classes::endako_d): as [`build`], but the breadth-first walk goes
+/// over the list from its first path, any path of it that meets a recorded one joining the next ring (no polygon
+/// test), and the records take the list's paths. The links, centres and radii as [`build`]'s.
+pub fn build_list(level: &LevelData, list: &[i32], nodes: &mut [Node]) -> usize {
+    let max = nodes.len().min(list.len());
+    let mut marks = vec![0u8; max.max(1)];
+    marks[0] = 1;
+    let mut count = 0;
+    let mut ring = 1u32;
+    loop {
+        let mut more = false;
+        let next = ring + 1;
+        for i in 0..max {
+            if max <= count || list[i] == -1 { break; }
+            if marks[i] as u32 != ring { continue; }
+            nodes[count].path = list[i];
+            count += 1;
+            for j in 0..max {
+                if j == i || marks[j] != 0 { continue; }
+                if list[j] == -1 { break; }
+                if meeting(level, list[i], list[j]).is_some() {
+                    marks[j] = next as u8;
+                    more = true;
+                }
+            }
+        }
+        ring = next;
+        if !(more && ring < 0x20) { break; }
+    }
+    link_and_measure(level, nodes, count);
+    count
+}
+
+/// The builds' tail: every two recorded paths that meet linked both ways, each record's centre and radius.
+fn link_and_measure(level: &LevelData, nodes: &mut [Node], count: usize) {
     for n in nodes[..count].iter_mut() { n.links = [0xff; 4]; }
     for i in 0..count {
         for j in i + 1..count {
@@ -183,7 +224,31 @@ pub fn build(level: &LevelData, start: i32, nodes: &mut [Node]) -> usize {
         n.centre = c;
         n.radius = pts.iter().fold(0.0f32, |r, p| r.max(dist2(c, p3(p))));
     }
-    count
+}
+
+/// The builds' writes into the level's path data (`0x1fe700`): the meeting points of every two linked records with
+/// `w` 0, kept as (path, point) in `openings` (crate::game::GameState::path_openings) for the fences and wall tests
+/// that read the level's paths afterwards ([`points_now`]).
+pub fn open(openings: &mut Vec<(i32, usize)>, level: &LevelData, nodes: &[Node]) {
+    for i in 0..nodes.len() {
+        for j in i + 1..nodes.len() {
+            let Some((ei, ej)) = meeting(level, nodes[i].path, nodes[j].path) else { continue };
+            for k in [(nodes[i].path, ei), (nodes[j].path, ej)] {
+                if !openings.contains(&k) { openings.push(k); }
+            }
+        }
+    }
+}
+
+/// Path `path`'s points as the level's path data holds them now: with the networks' openings ([`open`]) `w` 0.
+pub fn points_now<'a>(level: &'a LevelData, openings: &[(i32, usize)], path: i32) -> Option<std::borrow::Cow<'a, [[f32; 4]]>> {
+    let pts = usize::try_from(path).ok().and_then(|p| level.paths.get(p))?;
+    if !openings.iter().any(|&(p, _)| p == path) { return Some(std::borrow::Cow::Borrowed(pts.as_slice())); }
+    let mut v = pts.clone();
+    for &(_, k) in openings.iter().filter(|&&(p, _)| p == path) {
+        if let Some(q) = v.get_mut(k) { q[3] = 0.0; }
+    }
+    Some(std::borrow::Cow::Owned(v))
 }
 
 /// Record `k`'s path as the build leaves it: the points where it meets the network's other paths with `w` 0.
@@ -235,7 +300,15 @@ fn edge(level: &LevelData, n: &Node, e: u8) -> Option<(V3, V3)> {
 
 /// `0x32fd40(0, r, from, to, &yaw, nodes, n, &at, &goal)`: the heading through the network (module docs).
 pub fn steer(level: &LevelData, nodes: &[Node], r: f32, from: V3, to: V3, yaw: &mut f32, at: &mut i32, goal: &mut i32) -> bool {
+    steer_offset(level, nodes, 0.0, r, from, to, yaw, at, goal)
+}
+
+/// [`steer`] with its yaw offset (L03 `0x32b7c8`, the same code: the straight heading turned by `offset` before the
+/// openings clamp it; Endako's robots spread out by it).
+#[allow(clippy::too_many_arguments)]
+pub fn steer_offset(level: &LevelData, nodes: &[Node], offset: f32, r: f32, from: V3, to: V3, yaw: &mut f32, at: &mut i32, goal: &mut i32) -> bool {
     *yaw = atan2(to[0] - from[0], to[1] - from[1]);
+    if offset != 0.0 { *yaw = add_rot(*yaw, offset); }
     if !locate(level, nodes, from, at) || !locate(level, nodes, to, goal) { return false; }
     let t = *goal as usize;
     if nodes[t].closed() { return false; }
