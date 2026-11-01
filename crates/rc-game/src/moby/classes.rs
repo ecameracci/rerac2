@@ -50,6 +50,9 @@ pub mod tractor;
 pub mod vendor;
 pub mod weather;
 pub mod wrench;
+pub mod endako_a;
+pub mod endako_a_enemies;
+pub mod endako_b;
 
 use super::UpdateFn;
 
@@ -233,6 +236,32 @@ pub fn update_for(o_class: i16) -> Option<UpdateFn> {
         pickup::CLASS => Some(pickup::update),
         nanotech::CLASS => Some(nanotech::update),
         crate::vendor::CLASS => Some(vendor::update),
+        // Endako (endakoA).
+        0x09b2 => Some(endako_a::update_09b2),
+        0x09a3 | 0x09a4 | 0x09a6 => Some(endako_a::update_barrier),
+        0x0d40 => Some(endako_a::update_0d40),
+        0x02f6 | endako_a::HOOK_NODE => Some(endako_a::update_swing_node),
+        0x09b6 => Some(endako_a::update_09b6),
+        0x0979 => Some(endako_a::update_0979),
+        0x0994 => Some(endako_a::update_0994),
+        0x09ff => Some(endako_a::update_09ff),
+        0x09b1 => Some(endako_a::update_09b1),
+        0x0985 => Some(endako_a::update_0985),
+        0x0995 => Some(endako_a::update_0995),
+        endako_a_enemies::CLASS => Some(endako_a_enemies::update),
+        // Endako (endakoB).
+        0x0c25 => Some(endako_b::update_0c25),
+        0x0982 | 0x0983 | 0x0bf5 => Some(endako_b::update_lift),
+        0x0e87 | 0x0961 => Some(endako_b::update_0e87),
+        0x097a => Some(endako_b::update_097a),
+        0x0ef9 => Some(endako_b::update_0ef9),
+        0x099d => Some(endako_b::update_099d),
+        0x094e => Some(endako_b::update_empty),
+        0x0a0a => Some(endako_b::update_0a0a),
+        0x0a0b => Some(endako_b::update_0a0b),
+        0x11e7 => Some(endako_b::update_11e7),
+        0x11c4 => Some(endako_b::update_11c4),
+        0x12ea => Some(endako_b::update_12ea),
         _ => None,
     }
 }

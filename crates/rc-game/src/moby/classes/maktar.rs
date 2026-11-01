@@ -543,7 +543,7 @@ fn node_sparkle(w: &MobyWorld, id: usize, ctx: &mut Ctx) {
 }
 
 /// `0x320b50(group, on)`: every member of the group hooked (`once & 4`, `0x330490`).
-fn hook_group(w: &mut MobyWorld, group: i32, on: bool) {
+pub(crate) fn hook_group(w: &mut MobyWorld, group: i32, on: bool) {
     let Some(g) = usize::try_from(group).ok().and_then(|g| w.groups.get(g)).cloned() else { return };
     for i in g {
         if let Some(m) = w.mobys.get_mut(i as usize) {

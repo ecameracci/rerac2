@@ -222,6 +222,15 @@ impl Panel {
         // `0x308ac0`'s head: the shift's frames down; out, the shift goes.
         g.help_shift_ticks = (g.help_shift_ticks - 1).max(0);
         if g.help_shift_ticks == 0 { g.help_shift = 0; }
+        // L03 `0x2f61e8` (GameState::help_cancel): 1..3 → 7 and 5 → 6 from tick 0, 4 → 6 at `4 − ticks`.
+        if g.help_close.take().is_some_and(|s| s == -1 || s == self.slot) {
+            match g.help_state {
+                1..=3 => (g.help_state, self.timer) = (7, 0),
+                4 => (g.help_state, self.timer) = (6, 4 - self.timer),
+                5 => (g.help_state, self.timer) = (6, 0),
+                _ => {}
+            }
+        }
         self.timer += 1;
         match g.help_state {
             0 => {
