@@ -40,6 +40,7 @@ pub mod ship;
 pub mod script_camera;
 pub mod shadows;
 pub mod shadow_volumes;
+pub mod skill_points;
 pub mod sky;
 pub mod spline;
 pub mod vendor;

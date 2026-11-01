@@ -600,8 +600,9 @@ pub fn update_0c81(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 pub struct Globals {
     /// `$gp−0x3c0`: the breakables left (0x12cf counts them, [`update_12cf`]; each takes one off when it breaks).
     pub left: i32,
-    /// `0x1a7a76`: the count's message shown (a save flag in the game; here for the level's load).
-    pub told: bool,
+    /// `$gp+0x11b0`: the arena boss 0x09f8 hit by nothing but the wrench (or Ratchet) since it came out (its skill
+    /// point, crate::moby::classes::bosses).
+    pub wrench_only: bool,
     /// `$gp+0x1d24`: the belts' way, −1 (the data's) or 1; `reversed` holds 1.
     pub reversed: bool,
     /// `$gp+0x1d28`: the belts' speed a tick.
@@ -612,8 +613,6 @@ pub struct Globals {
     pub combo: i32,
     /// `0x139647`: the slot machines' plays (a save byte in the game, at most 127; here for the level's load).
     pub plays: u8,
-    /// `0x1a7a81`: the jackpot's message shown (a save flag in the game; here for the level's load).
-    pub jackpot: bool,
     /// `0x1b08fc` / `0x1b090c` moved: the jackpot's odds raised (past 36 plays, once).
     pub odds_raised: bool,
     /// `$gp+0x193c` spent: the bolts the broken machines have thrown (of 300).
@@ -1346,9 +1345,9 @@ const COUNTED: [i16; 5] = [0x0a9c, 0x0d0d, 0x0aa4, 0x0e93, 0x1259];
 
 /// 0x12cf (`0x38b458`), the count of the resort's breakables (`$gp−0x3c0`, [`Globals::left`]): at its start (update
 /// distance 0xff) on Maktar it counts the placed 0x0a9c, 0x0d0d, 0x0aa4, 0x0e93 and 0x1259 under z 400; at the level's
-/// frame 2 the count is set to 113 (the game's own figure); at 10 left or fewer, once, the level's sound 1
-/// (`0x367f58(1, 0, 0)` at `0x38b648`) and the message 0x1233 (`0x32c310(0x1233, −1)`, crate::prompt). Not ported:
-/// the flag `0x1a903c`, level 3's count (classes 0xf37, 0xf38, 0xf3e: 112, at 11).
+/// frame 2 the count is set to 113 (the game's own figure); at 10 left or fewer, skill point 0xe (`0x1a7a76`,
+/// `0x38b5e8`: crate::skill_points). Not ported: level 3's count (classes 0xf37, 0xf38, 0xf3e: 112, at 11 skill point
+/// 0x15).
 pub fn update_12cf(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     match w.mobys[id].state {
         0 => {
@@ -1362,10 +1361,8 @@ pub fn update_12cf(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         1 => {
             if ctx.game.level != 2 { return; }
             if ctx.game.frame == 2 { w.maktar.left = 0x71; }
-            if 10 < w.maktar.left || w.maktar.told { return; }
-            w.maktar.told = true;
-            ctx.host.play_level_sound(None, 1, 0);
-            ctx.game.prompt.announce(0x1233, -1);
+            if 10 < w.maktar.left { return; }
+            ctx.game.award_skill_point(crate::skill_points::point::RESORT);
         }
         _ => {}
     }
@@ -1531,7 +1528,8 @@ const SYMBOL_ST: f32 = 2.320_500_1;
 /// A hit with the flags 0x10000 for more than 2 from anything but the wrench (and not Ratchet) breaks it (5, counted).
 /// Blown up, two creatures of its group `+0x58` waiting (state 13) drop out at (0.5, ∓0.45, 0) in its frame facing
 /// Ratchet (crate::moby::classes::critter::waiting / wake). Its reels draw while it is drawn ([`draw_0a9c`]). Not
-/// ported: the HUD's bolt count shown for 240 ticks (`0x3119f0`), the jackpot's flag `0x1a903c`.
+/// ported: the HUD's bolt count shown for 240 ticks (`0x3119f0`), the skill point's reward flag `0x1a903c`
+/// (crate::skill_points).
 pub fn update_0a9c(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     if w.mobys[id].drawn != 0 { w.register_draw(id); }
     if w.mobys[id].pvars.len() < 0xa8 { w.mobys[id].pvars.resize(0xa8, 0); }
@@ -1698,7 +1696,7 @@ fn slot_reels(w: &mut MobyWorld, id: usize) {
 
 /// `0x3e8d50`, state 4: back to 1 and the payout at (3, 0, 2) in its frame plus a random way across (`1 − r²` long, r in 0..1): bolts (15..65,
 /// `0x326ee8`), it blows up (5, counted), an ammo pickup thrown at 0.35 of its speed (`0x31ead8` / `0x3ed9a8`), a
-/// nanotech cluster (`0x3a9bf0`) or the jackpot (300 bolts; the first time its message 0x1233); each but the blow-up
+/// nanotech cluster (`0x3a9bf0`) or the jackpot (300 bolts; skill point 0x19, crate::skill_points); each but the blow-up
 /// with its sound 2, nothing with its sound 3.
 fn slot_pay(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     w.mobys[id].set_state(1, -1);
@@ -1727,12 +1725,8 @@ fn slot_pay(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         }
         4 => { crate::moby::classes::nanotech::create_at(w, at, 0); }
         5 => {
-            if !w.maktar.jackpot {
-                w.maktar.jackpot = true;
-                // The level's sound 1 (`0x367f58(1, 0, 0)` at `0x3e8f08`).
-                ctx.host.play_level_sound(None, 1, 0);
-                ctx.game.prompt.announce(0x1233, -1);
-            }
+            // Skill point 0x19 (`0x3e8f04`).
+            ctx.game.award_skill_point(crate::skill_points::point::JACKPOT);
             ctx.game.bolts += 300;
         }
         _ => {}

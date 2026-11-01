@@ -208,19 +208,13 @@ pub fn update_10fa(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     }
 }
 
-/// 0x12dc: the count set to 66 on the level's second frame; from the sixth, once none is left (and `0x1a7a77` not
-/// set), the level's sound 1 and the message 0x1233.
+/// 0x12dc: the count set to 66 on the level's second frame; from the sixth, once none is left, skill point 0xf
+/// (`0x1a7a77`, `0x379e6c`: crate::skill_points).
 pub fn update_12dc(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     if w.mobys[id].state == 0 { w.mobys[id].update_dist = 0xff; }
     let g = &mut *ctx.game;
     if w.frame == 2 { g.store_left = 0x42; }
-    if 5 < w.frame && g.store_left < 1 && !g.store_done {
-        g.store_done = true;
-        // The level's sound 1 (`0x356ad8(1, 0, 0)` at `0x379e70`).
-        ctx.host.play_level_sound(None, 1, 0);
-        let g = &mut *ctx.game;
-        g.messages.push(crate::msgbox::Request::Text { text: 0x1233, ticks: None });
-    }
+    if 5 < w.frame && g.store_left < 1 { g.award_skill_point(crate::skill_points::point::STORE); }
 }
 
 /// 0x0a26 (`0x3bd948`, 29 placed): the swamp's plants, which the leapers and spitters stir (`+0xbc`) and push through.

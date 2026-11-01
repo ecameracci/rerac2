@@ -2062,7 +2062,7 @@ fn can_talk(w: &MobyWorld, id: usize, ctx: &Ctx, r: f32, n: i32) -> bool {
 ///   step on (wrapping past the points); with its sequence having wrapped (`+0x60 & 2`) sequence 0 rising, else 1 (a
 ///   10-tick blend: the animation's trigger sounds go with them). A hit with the flags 0x10000 (`0x313d88`) knocks it
 ///   off: 0.05 a tick along its facing (`gp+0x82c` / 120 through its rows), 0.05 down; the fourth hit of the level on
-///   Oozla plays the level's sound 1 and shows the message 0x1233 once (`0x1a7a75`); 2.
+///   Oozla gives skill point 0xd (`0x1a7a75`, `0x3a7260`: crate::skill_points); 2.
 /// * **2**: its first tick plays class sound 0 (`0x320328` = L00 `0x32a7c8`, `0x356978`); it flies (the velocity falling 0.003 a
 ///   tick, slowing to 0.98 across, its pitch easing to π), its animation at half speed; within 0.5 of the ground
 ///   under it (`0x312c20` = L00 `0x31ce20`) it sinks for 30 ticks: 3.
@@ -2121,11 +2121,9 @@ pub fn update_061c(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             let v: V3 = std::array::from_fn(|k| push[0] * m.rows[0][k] + push[1] * m.rows[1][k] + push[2] * m.rows[2][k]);
             m.set_pv_v(0x60, [v[0], v[1], -0.05]);
             ctx.game.rider_hits += 1;
-            if 3 < ctx.game.rider_hits && ctx.game.level == 1 && !ctx.game.rider_hint {
-                ctx.game.rider_hint = true;
-                // The level's sound 1 (`0x356ad8(1, 0, 0)` at `0x3a7264`).
-                ctx.host.play_level_sound(None, 1, 0);
-                ctx.game.messages.push(crate::msgbox::Request::Text { text: 0x1233, ticks: None });
+            if 3 < ctx.game.rider_hits && ctx.game.level == 1 {
+                // Skill point 0xd (`0x3a7260`).
+                ctx.game.award_skill_point(crate::skill_points::point::RIDERS);
             }
             w.mobys[id].set_state(2, -1);
         }

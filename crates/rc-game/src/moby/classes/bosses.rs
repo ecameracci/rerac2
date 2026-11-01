@@ -34,8 +34,13 @@
 //! damage (flags 0x810001); its last 16 ticks it shrinks with a sparkle every third; its time out, a burst of sparkles.
 //! It draws a glow and five sparks between its two spinning points ([`draw_shot`]).
 //!
-//! Not ported: the skill points (`0x1a7a69`, `0x1a7a7b`: the level's sound 1 and the message 0x1233), the bosses'
-//! damage tallies by weapon for the weapons' XP (`0x1ff6b8` / `0x1ff798`, `0x1b3770` / `0x1b3774`, `0x1ba644`), the
+//! **Skill points** (crate::skill_points): 0x09f8 gives point 1 as its fade starts (`0x3d4d6c`) when nothing but the
+//! wrench (class 0x47) or Ratchet hit it since it came out (`$gp+0x11b0`, set at its set-up and its state 2, cleared by
+//! a hit from anything else, its health block's last hitter `+0x18`: crate::moby::classes::maktar::Globals); 0x0a44
+//! gives point 0x13 on its death's first tick (`0x3da250`) unless Ratchet was hurt (movement group 7) or hit by it or
+//! its shot since its jump in (`+0x290`, set every tick before its state, cleared through state 2).
+//!
+//! Not ported: the bosses' damage tallies by weapon for the weapons' XP (`0x1ff6b8` / `0x1ff798`, `0x1b3770` / `0x1b3774`, `0x1ba644`), the
 //! scale manipulators (`0x316598`: 0x09f8's hand balls hidden while a chain is out, 0x0a44's turret joint 4 growing and
 //! shrinking as it dies), 0x0a44's arm aims (rotation manipulators on the turret's joints 2 and 3, `0x321bf0` /
 //! `0x322f28`), the joint aim `0x32c1d0`, the chain's lightning (`0x3d7258` → `0x33db10`), the particle bursts
@@ -599,6 +604,7 @@ fn senses_09f8(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         m.set_pv_f(0x90, 3.0);
         m.set_pv_f(0x1e4, 0.5);
         m.set_pv_f(0x118, 0.5);
+        w.maktar.wrench_only = true;
         pool_09f8(w, id, ctx);
     }
     crate::shadow_volumes::probe_near(w, id, ctx, 60.0, 0x38);
@@ -615,6 +621,9 @@ fn senses_09f8(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         }
         if ai::take_damage(w, id, ctx, false) != 0 {
             if !w.mobys[id].has_collision { w.mobys[id].has_collision = w.class(C9F8).is_some_and(|c| c.has_collision); }
+            // Its last hitter (the health block's `+0x18`) other than the wrench (0x47) or Ratchet (0): no skill point.
+            let by = ai::link(&w.mobys[id], ai::health(&w.mobys[id]) + 0x18).and_then(|s| w.mobys.get(s));
+            if by.is_some_and(|s| s.o_class != crate::hero::items::WRENCH_CLASS && s.o_class != 0) { w.maktar.wrench_only = false; }
             let m = &w.mobys[id];
             if m.sub_state == 4 { set_seq(w, id, ctx, 0x10, 3); }
             let m = &w.mobys[id];
@@ -767,6 +776,7 @@ pub fn update_09f8(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         1 => return,
         2 => {
             if w.mobys[id].first() {
+                w.maktar.wrench_only = true;
                 w.mobys[id].state_ticks = 0;
                 set_seq(w, id, ctx, 0, 10);
             }
@@ -872,7 +882,8 @@ pub fn update_09f8(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             if 18.0 < dist2(w.mobys[id].pos, MIDDLE) { w.mobys[id].pos = keep; }
         }
         9 => {
-            // Dead: its bolts, a second still, then the fade back to the pool, its partner out.
+            // Dead: its bolts, a second still, then (beaten with the wrench alone: skill point 1, `0x3d4d6c`) the
+            // fade back to the pool, its partner out.
             if w.mobys[id].first() {
                 ctx.host.set_anim_speed(&w.mobys[id], 0.0);
                 w.mobys[id].state_ticks = 0;
@@ -881,6 +892,7 @@ pub fn update_09f8(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             }
             if 0x3c < w.mobys[id].state_ticks as u16 {
                 ctx.host.set_anim_speed(&w.mobys[id], 1.0);
+                if w.maktar.wrench_only { ctx.game.award_skill_point(crate::skill_points::point::BOSS_9F8); }
                 super::death_fade::start(w, id, ctx, 0.0, Some(pool_09f8));
                 hand_over(w, id);
             }
@@ -1019,6 +1031,8 @@ const TURRET_AT: usize = 0x244;
 const GUN_LINK: usize = 0x260;
 const PARTNER_A44: usize = 0x264;
 const SPIN_SOUND: usize = 0x26c;
+/// `+0x290`: Ratchet hurt since its jump in (its skill point lost).
+const HURT_A44: usize = 0x290;
 /// The turret's light colour now, from and to, and the fade (`+0x250..+0x25c`).
 const LIGHT: usize = 0x250;
 /// Its light's colours: walking, firing, spinning, its taunt's spin, staggered, dead.
@@ -1489,8 +1503,14 @@ pub fn update_0a44(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let ft = frame(w, id, ctx);
     let t = turret(w, id);
     let tw = |w: &MobyWorld, ctx: &Ctx| t.is_some_and(|t| wrapped(w, t, ctx));
+    // `+0x290`: Ratchet hurt (his movement group 7), or hit by it or its shot, since its jump in: no skill point.
+    let by = ctx.hero.damage.hit_by;
+    if ctx.hero.group == 7 || by == Some(id) || by.and_then(|b| w.mobys.get(b)).is_some_and(|b| b.o_class == SHOT) {
+        w.mobys[id].set_pv_s(HURT_A44, 1);
+    }
     match w.mobys[id].state {
         2 => {
+            w.mobys[id].set_pv_s(HURT_A44, 0);
             // The jump in: a second still, then (sequence 3) up and 30 across toward the middle down onto its height;
             // landed (5), a thud and the camera's shake, then its walk.
             if w.mobys[id].first() {
@@ -1730,8 +1750,9 @@ pub fn update_0a44(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         }
         0xb => {
             // Dead: still, its gun thrown at the camera, its bolts; after three seconds five blasts, its pieces and the
-            // turret's thrown, back to the pool, its partner out.
+            // turret's thrown, back to the pool, its partner out. Ratchet unhurt: skill point 0x13 (`0x3da250`).
             if w.mobys[id].first() {
+                if w.mobys[id].pv_s(HURT_A44) == 0 { ctx.game.award_skill_point(crate::skill_points::point::BOSS_A44); }
                 ctx.host.set_anim_speed(&w.mobys[id], 0.0);
                 if let Some(t) = t { ctx.host.set_anim_speed(&w.mobys[t], 0.0); }
                 w.mobys[id].state_ticks = 0;
