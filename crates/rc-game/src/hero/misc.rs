@@ -72,7 +72,7 @@ impl Hero {
                 if self.air_ticks == 0 {
                     self.vel[2] -= 0.015;
                 } else {
-                    self.gravity_from(self.disp[2], 0.006_944_444_5);
+                    self.gravity_from(self.disp, 0.006_944_444_5);
                     self.edge_slide();
                 }
                 let v = anim.view();
@@ -101,7 +101,7 @@ impl Hero {
                 self.target_yaw = self.ground_yaw;
                 self.target_speed = 0.091_666_67;
                 self.air_accel(0.006_944_444_5);
-                self.gravity_from(self.eff_v[2], 0.005);
+                self.gravity_from(self.eff_v, 0.005);
             }
             _ => {
                 // 0x77: off the wall.

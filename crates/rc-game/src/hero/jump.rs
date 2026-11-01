@@ -25,6 +25,10 @@
 //! glide 8; ✕ against an armed wall (`wall.rs`): the wall jump 0x11; a ledge: 0x17; a rail (0x27) or a pole (0x71);
 //! hitting a wall in a pack jump: 0x77.
 //!
+//! In the gravity frames (crate::gravity) the vertical work runs along his local up ([`Hero::frame_jump_vertical`],
+//! the descent's local speed, crate::hero::frame); the flip's, the wall jump's and the climbs' frame branches are not
+//! ported.
+//!
 //! Not ported: the ice's air control (`0x2b96a0`), the splash and sounds, the landing
 //! effects and camera jolt, the body lean `0x2b7c88`, the vehicle (`0x18c0d4` = 1) and the scripted timers
 //! `0x18a012` (→ 0x82) / `0x18a032` (the state refused).
@@ -327,7 +331,7 @@ impl Hero {
             if self.state == 10 && self.timer < 0x22 { self.vel = self.along_facing(self.vel, self.timer as f32 * 0.014_722_222); }
             // Blocked ahead in the first 10 ticks: a line (flags 4) from 0.5 up to 0.95 ahead.
             if self.timer < 10 && 0.2 < self.stick_mag {
-                let a = add(self.pos, [0.0, 0.0, 0.5]);
+                let a = self.add_up(self.pos, 0.5);
                 if env.line(a, self.along_facing(a, 0.95), 4).is_some() { self.jump.blocked = 1; }
             }
         } else {
@@ -344,7 +348,7 @@ impl Hero {
         }
         if self.pos[2] < self.jump.ref_z { self.jump.ref_z = self.pos[2]; }
         let j = self.jump;
-        if j.takeoff < self.timer && self.vel[2] < 0.001 && (!j.curve_on || j.curve_end < self.timer) && (self.state != 0xe || 0x11 < self.timer) {
+        if j.takeoff < self.timer && self.local_z(self.vel) < 0.001 && (!j.curve_on || j.curve_end < self.timer) && (self.state != 0xe || 0x11 < self.timer) {
             self.jump.descending = 1;
             if self.jump.g_down != 0.0 { self.jump.g = self.jump.g_down; }
         }
@@ -420,6 +424,7 @@ impl Hero {
     /// speed capped at `0x18a2c0` (the climb's first 9 ticks, the leap 0x89's 11 and the climb jump 0x48's 12 keep
     /// the vertical speed). Then the height ramp (module docs) and the scripted curve.
     pub(super) fn jump_vertical(&mut self, env: &Env) {
+        if self.gravity.mode != 0 { return self.frame_jump_vertical(env); }
         let j = self.jump;
         let keep = (self.state == 0x1b && self.timer <= 9) || (self.state == 0x89 && self.timer <= 0xb) || (self.state == 0x48 && self.timer <= 0xc);
         if !keep {
@@ -469,6 +474,61 @@ impl Hero {
         self.vel[2] += self.jump.curve_v;
     }
 
+    /// [`Hero::jump_vertical`] in a frame (`0x2b6668`'s helpers): before the takeoff the local z cleared and 1/75 of
+    /// gravity, landed 0.015, in the air the gravity `0x18a340` with the local fall capped at `0x18a2c0`; the height
+    /// ramp's and the curve's pushes go up his moby's up row (`0x2d3c40`).
+    fn frame_jump_vertical(&mut self, env: &Env) {
+        let j = self.jump;
+        let keep = (self.state == 0x1b && self.timer <= 9) || (self.state == 0x89 && self.timer <= 0xb) || (self.state == 0x48 && self.timer <= 0xc);
+        if !keep {
+            if self.timer < j.takeoff {
+                self.vel = self.with_local_z(self.vel, 0.0);
+                self.gravity(f32::from_bits(0x3c5a_740e));
+            } else if j.landed != 0 {
+                self.vel = self.with_local_z(self.vel, 0.0);
+                self.gravity(f32::from_bits(0x3c75_c290));
+            } else {
+                self.gravity(j.g);
+                let v = self.local_z(self.vel).max(-j.terminal);
+                self.vel = self.with_local_z(self.vel, v);
+            }
+        }
+        if self.state == 0xe {
+            self.double_jump_rise(env);
+            return;
+        }
+        let first = j.pending == 0.0 && j.applied == 0.0;
+        if (env.pad.held & button::CROSS != 0 || first || self.state == 0x12) && j.h < j.hmax && self.timer <= j.ramp {
+            let h = (j.h + (j.hmax - j.hmin) / j.ramp as f32).min(j.hmax);
+            self.jump.h = h;
+            let v = ((h + h) * j.g).sqrt();
+            self.jump.pending = v - self.jump.applied;
+        }
+        if j.takeoff <= self.timer && 0.0 < self.jump.pending {
+            self.vel = self.add_up(self.vel, self.jump.pending);
+            self.jump.applied += self.jump.pending;
+            self.jump.pending = 0.0;
+        }
+        if !j.curve_on || self.timer < j.curve_start || j.curve_end <= self.timer || j.curve.is_empty() { return; }
+        let jb = &mut self.jump;
+        jb.curve_tick += 1;
+        let rows = jb.curve;
+        let row_done = |jb: &super::JumpBlock| jb.curve_row < 0 || rows.get(jb.curve_row as usize).map_or(true, |r| r.2 <= jb.curve_tick);
+        if row_done(jb) {
+            loop {
+                jb.curve_row += 1;
+                jb.curve_tick = 0;
+                let Some(&(base, _, n)) = rows.get(jb.curve_row as usize) else { jb.curve_row = rows.len() as i32 - 1; break };
+                if base != -999_999.0 { jb.curve_v = base / 3600.0; }
+                if 1 <= n { break; }
+            }
+        }
+        if 0 < jb.curve_tick {
+            if let Some(r) = rows.get(jb.curve_row as usize) { jb.curve_v += r.1 / 3600.0; }
+        }
+        self.vel = self.add_up(self.vel, self.jump.curve_v);
+    }
+
     /// `0x2b6668`'s double jump: for the first 8 ticks the vertical speed rises toward 7/60 by 1/24 a tick, ×0.7 more
     /// than 1.7 above the first jump's takeoff and ×0.45 more than 2.1 above it. With the Thruster-Pack and no ceiling
     /// between 1 and 2.7 above the feet: ×0.7 above 2.2, ×0.47 above 2.8, and ×1.25.
@@ -476,12 +536,13 @@ impl Hero {
         let mut k = 0.116_666_675;
         let thruster = env.clank && env.pack == 3;
         let mut clear = true;
+        let framed = self.gravity.mode != 0;
         if thruster {
-            let a = add(self.pos, [0.0, 0.0, 1.0]);
-            let b = add(self.pos, [0.0, 0.0, 2.7]);
+            // `0x2d3a80`: up his rows (in mode 0 taken as upright).
+            let (a, b) = if framed { (self.up_point(1.0), self.up_point(2.7)) } else { (add(self.pos, [0.0, 0.0, 1.0]), add(self.pos, [0.0, 0.0, 2.7])) };
             clear = env.line(a, b, 2).is_none();
         }
-        let d = self.pos[2] - self.jump.takeoff_pos[2];
+        let d = if framed { self.local_z(sub(self.pos, self.jump.takeoff_pos)) } else { self.pos[2] - self.jump.takeoff_pos[2] };
         let (lo, hi, khi) = if thruster && clear { (2.2, 2.8, 0.47) } else { (1.7, 2.1, 0.45) };
         if hi < d {
             k *= khi;
@@ -490,9 +551,9 @@ impl Hero {
         }
         if thruster && clear { k *= 1.25; }
         if self.timer < 8 {
-            let mut v = self.vel[2];
+            let mut v = self.local_z(self.vel);
             if v < k { approach(k, 0.041_666_668, &mut v); }
-            self.vel[2] = v;
+            self.vel = self.with_local_z(self.vel, v);
         }
     }
 

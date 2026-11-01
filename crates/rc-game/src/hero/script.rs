@@ -183,7 +183,7 @@ impl Hero {
                 if self.air_ticks == 0 {
                     self.vel[2] -= 0.015;
                 } else {
-                    self.gravity_from(self.disp[2], 0.006_944_444_5);
+                    self.gravity_from(self.disp, 0.006_944_444_5);
                     self.edge_slide();
                 }
                 // Walking into the class 0xcb: a 100 hit (flags 0x10000) from a sphere at the head, the radius + 0.2
@@ -197,7 +197,7 @@ impl Hero {
                 self.vel = [0.0; 3];
                 self.momentum_decay(0.007_5);
                 self.wall_check(env, false);
-                if self.air_ticks == 0 { self.vel[2] -= 0.015 } else { self.gravity_from(self.disp[2], 0.006_944_444_5) }
+                if self.air_ticks == 0 { self.vel[2] -= 0.015 } else { self.gravity_from(self.disp, 0.006_944_444_5) }
             }
             0x3c | 0x64 | 0x60 | 0x61 => self.vel = [0.0; 3],
             _ => {}

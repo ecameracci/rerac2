@@ -8,6 +8,9 @@
 //!
 //! In the air: ✕ held with Clank on the back (more than 0.6 up) opens the glide 8; a ledge in reach (0x17).
 //!
+//! In the gravity frames (crate::gravity) the fall's gravity and caps run along his local up and the air
+//! acceleration takes its frame branch.
+//!
 //! Not ported: the stuck-in-air jump (`0x18a022`), the landing effects (`0x2a6188`) and the
 //! camera jolt (`0x2d35e8`).
 
@@ -54,6 +57,12 @@ impl Hero {
         if self.land_lag == 0 { self.air_control(env); }
         self.lean();
         self.drag(0.7, 0.0);
+        if self.gravity.mode != 0 {
+            // In a frame: `0x2d3860` and the cap on the local z (`0x2d3ea0` / `0x2d3ef8`).
+            self.gravity(self.fall_g);
+            if self.local_z(self.vel) < -50.0 * DT { self.vel = self.with_local_z(self.vel, -50.0 * DT); }
+            return;
+        }
         self.vel[2] -= self.fall_g;
         if self.vel[2] < -50.0 * DT { self.vel[2] = -50.0 * DT; }
     }
@@ -78,8 +87,14 @@ impl Hero {
             self.rot[0] = 0.0;
             self.rot[1] = 0.0;
         }
-        self.disp[2] = self.disp[2].max(-0.15);
-        self.vel[2] = self.vel[2].max(-0.15);
+        if self.gravity.mode != 0 {
+            // In a frame along his local z.
+            self.disp = self.with_local_z(self.disp, self.local_z(self.disp).max(-0.15));
+            self.vel = self.with_local_z(self.vel, self.local_z(self.vel).max(-0.15));
+        } else {
+            self.disp[2] = self.disp[2].max(-0.15);
+            self.vel[2] = self.vel[2].max(-0.15);
+        }
         if self.hp <= 0 { return Some(0x39); }
         if self.timer < 0x5a {
             if self.substate == 1 {
@@ -143,6 +158,7 @@ impl Hero {
     /// blocked against a wall in a jump) by at most `a·k`, k = 1.5·(1 − cos(angle between them)) in 1..3; then the
     /// speed = forward speed − the drag along the facing.
     pub(super) fn air_accel(&mut self, a: f32) {
+        if self.gravity.mode != 0 { return self.frame_air_accel(a); }
         let want = if self.group == 4 && self.jump.blocked != 0 && self.cap_hit != 0 { 1.0 / 12.0 } else { self.target_speed };
         let (s, c) = self.target_yaw.sin_cos();
         let d = [c * want, s * want, self.vel[2]];
@@ -156,5 +172,20 @@ impl Hero {
         self.eff_h = self.vel;
         let (s, c) = self.rot[2].sin_cos();
         self.speed = self.fwd_speed - (self.drag[0] * c + self.drag[1] * s);
+    }
+
+    /// `0x2b62a0(a)` in a frame: the same pull of the velocity toward the stick's direction (`0x189fb0` without its
+    /// local z, at the target speed), all in his local xy (`0x2d3ef8` / `0x2d3df8` / `0x2d3f78`); the speed is the
+    /// forward speed (strafing: the local speed).
+    fn frame_air_accel(&mut self, a: f32) {
+        let d = set_len(self.with_local_z(self.stick_dir, 0.0), self.target_speed);
+        let v = self.with_local_z(self.vel, 0.0);
+        let (ld, lv) = (self.flat_len(d), self.flat_len(self.vel));
+        let f = if ld != 0.0 && lv != 0.0 { (-dot(v, d) / ld) / lv } else { 0.0 };
+        let k = ((f + 1.0) * 1.5).clamp(1.0, 3.0);
+        let mut diff = self.with_local_z(sub(d, self.vel), 0.0);
+        if a * k < self.flat_len(diff) { diff = self.with_flat_len(diff, a * k); }
+        self.vel = add(self.vel, diff);
+        self.speed = if self.strafe != 0 { self.eff_len_xy } else { self.fwd_speed };
     }
 }

@@ -35,11 +35,13 @@
 //! The Electrolyzer's puzzle 0x0896 (`0x3c3b80`, two here) is crate::moby::classes::electrolyzer: its group's
 //! 0x0873 / 0x0a24 / 0x0a55 are its pieces, pulses and balls (their starts here, the rest its).
 //!
+//! * 0x0b25 (`0x3f6820`): the upper area's gravity sphere about (500, 200, 500) ([`update_0b25`], crate::gravity).
+//!
 //! Not ported (no visible effect here, or a missing system): 0x0af3 (`0x3efea8`, four: a camera guide along its path `+0`, every placed one has −1 and deletes
-//! itself on its first tick); 0x0b25 (`0x3f6820`: the area above z 420 — the tfrags and shrubs below or above it
-//! moved out `0x2ee5a0`, and within 150 of (500, 200, 500) the gravity frames `0x1a8ff0` (G-LVL-003), the no-item
-//! area, its music; its tie group's 32 instances turned while in view; a texture's scroll). 0x0f15, the arena's
-//! scene props, is crate::moby::classes::arena's.
+//! itself on its first tick); of 0x0b25, the tfrags and shrubs below or above z 420 moved out (`0x2ee5a0`), the
+//! area's music (`0x335928`, once), `0x18c0e2` (a hero byte its readers `0x31adc0` / `0x3d26a8` take), its tie
+//! group's 32 instances turned while in view (`0x3f6900` / `0x3f6a48`) and a texture's scroll (`0x3f6c30`). 0x0f15,
+//! the arena's scene props, is crate::moby::classes::arena's.
 //!
 //! Not ported: 0x0adf's lift (`0x3ece68`, its update when the cuboid's z scale is 2: up and down to Ratchet's level
 //! as he rides it); 0x0e96 (`0x4301b0`, the arena crowd: it waits for its controller past state 1, cheers by the
@@ -54,6 +56,47 @@ use crate::shadow_volumes::probe_near;
 
 /// 0x0afc.
 pub fn update_0afc(_w: &mut MobyWorld, _id: usize, _ctx: &mut Ctx) {}
+
+/// The upper area's sphere: its centre (`0x189ed0` and the heights' `0x1b3210`, w 1: down toward it).
+const SPHERE: [f32; 3] = [500.0, 200.0, 500.0];
+
+/// `0x3f6820` (0x0b25), the upper area. State 0: the sphere's centres set (crate::gravity), state 1. State 1
+/// (`0x3f6c80`), by Ratchet's z against 420 and its value last tick (pvars `+0x98`): dropping below 420 turns the
+/// frames (`0x1a8ff0`) and the no-item area (`0x18c310`) off; rising past it within 150 of the centre turns both on
+/// (farther, with the frames on, off).
+pub fn update_0b25(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    let m = &mut w.mobys[id];
+    match m.state {
+        0 => {
+            let g = &mut ctx.hero.gravity;
+            (g.centre, g.inward, g.height_centre) = (SPHERE, true, SPHERE);
+            m.set_state(1, -1);
+        }
+        1 => {
+            let z = ctx.hero.pos[2];
+            let prev = m.pv_f(0x98);
+            if z < 420.0 {
+                if 420.0 <= prev {
+                    ctx.game.no_item_area = false;
+                    ctx.hero.gravity.on = false;
+                }
+            } else if 420.0 < z && prev <= 420.0 {
+                let d = crate::hero::physics::dist(ctx.hero.pos, ctx.hero.gravity.height_centre);
+                if !ctx.hero.gravity.on {
+                    if d < 150.0 {
+                        ctx.game.no_item_area = true;
+                        ctx.hero.gravity.on = true;
+                    }
+                } else if 150.0 < d {
+                    ctx.game.no_item_area = false;
+                    ctx.hero.gravity.on = false;
+                }
+            }
+            m.set_pv_f(0x98, z);
+        }
+        _ => {}
+    }
+}
 
 /// `0x3eb9f8`: pvars `+0x5c` |= 4, state 1, the collision blob `+0x98` cleared, mode 0x43 without TARGET.
 pub fn update_0aaf(w: &mut MobyWorld, id: usize, _ctx: &mut Ctx) {

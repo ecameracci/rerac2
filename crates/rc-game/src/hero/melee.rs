@@ -196,7 +196,7 @@ impl Hero {
         }
         if 10 < self.timer { self.edge_brake(env, 3.7, 0.0); }
         self.wall_check(env, true);
-        if self.air_ticks != 0 { self.gravity_from(self.eff[2], 0.006_111_111) } else { self.vel[2] -= 0.015 }
+        if self.air_ticks != 0 { self.gravity_from(self.eff, 0.006_111_111) } else { self.vel[2] -= 0.015 }
     }
 
     /// `0x2b76a8(range, yaw cone, pitch cone)`: the aim. Nothing with a gadget item 0x20 or while aiming; with the
@@ -310,7 +310,7 @@ impl Hero {
                 }
                 self.speed_step(0.010_277_778, 0.007_777_778);
                 if self.melee.aim == 0 { self.set_planar_vel(YAW_KEEP) } else { self.set_planar_vel(self.melee.aim_yaw) }
-                if self.air_ticks == 0 { self.gravity(0.015) } else { self.gravity_from(self.eff_v[2], 0.006_944_444) }
+                if self.air_ticks == 0 { self.gravity(0.015) } else { self.gravity_from(self.eff_v, 0.006_944_444) }
                 self.edge_brake(env, 3.7, 0.0);
             }
             0x14 => {
@@ -367,7 +367,7 @@ impl Hero {
                 if !v.blending() && v.seq_b == 0x1a && passed(&v, 33.0) && self.state == 0x15 { self.throw_wrench(); }
                 self.speed_step(0.010_277_778, 0.007_777_778);
                 self.set_planar_vel(YAW_KEEP);
-                if self.air_ticks != 0 { self.gravity_from(self.eff_v[2], 0.006_944_444) } else { self.gravity(0.015) }
+                if self.air_ticks != 0 { self.gravity_from(self.eff_v, 0.006_944_444) } else { self.gravity(0.015) }
             }
             0x22 => {
                 self.target_speed = 0.0;
@@ -378,7 +378,7 @@ impl Hero {
                 }
                 self.speed_step(0.008_333_334, 0.009_722_223);
                 self.set_planar_vel(YAW_KEEP);
-                if self.air_ticks != 0 { self.gravity_from(self.disp[2], 0.015) } else { self.gravity(0.015) }
+                if self.air_ticks != 0 { self.gravity_from(self.disp, 0.015) } else { self.gravity(0.015) }
             }
             _ => {}
         }

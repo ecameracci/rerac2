@@ -14,6 +14,7 @@ pub mod exhaust;
 pub mod fog;
 pub mod fx;
 pub mod game;
+pub mod gravity;
 pub mod gui;
 pub mod help;
 pub mod msgbox;

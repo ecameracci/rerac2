@@ -399,7 +399,7 @@ impl Hero {
                 if self.air_ticks == 0 {
                     self.vel[2] -= 0.015;
                 } else {
-                    self.gravity_from(self.eff[2], 0.006_111_111);
+                    self.gravity_from(self.eff, 0.006_111_111);
                     self.edge_slide();
                 }
                 let at = if self.state == 0x23 { self.swing.node.map(|_| node) } else { self.swing.pull.map(|n| n.pos) };

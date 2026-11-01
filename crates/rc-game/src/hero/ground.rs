@@ -125,7 +125,7 @@ impl Hero {
         // The magnetic walkway with the Gravity Boots: held to the floor (on a moby, on its surface).
         if self.surf.magnet && env.boots {
             if 0.2 < self.height {
-                self.gravity_from(self.eff[2], 0.006_111_111);
+                self.gravity_from(self.eff, 0.006_111_111);
                 return;
             }
             self.vel[2] -= 0.015;
@@ -138,7 +138,7 @@ impl Hero {
         }
         self.wall_check(env, false);
         if self.air_ticks != 0 {
-            self.gravity_from(self.eff_v[2], 0.006_944_44);
+            self.gravity_from(self.eff_v, 0.006_944_44);
         } else {
             self.gravity(0.015);
         }

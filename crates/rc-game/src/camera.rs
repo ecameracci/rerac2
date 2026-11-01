@@ -31,7 +31,7 @@
 //! **Not ported**: the body cameras (Giant Clank's branch of `0x4239d0`: the hero is never Giant Clank yet), the focus
 //! mobys `0x1b8e84` / `0x18b270` (nothing sets them on Aranos), the stick auto-centre (`$gp+0x2540` is 0 on the disc),
 //! the water settle (D+0x14e), the knock-down view (state 0x74, mode 11), the camera's own shift `0x1b8fc0`, the
-//! underwater test `0x2d9a58`; the other camera classes (first person `0x427bf8` needs Ratchet's camera mode 4 / 0x51,
+//! underwater test `0x2d9a58`, the magnetic walkway's branch of `0x4227b8` (the gravity frames' is ported: crate::gravity); the other camera classes (first person `0x427bf8` needs Ratchet's camera mode 4 / 0x51,
 //! script 5, 6, the Swingshot's 7, 0x1b), the blends between cameras (`0x2d8168` / `0x2d8ab0` / `0x2d9488`) and the
 //! FOV blend `0x2d7b70`. The shakes are [`Shakes`] (set by the Gravity Bomb's blast; the blast `0x320538` and the
 //! others that ask for one are not ported).
@@ -678,7 +678,8 @@ impl FollowCamera {
     /// 0x50), the yaw history.
     fn pre_motion(&mut self, inp: &CamInput) {
         let h = inp.hero;
-        let mut u = [0.0, 0.0, 1.0];
+        // `0x2ef138(−1, up, 0x18a0e0)`: against Ratchet's gravity (in the frames toward their centre, crate::gravity).
+        let mut u = if h.gravity.on { norm(h.gravity.down, -1.0) } else { [0.0, 0.0, 1.0] };
         self.up2_prev = self.up2;
         self.up2 = u;
         if dot(self.up_s, u) < -0.98 { u = add(u, [0.2; 3]); }
@@ -707,7 +708,8 @@ impl FollowCamera {
         let mut d = h.carry;
         let magnet = h.surf.boots != 0;
         match inp.ground {
-            Some((id, _, z)) if !magnet => {
+            // The frames (`0x1a8ff0`) drop the moby as the walkway does.
+            Some((id, _, z)) if !magnet && !h.gravity.on => {
                 if self.plat_moby == Some(id) {
                     let rise = z - self.plat_z;
                     if 0.0 < rise && d[2] < rise { d[2] = rise; }
@@ -758,7 +760,8 @@ impl FollowCamera {
             self.set_pivot_h(0.5, 0.003);
         }
         let glide = h.group == 5;
-        if glide {
+        // Not in the gravity frames (`0x1a8ff0`).
+        if glide && !h.gravity.on {
             self.look_h = 0.25;
             self.set_pivot_h(if h.mode == 1 && req.is_none() { 1.5 } else { 2.5 }, 0.003);
         }
@@ -995,6 +998,15 @@ impl FollowCamera {
         let up2 = self.up2;
         let hero = h.pos;
         let hz = |p: V3| sub(p, scale(up2, dot(p, up2)));
+        if h.gravity.on {
+            // The frames (`0x1a8ff0`; the walkway's `0x18a168` is not ported here): the look from the smoothed target,
+            // the blend's length 15, the vertical target the target's part along the up (D+0x80 too). Its countdown
+            // D+0x14e (the water settle's) and the raise's restart `0x422098` are not ported.
+            self.look_from_s = 1;
+            self.look_blend_len = 0xf;
+            self.vtarget = scale(up2, dot(self.target, up2));
+            self.raise_a = self.vtarget;
+        }
         match self.mode {
             2 => {
                 let leave = h.state == 0x11 || (h.jump.descending != 0 && 0.2 < h.height && {

@@ -23,8 +23,9 @@
 //! | Ground probe | `0x2b4a08` | [`Hero::ground_probe`] |
 //! | Step snap | `0x2b5358` (mode 0) | [`Hero::step_snap`] |
 //!
-//! Not ported here (noted where they are called): the gravity frames 1 and 2 (`0x18c0e3`, R&C2's gravity surfaces),
-//! the platform carry (`0x189f20`), the water surfaces of the probe. The queries test the mobys when the engine gives
+//! The gravity frames (crate::gravity, `0x18c0e3` = 2): each helper keeps its world-z code for mode 0 and takes its
+//! frame branch (crate::hero::frame) otherwise. Not ported here (noted where they are called): frame mode 1 (the
+//! magnetic walkways), the platform carry (`0x189f20`), the water surfaces of the probe. The queries test the mobys when the engine gives
 //! a moby scene ([`Env::scene`], R&C2's moby pass is R&C1's: `crate::moby`), ignoring Ratchet's own moby.
 
 use super::Hero;
@@ -319,7 +320,8 @@ impl Hero {
         if 1.0 < l { (x, y) = (x / l, y / l); }
         if x == 0.0 && y == 0.0 {
             self.target_speed = 0.0;
-            self.target_yaw = self.rot[2];
+            // In a frame: `0x2d3630`, the facing's yaw off the slope.
+            self.target_yaw = if self.gravity.mode == 0 { self.rot[2] } else { self.frame_yaw() };
             self.stick_dir = self.rows[0];
             return;
         }
@@ -373,6 +375,8 @@ impl Hero {
     /// `0x2b4410`: on the ground (under 0.15 up) moving up against a wall steeper than 50°: the velocity's part into
     /// it taken away, and 0.03 down.
     pub fn edge_slide(&mut self) {
+        // Its frame branch is not ported.
+        if self.gravity.mode != 0 { return; }
         if self.air_ticks == 0 || 0.15 <= self.height || self.disp[2] <= 0.0 || self.cap_hit == 0 || self.contact_normal[2] <= 0.0 { return; }
         if slope_of(self.contact_normal) < 0.872_664_7 { return; }
         let mut n = [self.contact_normal[0], self.contact_normal[1], 0.0];
@@ -401,8 +405,9 @@ impl Hero {
     }
 
     /// `0x2b4000(k, d, max, mode)`: the yaw `0x189eb8` springs toward the target yaw (velocity `0x189fc4`); the
-    /// remaining difference goes to `0x189fc8`. (Gravity frames ≠ 0: `0x2b3f48`, not ported.)
+    /// remaining difference goes to `0x189fc8`. In a frame: `0x2b3f48` ([`Hero::frame_turn`]).
     pub fn turn_to(&mut self, k: f32, d: f32, max: f32, mode: i32) {
+        if self.gravity.mode != 0 { return self.frame_turn(k, d, max, mode); }
         let (mut a, mut v) = (self.rot[2], self.yaw_vel);
         self.yaw_residual = turn_spring(self.target_yaw, k, d, max, &mut a, &mut v, mode);
         self.rot[2] = a;
@@ -427,7 +432,12 @@ impl Hero {
     }
 
     /// `0x2b4310(yaw)`: velocity xy = speed along `yaw` (a yaw > π: the hero's own), z = 0 (`0x325100(speed, yaw, 0)`).
+    /// In a frame the yaw is not read: the speed along his forward row (`0x189e20`).
     pub fn set_planar_vel(&mut self, yaw: f32) {
+        if self.gravity.mode != 0 {
+            self.vel = scale(self.rows[0], self.speed);
+            return;
+        }
         let yaw = if PI < yaw { self.rot[2] } else { yaw };
         let (s, c) = yaw.sin_cos();
         self.vel = [self.speed * c, self.speed * s, 0.0];
@@ -438,6 +448,7 @@ impl Hero {
     /// (or surface 8 / 0xc) takes the velocity's component into the wall away. Group 0x11/0x12: from the feet, 0.7
     /// ahead. Only when the velocity's xy is at least 0.1 / 60.
     pub fn wall_check(&mut self, env: &Env, always_forward: bool) {
+        if self.gravity.mode != 0 { return self.frame_wall_check(env, always_forward); }
         if len2(self.vel) < 0.1 * DT { return; }
         let (h, ahead) = if matches!(self.group, 0x11 | 0x12) { (0.0, 0.7) } else { (0.37, 0.5) };
         let a = add(self.pos, [0.0, 0.0, h]);
@@ -488,6 +499,7 @@ impl Hero {
     /// ahead; a line (flags 4) down from 0.3 above that point to 0.35 below it (Clank: 0.7) that finds no floor
     /// flatter than 50° brakes the move (`0x2b6220`: the velocity's xy taken away).
     pub fn edge_brake(&mut self, env: &Env, k: f32, min: f32) {
+        if self.gravity.mode != 0 { return self.frame_edge_brake(env, k, min); }
         let l = len2(self.vel);
         if l == 0.0 || !(self.stick_mag <= 0.5 || self.group == 6) || self.air_ticks != 0 { return; }
         let k = if self.state == 0x1f { 2.0 } else { k };
@@ -502,17 +514,24 @@ impl Hero {
         if !floor { self.vel = [0.0, 0.0, self.vel[2]]; }
     }
 
-    /// `0x2d3b38(k, out, v)` in gravity mode 0: v + the facing (Ratchet's moby yaw) · k.
+    /// `0x2d3b38(k, out, v)`: v + the facing (Ratchet's moby yaw) · k; in a frame his moby's forward row · k.
     pub fn along_facing(&self, v: V3, k: f32) -> V3 {
+        if self.gravity.mode != 0 { return add(v, scale(self.gravity.moby_rows[0], k)); }
         let (s, c) = self.rot[2].sin_cos();
         [v[0] + c * k, v[1] + s * k, v[2]]
     }
 
-    /// `0x2d3860(g, out, in)` in gravity mode 0: `out.z = in.z − g`.
-    pub fn gravity(&mut self, g: f32) { self.vel[2] -= g; }
+    /// `0x2d3860(g, vel, vel)`: mode 0 `vel.z −= g`; in a frame [`Hero::frame_gravity`].
+    pub fn gravity(&mut self, g: f32) {
+        if self.gravity.mode != 0 { return self.frame_gravity(self.vel, g); }
+        self.vel[2] -= g;
+    }
 
-    /// `0x2d3860(g, vel, src)`: `vel.z = src.z − g`.
-    pub fn gravity_from(&mut self, src_z: f32, g: f32) { self.vel[2] = src_z - g; }
+    /// `0x2d3860(g, vel, src)`: mode 0 `vel.z = src.z − g`; in a frame [`Hero::frame_gravity`].
+    pub fn gravity_from(&mut self, src: V3, g: f32) {
+        if self.gravity.mode != 0 { return self.frame_gravity(src, g); }
+        self.vel[2] = src[2] - g;
+    }
 
     /// `0x2b3400`: the capsule targets (top 0.8, bottom 0.7, radius 0.45; fall 6: bottom 0.5; crouch 4: top 0.35;
     /// groups 0x11/0x12: 0) and their ease (top / bottom by 0.02, the radius spring 0.02 / 0.3 / 1/15).
@@ -544,6 +563,7 @@ impl Hero {
     /// each moving the position to the kernel's pushed centre; then the hero-only groups. `false` when the total
     /// push exceeds 1.5·r.
     fn capsule_try(&mut self, env: &Env) -> bool {
+        if self.gravity.mode != 0 { return self.frame_capsule_try(env); }
         let old = self.pos;
         let off = if self.group == 0x11 { 0.0 } else { self.cap_bottom };
         self.pos[2] += off;
@@ -595,8 +615,14 @@ impl Hero {
         self.on_moby = false;
         if self.water.under != 0 { self.water.under += 1; }
         let up = self.cap_radius * if self.group == 2 { 2.9 } else { 2.2 };
-        let mut a = add(self.pos, [0.0, 0.0, up]);
-        let b = add(self.pos, [0.0, 0.0, -48.0]);
+        // `0x2b48b0(.., 1)`: with the frames on, along the last tick's down `0x18a0e0`.
+        let framed = self.gravity.mode != 0;
+        let (mut a, b) = if framed {
+            let d = self.gravity.down;
+            (add(self.pos, set_len(d, -up)), add(self.pos, set_len(d, 48.0)))
+        } else {
+            (add(self.pos, [0.0, 0.0, up]), add(self.pos, [0.0, 0.0, -48.0]))
+        };
         let mut hit = env.line(a, b, 2);
         if let Some(o) = hit {
             // `0x2e2410`: the footstep class of the hit (on a moby 0; on level 7's 1).
@@ -630,14 +656,15 @@ impl Hero {
                 self.ground_class = o.moby.and_then(|m| env.classes.get(m).copied()).unwrap_or(-1);
                 self.on_moby = o.moby.is_some();
                 self.ground_point = o.point;
-                self.ground_z = o.point[2];
+                // With the frames on the ground's height is its distance from the centre (`0x326820`).
+                self.ground_z = if framed { self.gravity.height(o.point) } else { o.point[2] };
                 self.height = dist(self.pos, self.ground_point);
                 self.ground_normal = unit(o.normal);
-                self.slope = slope_of(o.normal);
+                self.slope = if framed { self.frame_slope(o.normal) } else { slope_of(o.normal) };
                 if 0.0 < dot(sub(self.ground_point, self.pos), self.ground_normal) { self.height = -self.height; }
                 if self.height < 0.02 {
                     self.f16c = 0;
-                    if self.slope <= SLOPE_MAX { self.air_ticks = 0; }
+                    if self.slope <= SLOPE_MAX || framed { self.air_ticks = 0; }
                 }
             }
         }
@@ -648,12 +675,15 @@ impl Hero {
         } else {
             self.grounded_ticks = 0;
         }
+        // `0x18a0e0`: the gravity, toward the frame's centre in mode 2.
+        self.gravity.down = if framed { self.gravity.down_at(self.pos) } else { [0.0, 0.0, -1.0] };
         self.foot_probe(env);
     }
 
     /// `0x2b5358` (gravity mode 0): grounded and below the ground z: snap to it when within |vel.z| + 0.01 (and the
     /// capsule is clear of the contact), else undo a downward step and spring up (0.05, 0.17, 1/12).
     pub fn step_snap(&mut self) {
+        if self.gravity.mode != 0 { return self.frame_step_snap(); }
         if self.air_ticks != 0 || self.ground_z <= self.pos[2] {
             self.snap_vel = 0.0;
             return;
@@ -688,7 +718,10 @@ impl Hero {
     pub fn move_collide(&mut self, env: &Env) {
         let old = self.pos;
         let lim = self.cap_radius - 0.02;
-        if matches!(self.state, 0x14 | 0x5b | 0x58 | 0x81) {
+        if matches!(self.state, 0x14 | 0x5b | 0x58 | 0x81) && self.gravity.mode != 0 {
+            if lim < self.flat_len(self.vel) { self.vel = self.with_flat_len(self.vel, lim); }
+            if self.local_z(self.vel) < -self.height { self.vel = self.with_local_z(self.vel, (-self.height - 0.02).min(0.0)); }
+        } else if matches!(self.state, 0x14 | 0x5b | 0x58 | 0x81) {
             if lim < len2(self.vel) { self.vel = set_len2(self.vel, lim); }
             if self.vel[2] < -self.height { self.vel[2] = (-self.height - 0.02).min(0.0); }
         } else if self.group == 0xf {
@@ -712,12 +745,22 @@ impl Hero {
         }
         let d = sub(self.pos, old);
         self.eff = Self::project(d, self.vel);
-        self.eff_v = Self::project([0.0, 0.0, d[2]], [0.0, 0.0, self.vel[2]]);
-        self.eff_h = Self::project([d[0], d[1], 0.0], [self.vel[0], self.vel[1], 0.0]);
-        self.eff_len = len(self.eff);
-        self.eff_len_xy = len2(self.eff);
-        let (s, c) = self.rot[2].sin_cos();
-        self.fwd_speed = (self.eff[0] * c + self.eff[1] * s).max(0.0);
+        if self.gravity.mode != 0 {
+            // `0x2d3f78(0)` / `0x2d3d00` / `0x2d3df8` / `0x2b5698`: the parts along his up and across the gravity.
+            self.eff_v = Self::project(self.with_flat_len(d, 0.0), self.with_flat_len(self.vel, 0.0));
+            self.eff_h = Self::project(self.flat(d), self.flat(self.vel));
+            self.eff_len = len(self.eff);
+            self.eff_len_xy = self.flat_len(self.eff);
+            self.fwd_speed = dot(self.eff, self.gravity.moby_rows[0]).max(0.0);
+        } else {
+            self.eff_v = Self::project([0.0, 0.0, d[2]], [0.0, 0.0, self.vel[2]]);
+            self.eff_h = Self::project([d[0], d[1], 0.0], [self.vel[0], self.vel[1], 0.0]);
+            self.eff_len = len(self.eff);
+            self.eff_len_xy = len2(self.eff);
+            let (s, c) = self.rot[2].sin_cos();
+            self.fwd_speed = (self.eff[0] * c + self.eff[1] * s).max(0.0);
+        }
+        self.gravity.push_step = 0.0;
         if pushed {
             // `0x189f70`: the push's step as resolved joins the carry (the slide's exit keeps it as momentum).
             let before = self.pos;
@@ -728,6 +771,7 @@ impl Hero {
             self.disp = sub(self.pos, old);
             self.step_snap();
             self.carry = add(self.carry, sub(self.pos, before));
+            self.gravity.push_step = len(sub(self.pos, before));
         }
         // The displacement once more after the push's snap (the slide's fall reads it).
         self.disp = sub(self.pos, old);

@@ -16,7 +16,8 @@
 //!
 //! Not ported: the held item's run speeds and the item 10's kept direction, the water effects, the body lean
 //! (`0x2b7c88`, `0x2b8dc0`, the slide's lean angles), the sliding floors' drag (`0x18a890`), the weapon stances on
-//! stopping (`0x2cb1c8`), the stick-gravity frames (`0x18c0e3`).
+//! stopping (`0x2cb1c8`). In the gravity frames (`0x18c0e3`, crate::gravity) the helpers take their frame branches
+//! (crate::hero::frame) and the step down ahead is off; the edge slide's frame branch is not ported.
 
 use super::physics::*;
 use super::states::Entry;
@@ -74,7 +75,7 @@ impl Hero {
         if self.state == 0x2e {
             self.ice_move(env);
             if self.air_ticks != 0 {
-                self.gravity_from(self.disp[2], 0.006_944_444_5);
+                self.gravity_from(self.disp, 0.006_944_444_5);
             } else {
                 self.vel[2] = 0.0;
                 self.vel[2] -= 1.0 / 24.0;
@@ -142,7 +143,7 @@ impl Hero {
         }
         self.wall_check(env, true);
         if self.air_ticks != 0 {
-            self.gravity_from(self.eff_v[2], 0.006_944_44);
+            self.gravity_from(self.eff_v, 0.006_944_44);
             self.edge_slide();
         } else {
             self.gravity(0.015);
@@ -276,6 +277,8 @@ impl Hero {
     /// `0x2cb038`: a step down ahead (a line 0.75·r ahead from 0.47 up to 1 down hits less than 0.37 above and more
     /// than 1 below the feet): the walk does not fall.
     fn step_down(&self, env: &Env) -> bool {
+        // Never in the sphere's frame (`0x18c0e3` = 2).
+        if self.gravity.mode == 2 { return false; }
         if self.eff_len_xy < self.cap_radius * 0.05 { return false; }
         if 0.523_598_85 < rot_dist(atan2(self.disp[0], self.disp[1]), self.rot[2]) { return false; }
         let (s, c) = self.rot[2].sin_cos();

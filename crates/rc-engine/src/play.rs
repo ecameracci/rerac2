@@ -13,7 +13,7 @@
 //!
 //! Environment: `RC_PLAY=0` (no tick), `RC_PLAY_FLY=1` (start on the fly camera; Tab switches), `RC_PLAY_TRACE=1`
 //! (one line per tick: state, position, velocity, air ticks, sequence), `RC_SCENES=0` (the scenes count as seen),
-//! `RC_HERO_AT=x,y,z,yaw` (Ratchet's start), `RC_GIVE_ITEMS=a,b,…` (the items had, the last in the hand).
+//! `RC_HERO_AT=x,y,z,yaw` (Ratchet's start), `RC_GRAVITY_AT=x,y,z` (the gravity frames pinned on about a centre), `RC_GIVE_ITEMS=a,b,…` (the items had, the last in the hand).
 
 use crate::game_camera::CameraSource;
 use crate::input_map::{self, PadFrame, Script};
@@ -686,6 +686,14 @@ fn tick(
         let nodes = rc_game::moby::classes::swing_nodes(&mobys.world, 0x2f6);
         let hooks = rc_game::moby::classes::swing_nodes(&mobys.world, 0x323);
         let pulls = rc_game::moby::classes::swing_nodes(&mobys.world, 0x99d);
+        // `RC_GRAVITY_AT=x,y,z` (dev builds): the gravity frames (rc_game::gravity) pinned on about that centre, down
+        // toward it, every tick (over a level's own writer), to try them where a level has none.
+        if cfg!(feature = "dev") {
+            if let Some(v) = std::env::var("RC_GRAVITY_AT").ok().map(|v| v.split(',').filter_map(|x| x.trim().parse::<f32>().ok()).collect::<Vec<_>>()).filter(|v| v.len() == 3) {
+                let g = &mut p.hero.gravity;
+                (g.on, g.inward, g.centre, g.height_centre) = (true, true, [v[0], v[1], v[2]], [v[0], v[1], v[2]]);
+            }
+        }
         let env = Env {
             coll, pad: &p.pad, cam_yaw: p.camera.yaw(), cam_pos: p.camera.pos, cam_rows: p.camera.rows, mirror: false, scene: scene.as_ref(), hero_moby: mobys.hero_moby, targets: &targets, hit, death_z,
             clank: p.game.clank, pack: p.game.pack(), boots: p.game.boots, charge_boots: p.game.charge_boots, grind_boots: p.game.grind_boots, rails: &mobys.rails, level: p.game.level, classes: &classes, nodes: &nodes, hooks: &hooks, pulls: &pulls,
@@ -982,10 +990,11 @@ fn tick(
         let v = rc_game::hero::anim::AnimCtl::view(&p.anim.ctl(class));
         let h = &p.hero;
         println!(
-            "tick {}: state {:#x}/{} pos ({:.2}, {:.2}, {:.2}) vel ({:.3}, {:.3}, {:.3}) air {} h {:.2} slope {:.2} seq {}/{} f {:.1} spd {:.2} cap {} at ({:.2}, {:.2}, {:.2}) n ({:.2}, {:.2}, {:.2}) capsule {:.2}/{:.2}/{:.2} cam ({:.2}, {:.2}, {:.2}) yaw {:.2} pitch {:.2}",
+            "tick {}: state {:#x}/{} pos ({:.2}, {:.2}, {:.2}) vel ({:.3}, {:.3}, {:.3}) air {} h {:.2} slope {:.2} seq {}/{} f {:.1} spd {:.2} cap {} at ({:.2}, {:.2}, {:.2}) n ({:.2}, {:.2}, {:.2}) capsule {:.2}/{:.2}/{:.2} cam ({:.2}, {:.2}, {:.2}) yaw {:.2} pitch {:.2} grav {} rot ({:.2}, {:.2}, {:.2}) up ({:.2}, {:.2}, {:.2})",
             p.ticks, h.state, h.substate, h.pos[0], h.pos[1], h.pos[2], h.vel[0], h.vel[1], h.vel[2], h.air_ticks, h.height, h.slope, v.seq_a, v.seq_b, v.frame, h.anim_speed,
             h.cap_hit, h.contact_point[0], h.contact_point[1], h.contact_point[2], h.contact_normal[0], h.contact_normal[1], h.contact_normal[2], h.cap_bottom, h.cap_top, h.cap_radius,
-            p.camera.pos[0], p.camera.pos[1], p.camera.pos[2], p.camera.yaw(), p.camera.pitch()
+            p.camera.pos[0], p.camera.pos[1], p.camera.pos[2], p.camera.yaw(), p.camera.pitch(),
+            h.gravity.mode, h.rot[0], h.rot[1], h.rot[2], h.rows[2][0], h.rows[2][1], h.rows[2][2]
         );
     }
     if let Some(o) = occl.as_mut() {

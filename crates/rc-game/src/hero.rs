@@ -23,6 +23,7 @@ pub mod anim;
 pub mod clank;
 pub mod damage;
 pub mod extras;
+pub mod frame;
 pub mod grind;
 pub mod ground;
 pub mod items;
@@ -346,6 +347,9 @@ pub struct Hero {
     pub bonk_yaw: f32,
     /// `0x189f20`: a push objects give (moved after the own move, then resolved).
     pub push: V3,
+    /// The gravity frames (crate::gravity: the flag `0x1a8ff0`, the centre `0x189ed0`, his frame mode `0x18c0e3` and
+    /// down `0x18a0e0`).
+    pub gravity: crate::gravity::Gravity,
     pub swing: swing::SwingBlock,
     /// `0x18a026`: the Swingshot's rest after a swing.
     pub swing_cooldown: i16,
@@ -427,7 +431,7 @@ impl Hero {
             yaw_hist_count: 0, melee: Default::default(), items: Default::default(), carry: [0.0; 3], carry_yaw: 0.0, ledge: Default::default(), anim_frame: 0.0, damage: Default::default(), pending_damage: None, show_health: None, underwater_write: None,
             surf: Default::default(), wall: Default::default(), ahead: Default::default(), frame: 0, ground_moby: None, ground_class: -1, wall_moby: None, push_moby: None,
             bounce: [37.0, 13.0], glide_vz: 0.0, glide_sink: 0.0, hot_hops: 0, glide_lag: 0, ice_along: 0.0, ice_slope: 0.0, strafe: 0, strafe_yaw: 0.0, strafe_dir: [1.0, 0.0, 0.0], stick_sector: 2, strafe_back: false, strafe_flip: [0; 2], strafe_yaw_vel: 0.0,
-            ground_yaw: 0.0, slide_yaw: 0.0, slide_bank: 0.0, slide_hold: 0, slide_vel: [0.0; 2], slide_speed: 0.0, stagger: 0, rot_vel: [0.0; 2], bonk_yaw: 0.0, push: [0.0; 3], swing: Default::default(), swing_cooldown: 0, gear: Default::default(), grind: Default::default(), water: Default::default(), no_menu: 0, rng: Default::default(), state_req: None, anim_req: None, walk_to: Default::default(), fidget_rest: [0; 4], fidget_gap: 0, no_update: false, hits_out: Vec::new(), sounds: Vec::new(), level_sounds: Vec::new(), loops: Vec::new(), loop_stops: Vec::new(), loops_off: false, posture: Default::default(), layers: Default::default(), aim_point: [0.0; 3], unported_seen: Vec::new(), warps: 0,
+            ground_yaw: 0.0, slide_yaw: 0.0, slide_bank: 0.0, slide_hold: 0, slide_vel: [0.0; 2], slide_speed: 0.0, stagger: 0, rot_vel: [0.0; 2], bonk_yaw: 0.0, push: [0.0; 3], gravity: Default::default(), swing: Default::default(), swing_cooldown: 0, gear: Default::default(), grind: Default::default(), water: Default::default(), no_menu: 0, rng: Default::default(), state_req: None, anim_req: None, walk_to: Default::default(), fidget_rest: [0; 4], fidget_gap: 0, no_update: false, hits_out: Vec::new(), sounds: Vec::new(), level_sounds: Vec::new(), loops: Vec::new(), loop_stops: Vec::new(), loops_off: false, posture: Default::default(), layers: Default::default(), aim_point: [0.0; 3], unported_seen: Vec::new(), warps: 0,
         }
     }
 
@@ -496,6 +500,11 @@ impl Hero {
             self.stick = [x as f32, y as f32];
         }
         self.stick_mag = self.stick_magnitude();
+        // `0x18be50` and `0x2d37a0`: the tick's start and the frame mode (crate::gravity); the moby's rows as the last
+        // write-back left them.
+        self.gravity.tick_start = self.pos;
+        self.gravity.mode = self.gravity.frame_mode();
+        if self.gravity.mode != 0 { self.gravity.moby_rows = euler_rows(self.rot); }
         if !self.state_physics(env, anim) { return false; }
         self.yaw_hist[self.yaw_hist_idx] = self.rot[2];
         self.yaw_hist_idx = (self.yaw_hist_idx + 1) & 31;
@@ -514,6 +523,14 @@ impl Hero {
     /// The start of `0x2c3330`: the state, group and sequence timers. Its ~35 countdown timers belong to states not
     /// ported yet.
     fn post_move(&mut self) {
+        // `0x2b9488`: in a frame his up springs toward −down; its mode-0 branch (the pitch and roll easing back to 0)
+        // runs only after a frame (crate::gravity::Gravity::tilted).
+        if !self.no_update && self.gravity.mode != 0 {
+            self.frame_align();
+            self.gravity.tilted = true;
+        } else if !self.no_update && self.gravity.tilted {
+            self.frame_release();
+        }
         self.timer += 1;
         self.group_timer += 1;
         self.substate_timer += 1;
@@ -534,6 +551,7 @@ impl Hero {
         if 0 < self.grind.pole_rest { self.grind.pole_rest -= 1; }
         for r in &mut self.fidget_rest { if 0 < *r { *r -= 1; } }
         if 0 < self.slide_hold { self.slide_hold -= 1; }
+        self.frame_hold();
     }
 
     /// `0x2ae0e8(n)`: the yaw `n` ticks before the newest in the history (at most 31, at most what it holds).
@@ -590,7 +608,14 @@ pub fn hero_update(hero: &mut Hero, env: &Env, anim: &mut dyn AnimCtl) -> HeroTi
     anim.advance(Pf::f(hero.anim_speed));
     hero.anim_frame = anim.view().frame;
     hero.input_physics_move(env, anim);
-    if hero.height < 4.0 { hero.aim_point = [hero.ground_point[0], hero.ground_point[1], hero.ground_point[2] + 0.5]; }
+    if hero.height < 4.0 {
+        // `0x2d3b18(0.5)`: 0.5 up (in a frame against his down).
+        hero.aim_point = if hero.gravity.mode == 0 {
+            [hero.ground_point[0], hero.ground_point[1], hero.ground_point[2] + 0.5]
+        } else {
+            physics::sub(hero.ground_point, physics::scale(hero.gravity.down, 0.5))
+        };
+    }
     // `0x2aca80`: the surface under the feet (the lava hop, the slides, the liquids).
     if hero.surface_check(env, anim) { return HeroTick::Ran; }
     // `0x2ad000(pos, rot, 0x18a370)`: the ledge ahead; `0x2adbb8` / `0x2adda8`: a rail and a pole in reach.

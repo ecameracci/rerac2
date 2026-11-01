@@ -116,7 +116,7 @@ impl Hero {
     /// edge slide, on the ground 0.015 down.
     fn clank_gravity(&mut self) {
         if self.air_ticks != 0 {
-            self.gravity_from(self.eff_v[2], 0.006_944_444_5);
+            self.gravity_from(self.eff_v, 0.006_944_444_5);
             self.edge_slide();
         } else {
             self.vel[2] -= 0.015;
@@ -171,7 +171,7 @@ impl Hero {
                 let l = len2(self.vel);
                 self.vel = set_len2(self.vel, l * k);
                 self.vel[2] = 0.0;
-                if self.air_ticks != 0 { self.gravity_from(self.eff[2], 0.006_111_111) } else { self.vel[2] -= 0.004; }
+                if self.air_ticks != 0 { self.gravity_from(self.eff, 0.006_111_111) } else { self.vel[2] -= 0.004; }
             }
             0x44 => {
                 self.vel[2] -= 0.005_555_556;
@@ -216,7 +216,7 @@ impl Hero {
                 self.target_yaw = self.ground_yaw;
                 self.target_speed = 0.091_666_67;
                 self.air_accel(0.006_944_444_5);
-                self.gravity_from(self.eff_v[2], 0.005);
+                self.gravity_from(self.eff_v, 0.005);
             }
         }
     }
@@ -244,7 +244,7 @@ impl Hero {
         if self.air_ticks == 0 {
             self.vel[2] -= 0.015;
         } else {
-            self.gravity_from(self.eff_v[2], 0.006_944_444_5);
+            self.gravity_from(self.eff_v, 0.006_944_444_5);
             self.edge_slide();
         }
         self.edge_brake(env, 0.7, 0.0);

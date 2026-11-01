@@ -196,6 +196,7 @@ pub fn update_for(o_class: i16) -> Option<UpdateFn> {
         0x00bc => Some(tractor::update),
         0x0acb | 0x0acc => Some(tractor::update_box),
         0x0afc => Some(maktar::update_0afc),
+        0x0b25 => Some(maktar::update_0b25),
         0x0aaf => Some(maktar::update_0aaf),
         0x0873 => Some(maktar::update_0873),
         0x0a24 => Some(maktar::update_0a24),

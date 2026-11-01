@@ -16,7 +16,7 @@
 //! at `up·pos + off`, `±t` about it (crate `rc-engine` `shadow_render` takes them with the posed proxy); `t ≤ 0` = no
 //! shadow. Every probe is the line test with flags 0x22 (no moby primitives, not the water).
 //!
-//! Not ported: the gravity frames (`0x1a8ff0`, G-LVL-003: the probes along the up row run only with them), the water
+//! The gravity frames (`0x1a8ff0`, crate::gravity) switch the probes to their up-row branch. Not ported: the water
 //! and liquid heights Ratchet's slab also seeds from (`0x18a150` / `0x18a154`, G-HERO-001).
 
 pub mod volume;
@@ -107,10 +107,10 @@ pub fn probe_down(m: &mut Moby, gravity: bool, line: impl FnOnce(V3, V3) -> Opti
 }
 
 /// [`probe_down`] on moby `id` in a class update (the line test against the world and the mobys, flags
-/// [`PROBE_FLAGS`]; the gravity frames are not ported).
+/// [`PROBE_FLAGS`]; the gravity frames' branch while they are on, crate::gravity).
 pub fn probe(w: &mut crate::moby::MobyWorld, id: usize, ctx: &crate::moby::Ctx) {
     let line = |a: V3, b: V3| ctx.coll.and_then(|c| crate::collision::coll_line_m(c, ctx.scene, a, b, crate::collision::QueryFlags(PROBE_FLAGS), None)).map(|o| o.point);
-    probe_down(&mut w.mobys[id], false, line);
+    probe_down(&mut w.mobys[id], ctx.hero.gravity.on, line);
 }
 
 /// The class updates' call: drawn (`+0x31`) and nearer the camera than `reach` (`0x2ef018`), [`probe`], and the
@@ -128,9 +128,10 @@ pub fn hero_pass(w: &mut crate::moby::MobyWorld, ctx: &mut crate::moby::Ctx) {
     let Some(id) = ctx.hero_moby.filter(|&i| i < w.mobys.len()) else { return };
     let h = &*ctx.hero;
     let input = HeroIn { group: h.group, state: h.state, body: h.mode, air_ticks: h.air_ticks, ground_z: h.ground_z };
+    let gravity = h.gravity.on;
     let (coll, scene) = (ctx.coll, ctx.scene);
     let line = |a: V3, b: V3| coll.and_then(|c| crate::collision::coll_line_m(c, scene, a, b, crate::collision::QueryFlags(PROBE_FLAGS), None)).map(|o| o.point);
-    update_hero(&mut w.mobys[id], &mut ctx.game.shadow, &input, false, line);
+    update_hero(&mut w.mobys[id], &mut ctx.game.shadow, &input, gravity, line);
     let light = w.mobys[id].light;
     update_dir(&mut ctx.game.shadow, light);
 }
