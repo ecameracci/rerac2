@@ -56,7 +56,9 @@ pub mod endako_a_enemies;
 pub mod endako_b;
 pub mod endako_clank;
 pub mod endako_c;
+pub mod endako_crane;
 pub mod endako_d;
+pub mod endako_boss;
 
 use super::UpdateFn;
 
@@ -66,7 +68,9 @@ use super::UpdateFn;
 /// where none of its callers runs; the big explosion 0x0d4e, L02's record `0x2a69ec`), added to every level's class table
 /// as the overlay's table holds them.
 /// The Spiderbot 0x0b58 is listed for the levels whose class list lacks it (`0x315530` creates it without a model, hidden).
-pub const CREATED_LOGIC: &[i16] = &[crate::ship::LASER_CLASS, teleport::CLASS, explosion::CLASS, spiderbot::BOT_CLASS];
+/// Endako's boss's shots (crate::moby::classes::endako_boss: the laser 0x09df, the tracer 0x0a72, the rocket 0x0b1b;
+/// L03's update table `0x2a9604` holds them) are listed so too, for when the level's class list lacks their models.
+pub const CREATED_LOGIC: &[i16] = &[crate::ship::LASER_CLASS, teleport::CLASS, explosion::CLASS, spiderbot::BOT_CLASS, endako_boss::BEAM, endako_boss::TRACER, endako_boss::ROCKET];
 
 pub fn update_for(o_class: i16) -> Option<UpdateFn> {
     match o_class {
@@ -143,7 +147,7 @@ pub fn update_for(o_class: i16) -> Option<UpdateFn> {
         0x1259 => Some(maktar::update_1259),
         0x0a9c => Some(maktar::update_0a9c),
         keeper::CLASS => Some(keeper::update),
-        keeper::SHOT => Some(keeper::update_shot),
+        keeper::SHOT | keeper::ROCKET => Some(keeper::update_shot),
         0x132d => Some(props::update_132d),
         0x0919 => Some(props::update_0919),
         0x0c8c => Some(props::update_0c8c),
@@ -274,6 +278,14 @@ pub fn update_for(o_class: i16) -> Option<UpdateFn> {
         endako_c::SENTRY => Some(endako_c::update_0ffd),
         endako_c::FLAMER => Some(endako_c::update_0ffc),
         endako_c::MINE => Some(endako_c::update_0b23),
+        endako_crane::PANEL => Some(endako_crane::update_0949),
+        endako_crane::CRANE => Some(endako_crane::update_094a),
+        endako_crane::BOX | endako_crane::BOMB | endako_crane::BOX_094C => Some(endako_crane::update_box),
+        endako_crane::WALL => Some(endako_crane::update_10f6),
+        // Endako's boss.
+        endako_boss::CLASS => Some(endako_boss::update),
+        endako_boss::TRACER => Some(endako_boss::update_tracer),
+        endako_boss::BEAM => Some(endako_boss::update_beam),
         // Endako (endakoD).
         0x0f37 => Some(endako_d::update_0f37),
         0x0f3e => Some(endako_d::update_0f3e),

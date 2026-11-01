@@ -742,6 +742,18 @@ fn tie_spheres(lv: &crate::level_load::LoadedLevel) -> Vec<[f32; 4]> {
         .collect()
 }
 
+/// A moby's runtime joint modifiers on its lists' target joints (`targets`, [`Mobys::targets`]): its manipulators
+/// (rc_game::moby::Moby::manips), scale nodes (`joint_scales`) and translations (`joint_moves`), in that order.
+pub fn moby_mods(targets: &HashMap<i16, Vec<u8>>, m: &Moby) -> Vec<moby_anim::JointModifier> {
+    let target = |l: u8| targets.get(&m.o_class)?.get(l as usize).filter(|&&j| j != 0xff).copied();
+    m.manips
+        .iter()
+        .filter_map(|&(l, quat)| Some(moby_anim::JointModifier { quat, ..moby_anim::JointModifier::compose(target(l)?) }))
+        .chain(m.joint_scales.iter().filter_map(|&(l, s)| Some(moby_anim::JointModifier { scale: [s; 3], ..moby_anim::JointModifier::compose(target(l)?) })))
+        .chain(m.joint_moves.iter().filter_map(|&(l, t)| Some(moby_anim::JointModifier { trans: t, ..moby_anim::JointModifier::compose(target(l)?) })))
+        .collect()
+}
+
 /// The scene from the snapshot's parts (a free function, so the world can be borrowed mutably beside it).
 pub fn scene_of<'a>(snap: &'a Option<(Snapshot, Arc<MobyGrid>)>, coll: &'a Arc<HashMap<i16, MobyCollision>>, cache: &'a Mutex<PoseCache>) -> Option<MobyScene<'a>> {
     snap.as_ref().map(|(s, g)| MobyScene { mobys: s, grid: g, classes: coll, cache })
@@ -848,15 +860,7 @@ impl CreatedDraw {
             let look = moby_render::SlotLook { model, alpha: m.alpha, fading: false, mode: m.mode, glow: m.glow, shine, e, late: mobys.shadow_casters.contains(&id), piece: m.piece, bangles: m.bangles };
             self.extra.show_slot(commands, level, slot, Some((class, look)), meshes, images, materials, buffers);
             shown.push(slot);
-            // Its manipulators (rc_game::moby::Moby::manips) and scale nodes (`joint_scales`) on their lists' target
-            // joints.
-            let target = |l: u8| mobys.targets.get(&m.o_class)?.get(l as usize).filter(|&&j| j != 0xff).copied();
-            let mods: Vec<moby_anim::JointModifier> = m
-                .manips
-                .iter()
-                .filter_map(|&(l, quat)| Some(moby_anim::JointModifier { quat, ..moby_anim::JointModifier::compose(target(l)?) }))
-                .chain(m.joint_scales.iter().filter_map(|&(l, s)| Some(moby_anim::JointModifier { scale: [s; 3], ..moby_anim::JointModifier::compose(target(l)?) })))
-                .collect();
+            let mods = moby_mods(&mobys.targets, m);
             let pose = |ac: &MobyAnimClass| if mods.is_empty() { moby_anim::evaluate_with_snapshot(ac, &c.state, c.snapshot.as_ref()) } else { moby_anim::evaluate_posed(ac, &c.state, c.snapshot.as_ref(), &[], &mods) };
             if let Some(f) = mobys.skinned.get(&id).cloned().or_else(|| lv.anim.get(c.class).map(pose)) {
                 let at = (slot * SLOT_JOINTS) as usize * 64;

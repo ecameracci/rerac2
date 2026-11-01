@@ -977,6 +977,12 @@ fn tick(
             if m.update.is_some() || m.drive {
                 o.drive(ii, m.pos, m.rows, m.scale, crate::mobys::moby_lights(&lv.mobys, m.rows, m.light, m.ambient).as_ref(), hidden);
                 o.game_look(ii, m.alpha, m.mode, m.glow, m.draw_dist, m.shine);
+                // A placed moby's translation manipulators (rc_game::moby::Moby::joint_moves: Endako's crane) pose it.
+                if !m.joint_moves.is_empty() {
+                    if let (Some(a), Some(k)) = (anim.as_deref_mut(), o.anim_index(ii)) {
+                        if let Some(slot) = a.mods.get_mut(k) { *slot = crate::mobys::moby_mods(&mobys.targets, m); }
+                    }
+                }
             } else {
                 o.set_hidden(ii, hidden);
                 o.set_shine(ii, m.shine);

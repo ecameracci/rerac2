@@ -41,6 +41,9 @@ use super::props::{seq, set_seq, wrapped};
 pub const CLASS: i16 = 0x09c5;
 const LAUNCHER: [i16; 2] = [0x0a20, 0x0a21];
 pub const SHOT: i16 = 0x0b5a;
+/// The other class the shot's code serves (L03 `0x3e2958`, the same code as `0x402450`): Endako's boss's rocket
+/// (crate::moby::classes::endako_boss). Its end is the big one ([`update_shot`]).
+pub const ROCKET: i16 = 0x0b1b;
 /// The movement block, the target's point and found word, home, the goal.
 const MV: usize = 0x100;
 const TARGET: usize = 0x1f0;
@@ -742,7 +745,14 @@ fn state_tick(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> Option<u8> {
 #[allow(clippy::too_many_arguments)]
 pub fn spawn_shot(w: &mut MobyWorld, src: usize, damage: f32, b: f32, accel: f32, pos: V3, vel: V3, goal: V3, trail: (u8, u8, u8)) -> Option<usize> {
     w.class(SHOT)?;
-    let s = w.create(SHOT);
+    spawn_shot_of(w, SHOT, src, damage, b, accel, pos, vel, goal, trail)
+}
+
+/// The same shot of class `class`: the keeper's 0x0b5a, or Endako's boss's rocket [`ROCKET`] (L03 `0x3e2ee8`, the same
+/// code; created even when the level's class table lacks it, as the overlay's update table holds it).
+#[allow(clippy::too_many_arguments)]
+pub fn spawn_shot_of(w: &mut MobyWorld, class: i16, src: usize, damage: f32, b: f32, accel: f32, pos: V3, vel: V3, goal: V3, trail: (u8, u8, u8)) -> Option<usize> {
+    let s = w.create(class);
     let x = &mut w.mobys[s];
     x.update = Some(update_shot);
     x.mode &= !mode::NO_UPDATE;
@@ -818,12 +828,21 @@ pub fn update_shot(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         if let Some(t) = hit.moby {
             let m = &w.mobys[id];
             let mut tmpl = crate::moby::hits::HitTemplate::new(m.pv_f(0x6c), Some(id), 0x1_0001, [v[0], v[1], v[2], 0.0]);
-            tmpl.kind = (SHOT as u16 as u32) << 16 | 0x305;
+            tmpl.kind = (m.o_class as u16 as u32) << 16 | 0x305;
             w.deliver_hit(t, &tmpl, [0.0, 0.0, 0.0, 1.0]);
         }
         ctx.host.play_sound(&w.mobys[id], 1, 0);
         let pos = w.mobys[id].pos;
-        crate::moby::blast::burst(w, ctx, pos, &crate::moby::blast::Blast { size: 0.3, bursts: [0; 3], puffs: 0x14, streaks: 0x2d, light: true, shake: false });
+        if w.mobys[id].o_class == SHOT {
+            crate::moby::blast::burst(w, ctx, pos, &crate::moby::blast::Blast { size: 0.3, bursts: [0; 3], puffs: 0x14, streaks: 0x2d, light: true, shake: false });
+        } else {
+            // L03 `0x3e3008`, any other class: a sphere of 0.25 hits for its damage (push 1, flags 0x10001, `0x31e588`)
+            // and the big explosion (crate::moby::classes::explosion) faces the camera.
+            let dmg = w.mobys[id].pv_f(0x6c);
+            ai::attack_sphere(w, id, ctx, 0.25, dmg, 1.0, pos, 0x1_0001, 0, 1, 0);
+            let dir = set_len(sub(ctx.host.camera_pos(), pos), 1.0);
+            super::explosion::start(w, ctx, 0.0, pos, dir);
+        }
         let m = &mut w.mobys[id];
         m.state = 2;
         m.mode |= 0x41;
@@ -859,13 +878,17 @@ pub fn update_shot(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 
 /// `$gp+0x277c`: the shot's colour (rgb; `+0x2778` the other class's, 0x0b1b).
 const SHOT_RGB: u32 = 0x0010_8030;
+/// L03 `$gp+0x1aa0`: the rocket's colour.
+const ROCKET_RGB: u32 = 0x0010_3080;
 
 /// `0x402bc8`, the shot's draw: its glow at its head (crate::fx::halo) and its streak through its trail's points from
 /// it (crate::fx::streak, scroll `+0x60`, 0.25 of the texture a segment).
 pub fn draw_shot(w: &MobyWorld, id: usize, rng: &mut crate::rng::Rng, cam: V3, out: &mut Vec<crate::fx::FxQuad>) {
     let m = &w.mobys[id];
     let head = shot_head(m);
-    crate::fx::halo(out, rng, head, SHOT_RGB, cam);
+    // L03 `0x3e31e8`: `$gp+0x1aa0` for any class but 0x0b5a (`+0x1aa4`).
+    let rgb = if m.o_class == SHOT { SHOT_RGB } else { ROCKET_RGB };
+    crate::fx::halo(out, rng, head, rgb, cam);
     let pts: Vec<V3> = (0..4).map(|k| m.pv_v(0x20 + 0x10 * k)).collect();
-    crate::fx::streak(out, rng, m.pv_f(0x60), 0.25, head, &pts, SHOT_RGB, cam);
+    crate::fx::streak(out, rng, m.pv_f(0x60), 0.25, head, &pts, rgb, cam);
 }

@@ -33,9 +33,11 @@
 //! (`+0x2e8`: calm green, wary yellow, chasing red; eased 0.2 a tick) on its glow word and a glow there (94500, 0.1
 //! toward the camera, at (0.33, 0, 0.075), 2 ticks).
 //!
-//! Not ported: the remote-control mode (Ratchet in state 0x31, `0x18b650`: its targets and facing then the remote
-//! moby, the crane's kills counted for skill point 0x1c, `$gp − 0x5fac`; Endako's crane 0x0949 / 0x094a is not
-//! ported, so the state never comes), the eyes' glow on joint 0 (the port's glows take the rows), the head's aim
+//! With Ratchet steering Endako's crane (state 0x31, crate::moby::classes::endako_crane) states 3 and 4 face the
+//! crane (`0x18b650`) instead of him, and its deaths (the frame's damage and the knock's fall) count toward skill
+//! point 0x1c (crate::moby::classes::endako_c::crane_kill, `$gp − 0x5fac`).
+//!
+//! Not ported: the eyes' glow on joint 0 (the port's glows take the rows), the head's aim
 //! (`0x327308`, 1.8 at `+0x210`), the spawn spot's world test (`0x2df8d8`: only the mobys there are looked at), state 9
 //! without a spawn cuboid (the game reads before the cuboid table; here straight to the chase).
 
@@ -191,6 +193,7 @@ fn senses(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> bool {
     let kind = ai::take_damage(w, id, ctx, false);
     if kind != 0 && w.mobys[id].pv_f(HEALTH) <= 0.0 {
         burst(w, id, ctx);
+        super::endako_c::crane_kill(w, ctx);
         ctx.host.play_sound(&w.mobys[id], 2, 0);
         alarm(w, id);
         crate::moby::bolts::drop(w, id, 0, 3, ctx);
@@ -283,6 +286,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             let r = ai::flight(w, id, ctx);
             if r & 1 != 0 {
                 burst(w, id, ctx);
+                super::endako_c::crane_kill(w, ctx);
                 crate::moby::bolts::drop(w, id, 0, 3, ctx);
                 if w.mobys[id].pv_i(RESPAWN) == 0 {
                     w.delete(id);
@@ -318,7 +322,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             if r & 0x80 != 0 || 0x12d <= w.mobys[id].state_ticks as u16 { w.mobys[id].set_state(1, -1); }
         }
         3 => {
-            let y = yaw_to(w, id, ctx.hero.pos);
+            let y = yaw_to(w, id, watched(w, ctx));
             face(w, id, y);
             if 0xb <= w.mobys[id].state_ticks as u16 { w.mobys[id].set_state(4, -1); }
         }
@@ -329,7 +333,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 w.mobys[id].set_pv_i(o, v);
                 stroll_goal(w, id, ctx, 1.0);
             }
-            let y = yaw_to(w, id, ctx.hero.pos);
+            let y = yaw_to(w, id, watched(w, ctx));
             face(w, id, y);
             let g = w.mobys[id].pv_v(GOAL);
             let y = yaw_to(w, id, g);
@@ -397,6 +401,15 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         _ => {}
     }
     tail(w, id, ctx);
+}
+
+/// What states 3 and 4 face: Ratchet, or while he steers (state 0x31) the moby he steers (`0x18b650`,
+/// crate::moby::classes::endako_crane).
+fn watched(w: &MobyWorld, ctx: &Ctx) -> V3 {
+    match w.endako.steered.and_then(|s| w.mobys.get(s)) {
+        Some(m) if ctx.hero.state == 0x31 => m.pos,
+        _ => ctx.hero.pos,
+    }
 }
 
 /// `0x41e898`: inside its fence path's polygon and clear of its walls by its radius.

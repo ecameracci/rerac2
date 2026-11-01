@@ -3,11 +3,7 @@
 //! ([`update_0ffc`]) and the floating mine 0x0b23 ([`update_0b23`]).
 //!
 //! Not ported (the set's other classes):
-//! * **0x10f6** (`0x422a78`, 3; Ghidra has no function there): a wall the remote crane's box (class 0x0cfc) breaks —
-//!   it clears the table `0x259a30` (16 records of 0x150) and goes when its uid is done (`0x21ea60`, the save bits
-//!   `0x1a4b58`); a hit with flags 0x10000 from a 0x0cfc no more than 0.5 below its top sets its group going (2), which
-//!   bursts in three rows of blasts (`0x403f10`, size 0.75, at (±8, −6, 5 / 15 / 25) in its frame, 230 then 10 ticks
-//!   apart), marks its uid and throws its pieces (`0x32d008`). The crane and its box are not ported, so it waits.
+//! * **0x10f6** (`0x422a78`): the wall the remote crane's bomb box breaks, crate::moby::classes::endako_crane.
 //! * **0x0944** (`0x3c75f8`, 5; no function in Ghidra): an energy field drawn by its own callback (`0x3c7810`: pulsing
 //!   quads from two phases at `$gp+0x1020..`), its looped sound 0; hooked, it fades (`+0x14` to 0 at 1/30 a tick) and
 //!   turns off without collision (2). Its draw is a system of its own; left for the field's pass.
@@ -38,6 +34,11 @@
 //!   from 6 ticks in. 4 the watch: Clank (`0x18c0d4` = 1) wakes it (5). 5 it turns toward Ratchet weaving ±5° (6° a
 //!   tick), its beam from 6 ticks in; Ratchet again, 4. 8 knocked (nothing). 9 waiting hidden: hooked, it teleports in
 //!   at its cuboid (crate::moby::classes::teleport; a hit sphere 0.5 of 2 where it waited) and goes into the arena (2).
+//!   6 carried by the remote crane (crate::moby::classes::endako_crane; set by [`carry`], `0x4206e0`, sub 2): under its
+//!   hook (`0x313be0(crane, 2)`: 0.75 lower, 0.5 down its own up row), tipping to 90° (6° a tick), its beam growing to
+//!   10 (1/15 a tick), flags 0x10001 in sub 2. 7 dropped ([`drop`], `0x420720`): falling at 1/240 a tick² from the
+//!   crane's velocity, its beam on; a sphere of 0.5 at 0.5 up its row meeting anything: the blast, its pieces,
+//!   deleted. [`arm`] (`0x420768`) is the crane terminal's: it brings a waiting one in.
 //! * **The beam** (`0x420850`, every odd frame): from (1.0875, 0, 0.99375) in its frame to (length, 0, −0.0125), the
 //!   line (`0x2df4f8`) to the first thing it meets, which takes the hit (its damage `+0x34`, flags 1 or 0x10001 in sub
 //!   2, no knock); a crate (classes 500..520) also a hit of flags 0x10000; its end shown to the spills (crate::moby::
@@ -49,12 +50,8 @@
 //!   alpha 0x40; its looped sound 5.
 //! * **The tail** (`0x420668`): the flash `+0x50`, the timers `+0x320` / `+0x322` down, its ticks.
 //!
-//! Not ported: the remote crane's carry (state 6, set by `0x4206e0` from the crane `0x3c88b0`: at the crane's joint
-//! 2, tipping to 90°, its beam to 10, flags 0x10001 in sub 2) and drop (state 7, `0x420720`: falling at 1/240 a tick²
-//! until a sphere of 0.5 meets something: the blast, its pieces, deleted), and the crane terminal's arming
-//! (`0x420768`, from `0x3c8030`): the crane and its terminal are not ported, so these never come; the class record's
-//! `+0x46` = 5 the set-up writes; `0x327aa8(2, m, +0x200)` (its `+0x270` 2 under the flag `0x1a7a4f`, else 1: a
-//! block nothing here reads); the moby's `+0x7f` byte state 9 clears. The beam's second line query is made in the
+//! Not ported: the class record's `+0x46` = 5 the set-up writes; `0x327aa8(2, m, +0x200)` (its `+0x270` 2 under the
+//! flag `0x1a7a4f`, else 1: a block nothing here reads); the moby's `+0x7f` byte state 9 clears. The beam's second line query is made in the
 //! update, where it registers its draw (the port's draws have no collision), and its sound is started there too.
 
 use crate::hero::physics::{add, add_rot, atan2, cross, dist, dist2, len2, scale, set_len, sub, unit, V3};
@@ -82,6 +79,7 @@ const POINT: usize = 0x32c;
 const BRIGHT: usize = 0x330;
 const HEAD: usize = 0x334;
 const COUNT: usize = 0x336;
+const CRANE_LINK: usize = 0x338;
 const LEN: usize = 0x33c;
 const LOOP: usize = 0x340;
 
@@ -109,6 +107,8 @@ pub struct Globals {
     pub beam_end: V3,
     /// `$gp−0x5fac` (`0x1a9044`): the enemies killed while Ratchet works the remote crane (state 0x31).
     pub crane_kills: i32,
+    /// `0x18b650`: the moby Ratchet steers in state 0x31 (crate::moby::classes::endako_crane's terminal sets it).
+    pub steered: Option<usize>,
     /// The beams to draw this frame: the moby, its start and the end its draw's line found.
     pub beams: Vec<(usize, V3, V3)>,
 }
@@ -328,6 +328,39 @@ pub fn update_0ffd(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             if 6 <= w.mobys[id].state_ticks as u16 { draw_prep(w, id, ctx); }
             if ctx.hero.mode != 1 { w.mobys[id].set_state(4, -1); }
         }
+        6 => {
+            // `0x313be0(+0x338, 2)`: under the crane's hook, 0.75 lower and 0.5 down its own up row.
+            if let Some(c) = ai::link(&w.mobys[id], CRANE_LINK) {
+                let j = super::endako_crane::hook_point(w, c, ctx);
+                let m = &mut w.mobys[id];
+                let off = to_world([0.0, 0.0, 0.5], &m.rows);
+                m.pos = sub([j[0], j[1], j[2] - 0.75], off);
+            }
+            let m = &mut w.mobys[id];
+            m.rot[1] = ease(m.rot[1], f32::from_bits(0x3fc9_0fdb), f32::from_bits(0x3dd6_7752));
+            m.set_pv_f(LEN, ease(m.pv_f(LEN), 10.0, f32::from_bits(0x3d88_8889)));
+            beam(w, id, ctx);
+            draw_prep(w, id, ctx);
+        }
+        7 => {
+            let m = &mut w.mobys[id];
+            let mut v = m.pv_v(MV + 0xa0);
+            v[2] -= f32::from_bits(0x3b88_8889);
+            m.set_pv_v(MV + 0xa0, v);
+            m.pos = add(m.pos, v);
+            let at = add(to_world([0.0, 0.0, 0.5], &m.rows), m.pos);
+            beam(w, id, ctx);
+            draw_prep(w, id, ctx);
+            // `0x2e0558(0.5, at, 0, m)`: meeting anything, it blows up.
+            if ctx.coll.and_then(|c| crate::collision::coll_sphere_m(c, ctx.scene, at, 0.5, crate::collision::QueryFlags(0), Some(id))).is_some() {
+                blast(w, id, ctx);
+                crate::moby::shards::break_into(w, id, ctx, (3.0, 6.0), (3.0, 6.0), 0x1f, [0.0; 3], 0xff);
+                // The port's delete leaves a looped sound playing.
+                stop_loop(w, id, ctx);
+                w.delete(id);
+                return;
+            }
+        }
         9 => {
             if w.mobys[id].first() { stop_loop(w, id, ctx); }
             if w.mobys[id].once & 4 != 0 {
@@ -350,6 +383,43 @@ pub fn update_0ffd(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         _ => {}
     }
     tail(w, id);
+}
+
+/// `0x420768(m)`: the crane terminal's arming (crate::moby::classes::endako_crane). A sentry with a cuboid to come in at,
+/// waiting hidden (9) and not yet hooked: its hit let go, its knock `+0x98` 0, its walk back (4/s² up to 4/s), its
+/// beam 6 long, its health full, its class's collision, Ratchet's light (`0x321328`), hooked — true. Else false.
+pub fn arm(w: &mut MobyWorld, id: usize, ctx: &Ctx) -> bool {
+    let m = &w.mobys[id];
+    if m.pv_i(CUBOID) == -1 || m.state != 9 || m.once & 4 != 0 { return false; }
+    w.clear_hit(id);
+    let solid = w.class(SENTRY).is_some_and(|c| c.has_collision);
+    let light = ctx.hero_moby.and_then(|h| w.mobys.get(h)).map(|h| (h.light, h.ambient));
+    let m = &mut w.mobys[id];
+    m.set_pv_s(REACT + 0x38, 0);
+    m.set_pv_f(MV + 0x28, WALK.1 * 0.016_666_668);
+    m.set_pv_f(LEN, 6.0);
+    m.set_pv_f(HEALTH, m.pv_s(HEALTH + 4) as f32);
+    m.set_pv_f(MV + 0x20, WALK.0 * 0.000_277_777_78);
+    m.set_pv_f(MV + 0x24, WALK.0 * 0.000_277_777_78);
+    m.has_collision = solid;
+    if let Some((l, a)) = light { (m.light, m.ambient) = (l, a); }
+    m.once |= 4;
+    w.changed = true;
+    true
+}
+
+/// `0x4206e0(m, crane)`: hung on the crane's hook (6, sub 2), the crane kept (`+0x338`).
+pub fn carry(w: &mut MobyWorld, id: usize, crane: usize) {
+    let m = &mut w.mobys[id];
+    m.set_state(6, 2);
+    ai::set_link(m, CRANE_LINK, Some(crane));
+}
+
+/// `0x420720(m, vel)`: let go with the crane's velocity (7, sub 2; its movement's velocity `+0x1b0`).
+pub fn drop(w: &mut MobyWorld, id: usize, vel: V3) {
+    let m = &mut w.mobys[id];
+    m.set_state(7, 2);
+    m.set_pv_v(MV + 0xa0, vel);
 }
 
 /// `0x420668` (module docs).
