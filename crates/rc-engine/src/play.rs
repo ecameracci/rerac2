@@ -644,6 +644,11 @@ fn tick(
         // The Electrolyzer's screen (`0x3784e8`, rc_game::moby::classes::electrolyzer): its frame alone.
         rc_game::moby::classes::electrolyzer::MODE => {
             puzzle_frame(p, &level.0, occl.as_deref_mut(), anim.as_deref_mut(), parts.as_deref_mut().map(|s| &mut s.sys), audio.as_deref_mut());
+            // The Hacker's mode puts the camera at the origin (rc_game::hacker).
+            if let Some((eye, rows)) = p.game.hacker.view {
+                let tan = rc_game::moby::classes::electrolyzer::tan();
+                commands.insert_resource(PlayView { view: scene_view(&rc_game::scene_camera::SceneCamera { eye, rows, tan_half_fov: tan, cut: false }), tan_half_fov: tan, far: p.game.view_far * 1024.0 });
+            }
             p.ticks += 1;
             return;
         }
@@ -1264,11 +1269,12 @@ fn puzzle_frame(p: &mut Play, lv: &crate::level_load::LoadedLevel, occl: Option<
         let aux = rc_game::particles::PartAux { cam_yaw: p.camera.yaw(), water_z: p.hero.surf.water_z, coll: Some(coll), rain: mobys.world.weather.aux(&mobys.level, &p.game) };
         rc_game::particles::update_parts(s, &mobys.world, p.camera.pos, p.hero.pos, &mut p.game.rng, &aux);
     }
-    let id = usize::try_from(p.game.scenes.arg.0).ok().filter(|&i| mobys.world.mobys.get(i).is_some_and(|m| m.state < 0x80 && m.o_class == rc_game::moby::classes::electrolyzer::CLASS));
+    let id = usize::try_from(p.game.scenes.arg.0).ok().filter(|&i| mobys.world.mobys.get(i).is_some_and(|m| m.state < 0x80 && matches!(m.o_class, rc_game::moby::classes::electrolyzer::CLASS | rc_game::moby::classes::hacker_panel::CLASS)));
     if let Some(id) = id {
         // The puzzle reads the pad as the hero's tick would have.
         p.hero.items.pressed = p.pad.pressed;
         p.hero.items.held = p.pad.held;
+        p.game.hacker.stick = rc_game::hacker::stick(&p.pad);
         let mods = p.hero.posture.modifiers(&mobys.hero_targets);
         let hl = mobys.hero_layers(&p.hero.layers);
         let pose = crate::mobys::HeroPose { class: p.class, state: &p.anim.state, snapshot: p.anim.snapshot.as_ref(), pos: p.hero.pos, rows: p.hero.rows, scale: p.scale, mods: &mods, layers: &hl };
@@ -1277,9 +1283,15 @@ fn puzzle_frame(p: &mut Play, lv: &crate::level_load::LoadedLevel, occl: Option<
         let mut host = crate::mobys::Host { lv: &lv.mobys, occl: occl.as_deref(), anim: anim.as_deref_mut(), created: &mut mobys.created, hero: Some(pose), hero_chains: &mobys.hero_chains, chains: Some(&mobys.chains), camera: p.camera.pos, camera_rows: p.camera.rows, sound };
         let scene = crate::mobys::scene_of(&mobys.snap, &mobys.coll, &mobys.cache);
         let mut ctx = rc_game::moby::Ctx { host: &mut host, hero: &mut p.hero, game: &mut p.game, coll: Some(coll), scene: scene.as_ref(), hero_moby: mobys.hero_moby, hero_view, level: &mobys.level, parts: parts.as_deref_mut(), view: None };
-        rc_game::moby::classes::electrolyzer::update(&mut mobys.world, id, &mut ctx);
+        if mobys.world.mobys[id].o_class == rc_game::moby::classes::hacker_panel::CLASS {
+            rc_game::moby::classes::hacker_panel::update(&mut mobys.world, id, &mut ctx);
+        } else {
+            rc_game::moby::classes::electrolyzer::update(&mut mobys.world, id, &mut ctx);
+        }
         drop(ctx);
         drop(host);
+        // The Hacker's arcs (rc_game::hacker, the frame's second list).
+        p.fx_quads.append(&mut p.game.hacker.quads);
         // Not left for the next play frame's moby loop (which reads the hero tick's pad of the tick before).
         (p.hero.items.pressed, p.hero.items.held) = (0, 0);
         if mobys.world.changed {
@@ -2480,6 +2492,14 @@ fn draw_hud(
                 quads.extend(rc_game::hud::quads(&draws, &a.sprites, &a.glyphs, &icon, rc_game::gui::MENU_TAN));
                 quads.extend(text);
             }
+            // The Hacker's screen (`0x3e5010`): its frame's sprites, the clock, the depth and the labels; the white.
+            if let Some(h) = p.game.hacker.hud.as_ref() {
+                let (mut draws, mut text) = (Vec::new(), Vec::new());
+                rc_game::hacker::draw_hud(h, &texts, (&a.glyphs_2, 2), &mut draws, &mut text);
+                quads.extend(rc_game::hud::quads(&draws, &a.sprites, &a.glyphs, &icon, rc_game::gui::MENU_TAN));
+                quads.extend(text);
+            }
+            rc_game::hacker::draw_white(p.game.hacker.white, &mut quads);
         }
         if p.glyphs.is_none() { p.glyphs = Some(Box::new(a.glyphs)); }
         p.boxes.draw(&mut quads, &a.glyphs, &a.sprites);

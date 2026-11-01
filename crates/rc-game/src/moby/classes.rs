@@ -60,6 +60,7 @@ pub mod endako_c;
 pub mod endako_crane;
 pub mod endako_d;
 pub mod endako_boss;
+pub mod hacker_panel;
 
 use super::UpdateFn;
 
@@ -230,6 +231,7 @@ pub fn update_for(o_class: i16) -> Option<UpdateFn> {
         0x0a24 => Some(maktar::update_0a24),
         0x0a55 => Some(maktar::update_0a55),
         electrolyzer::CLASS => Some(electrolyzer::update),
+        hacker_panel::CLASS => Some(hacker_panel::update),
         0x0a4b => Some(maktar::update_0a4b),
         0x0adf => Some(maktar::update_0adf),
         0x0aab | 0x0aac => Some(maktar::update_0aab),

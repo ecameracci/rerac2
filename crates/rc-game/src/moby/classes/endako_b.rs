@@ -18,9 +18,9 @@
 //! * **0x12ea** ([`update_12ea`], `0x3854b8`): a box broken open for bolts.
 //!
 //! Clank's rescue **0x0a08** (`0x3d2fd0`) and Clank's body **0x0057** (`0x394728`) are crate::moby::classes::endako_clank.
+//! The hacking panel **0x0b29** (`0x3e5c90`) is crate::moby::classes::hacker_panel, its puzzle crate::hacker.
 //!
 //! Not ported (set B's other classes):
-//! * The panel **0x0b29** (`0x3e5c90`): its puzzle in the game's mode 7 (G-CLS-012).
 //! * The robots **0x093c / 0x0940** (`0x3c31f8`, 49 functions: they walk the network of **0x0f2d** (`0x41b0b0`, built
 //!   by `0x32b318` from its list of paths) and raise 0x0e87 and stand on 0x097a): too large for this pass. The boss
 //!   **0x0c8a** (`0x3f5c78`) is crate::moby::classes::endako_boss.

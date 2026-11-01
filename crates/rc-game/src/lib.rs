@@ -18,6 +18,7 @@ pub mod fx;
 pub mod game;
 pub mod gravity;
 pub mod gui;
+pub mod hacker;
 pub mod help;
 pub mod msgbox;
 pub mod hero;
