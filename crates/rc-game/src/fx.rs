@@ -24,6 +24,7 @@
 //! | `0x3d7858` / `0x3dc2d0` | Maktar's arena bosses 0x09f8 / 0x0a44 | their lights (crate::moby::classes::bosses) |
 //! | `0x423e10` | 0x0a44's shot 0x0d08 (the first list) | its glow and sparks (crate::moby::classes::bosses::draw_shot) |
 //! | `0x4137d0` | the space fights' laser 0xffa | a streak ([`crate::ship::draw_laser`]) |
+//! | `0x3d20e8` (L03) | the Endako boss's laser 0x09df | its glows and strips ([`sprite`], crate::moby::classes::endako_boss::draw_beam) |
 //! | `0x426410` (L02) | the big explosion 0x0d4e | its discs and glare ([`crate::moby::classes::explosion::draw`]); its shimmer ([`FrameQuad`]) |
 //! | `0x3fac68` (L02) | the Spiderbot 0x0b58 | its blast's sphere ([`FrameQuad`], [`crate::moby::classes::spiderbot::draw_blast`]) |
 //!
@@ -327,7 +328,8 @@ fn one(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut crate::ga
         crate::moby::classes::bosses::CA44 => crate::moby::classes::bosses::draw_0a44(w, host, id, cam, out),
         crate::moby::classes::bosses::SHOT => crate::moby::classes::bosses::draw_shot(w, id, &mut game.rng, cam, out),
         crate::moby::classes::keeper::SHOT | crate::moby::classes::keeper::ROCKET => crate::moby::classes::keeper::draw_shot(w, id, &mut game.rng, cam, out),
-        crate::moby::classes::endako_boss::CLASS => crate::moby::classes::endako_boss::draw_tracers(w, id, cam, out),
+        crate::moby::classes::endako_boss::CLASS => crate::moby::classes::endako_boss::draw(w, host, id, cam, out),
+        crate::moby::classes::endako_boss::BEAM => crate::moby::classes::endako_boss::draw_beam(w, id, &mut game.rng, cam, out),
         crate::moby::classes::teleport::CLASS => crate::moby::classes::teleport::draw(w, id, &host.camera_rows(), out),
         crate::moby::classes::explosion::CLASS => crate::moby::classes::explosion::draw(w, id, cam, host.camera_rows(), out, frame),
         0x00bc => crate::moby::classes::tractor::draw(w, id, cam, -0.3 * (game.frame % 27) as f32, out),

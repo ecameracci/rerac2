@@ -57,8 +57,15 @@
 //!     / `[0xb8]`, the pilot deleted, `0x1395c3` marked, **its mission done** (`0x3146c0`), its loop stopped, gone.
 //! * [`tail`]: its flash; [`glide`] (`0x3f71b0`); its camera ([`camera`], `0x3f7b28`); the rotor and the turrets
 //!   ([`turn_parts`], `0x3f7c50`); the crates back ([`crates_back`], `0x3f7d88`); the pilot ([`pilot`], `0x3f7798`);
-//!   from sub 2 the boss bar (`0x2fddb0(health / most, 5, 0)`: picture 5); its tracers' draw ([`draw_tracers`],
-//!   `0x3f7f88`); its ticks.
+//!   from sub 2 the boss bar (`0x2fddb0(health / most, 5, 0)`: picture 5); its draws ([`draw`]: the tracers'
+//!   `0x3f7f88` with any kept, the rotor's glow `0x3f81e8` drawn last frame); its ticks.
+//!
+//! **The laser** 0x09df ([`update_beam`], [`draw_beam`]): its line hits as it sweeps, throwing sparks ([`sparks`],
+//! `0x3d25d0`) at the hit and down the line; drawn as four glows and two pulsing strips straight down from it.
+//!
+//! **The guns' aim**: the turrets' turns are manipulators on the boss's joint lists 0 and 1 (`turn_parts`), drawn by the
+//! engine on the placed moby; the muzzles' frames (`0x313b40` → `0x3189c0`, the joints posed with the moby's `+0x54`
+//! manipulator list) carry them, as the port's joint queries now do.
 //!
 //! **Its end**: the bolts, the music, `0x1395c3`, the mission (the level's mission end, crate::game::GameState::
 //! mission_done). No scene, item or skill point of its own.
@@ -69,16 +76,10 @@
 //! Not ported:
 //! * Its camera's turn toward it (`0x3f7b28` writes the follow camera's yaw rate `+0x1d4` and scripted yaw `+0x1dc`; the
 //!   moby update has no camera): only the tweak (distance 8, pivot 3, priority 5) is asked for.
-//! * The engine draws the manipulators (crate::moby::Moby::manips) of created mobys only: the boss's rotor (list 7,
-//!   −0.416 a tick) and turrets are kept but not drawn; the pilot's head turn is. The tracers' direction takes the turn
-//!   itself: the muzzle's frame turned about its turret's up (the port's joint frames carry no manipulators; the
-//!   turret's joint as the muzzle's parent is the port's reading).
-//! * Its glows (`0x3f81e8`: strips of `$gp+0x20d8..`), the pilot's second aim (`0x327aa8`), the hero word `0x18a03e`
+//! * The pilot's second aim (`0x327aa8`), the hero word `0x18a03e`
 //!   (0xf0) of its taunt, the line's start held for its stream (`0x330128`: the port's dialogue starts at once; the
 //!   pilot's sequence 1 starts with the line).
-//! * The laser's draw (`0x3d20e8`: its four glows and its scrolling strips `$gp+0x1580..`; the phases `+0x2c` / `+0x30`
-//!   go with it) and its sparks (`0x3d25d0`: their particles; the update's own draws for them are kept); a laser
-//!   carried by a moby (`+0x40`: the boss gives none).
+//! * A laser carried by a moby (`+0x40`: the boss gives none).
 
 use crate::hero::physics::{add, add_rot, approach, approach_angle, atan2, cross, dist, ease_speed, euler_rows, len, len2, scale, set_len, sub, sub_rot, turn_ease, turn_spring, unit, V3};
 use crate::moby::{ai, countdown, mode, Ctx, Moby, MobyWorld};
@@ -198,6 +199,8 @@ mod pv {
     /// The port's: `$gp+0x4770` (the health's share last tick) and `$gp+0x203c` (the scene played).
     pub const LAST_SHARE: usize = 0x420;
     pub const SCENE_DONE: usize = 0x424;
+    /// The port's: its rotor's glow registered this tick (drawn last frame, `+0x31`).
+    pub const ROTOR_DRAW: usize = 0x428;
     pub const LEN: usize = 0x430;
 }
 
@@ -221,13 +224,6 @@ fn anim(w: &MobyWorld, id: usize, ctx: &mut Ctx, s: u8, blend: u8) { ctx.host.se
 fn anim_unless(w: &MobyWorld, id: usize, ctx: &mut Ctx, s: u8, blend: u8) { if seq(w, id, ctx) != s { anim(w, id, ctx, s, blend); } }
 /// `0x2f02d8`: a local vector through the rows.
 fn through(rows: &[V3; 3], v: V3) -> V3 { std::array::from_fn(|k| v[0] * rows[0][k] + v[1] * rows[1][k] + v[2] * rows[2][k]) }
-/// `v` turned by `a` about the unit axis `n`.
-fn turn(v: V3, n: V3, a: f32) -> V3 {
-    let (s, c) = a.sin_cos();
-    let d = n[0] * v[0] + n[1] * v[1] + n[2] * v[2];
-    let x = cross(n, v);
-    std::array::from_fn(|k| v[k] * c + x[k] * s + n[k] * d * (1.0 - c))
-}
 
 /// Shown, a target, its class's collision (`& 0xffbe | 0x1000`, `+0x98` the class's).
 fn show(w: &mut MobyWorld, id: usize) {
@@ -665,22 +661,16 @@ fn sweep(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     }
 }
 
-/// A tracer from turret `g`'s muzzle (joint list `g + 2`): `0x313b40`'s frame, the point (0, ±0.1, ±0.1) in it, its
-/// first row at 24 a second; its sound 3.
+/// A tracer from turret `g`'s muzzle (joint list `g + 2`): `0x313b40`'s frame (the pose with the moby's
+/// manipulators, so the turret's turn `turn_parts` left last tick), the point (0, ±0.1, ±0.1) in it, its first row at
+/// 24 a second; its sound 3.
 fn fire(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, g: usize) {
     let r1 = ctx.game.rng.randf_signed(0.0, 0.1);
     let r2 = ctx.game.rng.randf_signed(0.0, 0.1);
     let m = &w.mobys[id];
     let (rows, at) = ctx.host.joint_matrix(m, g + 2).unwrap_or((m.rows, m.pos));
-    let mut from = add(at, through(&rows, [0.0, r1, r2]));
-    let mut vel = set_len(rows[0], tune::TRACER_SPEED / 60.0);
-    // The turret's turn (the port's: module docs) about its joint's up.
-    let a = m.pv_f(pv::AIM_GUN[g] + 0x48);
-    if let Some((tr, tp)) = ctx.host.joint_matrix(m, g) {
-        let n = unit(tr[2]);
-        from = add(tp, turn(sub(from, tp), n, a));
-        vel = turn(vel, n, a);
-    }
+    let from = add(at, through(&rows, [0.0, r1, r2]));
+    let vel = set_len(rows[0], tune::TRACER_SPEED / 60.0);
     ctx.host.play_sound(&w.mobys[id], 3, 0);
     let dmg = w.mobys[id].pv_b(pv::DMG_TRACER) as i32;
     if let Some(s) = spawn_tracer(w, id, from, vel, dmg) {
@@ -854,7 +844,10 @@ fn tail(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     }
     let m = &mut w.mobys[id];
     m.set_pv_i(pv::N_TRACERS, n);
-    if n != 0 { w.register_draw(id); }
+    // Its draws ([`draw`]): the tracers' with any kept, the rotor's glow drawn last frame.
+    let rotor = m.drawn != 0;
+    m.set_pv_b(pv::ROTOR_DRAW, rotor as u8);
+    if n != 0 || rotor { w.register_draw(id); }
     let m = &mut w.mobys[id];
     if m.state_ticks != -1 { m.state_ticks = m.state_ticks.wrapping_add(1); }
 }
@@ -1066,6 +1059,64 @@ fn say(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, n: usize) {
     if let Some(p) = ai::link(&w.mobys[id], pv::PILOT) { ctx.host.set_anim(&w.mobys[p], 1, 0, 10); }
 }
 
+/// The boss's draw callbacks, as its tail registers them: its tracers' streaks ([`draw_tracers`], `0x3f7f88`), then its
+/// rotor's glow ([`draw_rotor`], `0x3f81e8`).
+pub fn draw(w: &MobyWorld, host: &dyn crate::moby::MobyHost, id: usize, cam: V3, out: &mut Vec<crate::fx::FxQuad>) {
+    draw_tracers(w, id, cam, out);
+    if w.mobys[id].pv_b(pv::ROTOR_DRAW) != 0 { draw_rotor(w, host, id, out); }
+}
+
+/// The rotor's glow (`$gp+0x20d8..+0x21a0` on Endako): the short blades', then the long blades'.
+mod rotor {
+    use crate::hero::physics::V3;
+    /// `+0x20d8` / `+0x20dc`: the FX textures (ST `+0x20e8`: the middle, 0.5, at every corner; additive).
+    pub const FX: [usize; 2] = [5, 5];
+    /// `+0x2108` / `+0x210c`, `+0x2110` / `+0x2114`: the colours at the hub and at the tip.
+    pub const RGBA: [[u32; 2]; 2] = [[0x6020_3040, 0x3020_3040], [0x6020_3040, 0x3020_3040]];
+    /// `+0x2120` / `+0x2160`: a blade's hub and tip in the rotor's frame (joint list 7): 3 along x, 7 along y, 1.2 up.
+    const UP: f32 = f32::from_bits(0x3f99_999a);
+    pub const BLADE: [[V3; 2]; 2] = [[[0.0, 0.0, UP], [3.0, 0.0, UP]], [[0.0, 0.0, UP], [0.0, 7.0, UP]]];
+    /// `+0x21a0`: the sweep's fade (an eighth of the alpha a step).
+    pub const FADE: f32 = 8.0;
+    /// The sweep's step (π/32, 0x3dc90fdb): each edge turns two of them at a time.
+    pub const STEP: f32 = f32::from_bits(0x3dc9_0fdb);
+}
+
+/// `0x3f81e8`: the blur behind each of its four blades (the short pair along the rotor's x, the long along its y; each
+/// pair both ways) in the rotor's frame (joint list 7, `0x313b40`): a quad between two edges from the hub to the tip,
+/// the short blades' second edge π/32 on; thirty-two times the two edges take turns stepping π/16 on (the first edge
+/// first), their alpha down an eighth, and each blade's quad is drawn (FX 5, flat, additive), so the four sweep half a
+/// turn each, fading.
+pub fn draw_rotor(w: &MobyWorld, host: &dyn crate::moby::MobyHost, id: usize, out: &mut Vec<crate::fx::FxQuad>) {
+    use crate::hud::lerp_rgba;
+    let m = &w.mobys[id];
+    let Some((rows, at)) = host.joint_matrix(m, 7) else { return };
+    let r = euler_rows([0.0, 0.0, rotor::STEP]);
+    let r2: [V3; 3] = std::array::from_fn(|i| through(&r, r[i]));
+    let mut quads: [([V3; 4], [u32; 4], usize); 4] = std::array::from_fn(|k| {
+        let (b, s) = (k / 2, if k % 2 == 1 { -1.0 } else { 1.0 });
+        let [hub, tip] = rotor::BLADE[b].map(|v| [v[0] * s, v[1] * s, v[2]]);
+        let [ch, ct] = rotor::RGBA[b];
+        ([hub, tip, hub, tip], [ch, ct, ch, ct], rotor::FX[b])
+    });
+    for q in &mut quads[..2] {
+        q.0[2] = through(&r, q.0[2]);
+        q.0[3] = through(&r, q.0[3]);
+    }
+    let t = 1.0 / rotor::FADE;
+    for i in 0..32 {
+        let e = if i & 1 == 0 { 0 } else { 2 };
+        for (v, c, fx) in &mut quads {
+            for j in e..e + 2 {
+                v[j] = through(&r2, v[j]);
+                c[j] = lerp_rgba(t, c[j], c[j] & 0xff_ffff);
+            }
+            let corners = (*v).map(|p| add(through(&rows, p), at));
+            out.push(crate::fx::FxQuad { fx: *fx, additive: true, corners, st: [[0.5, 0.5]; 4], rgba: *c });
+        }
+    }
+}
+
 /// `0x3f7f88`: each kept tracer's streak — a quad of FX 5 (additive) from 0.1 to either side of it back along its
 /// velocity by 24/60 a tick of its trail to 0.05 to either side, across the view (`(camera − it) × velocity`); red
 /// (0x600000ff) at its head fading to nothing (0x0000ff80) at its tail.
@@ -1228,14 +1279,22 @@ pub fn update_beam(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             let end = [pos[0], pos[1], pos[2] - t * 5.0];
             let tmpl = crate::moby::hits::HitTemplate::new(m.pv_i(0x38) as f32, Some(id), 0x1_0001, [0.0; 4]);
             let hit = w.coll_line(ctx, pos, end, 0, Some(id));
-            let g = &mut ctx.game.rng;
             if let Some(o) = hit {
                 if let Some(t_id) = o.moby { w.deliver_hit_any(t_id, &tmpl, [o.point[0], o.point[1], o.point[2], 1.0]); }
-                // `0x3d25d0` at the hit (its particles not ported: module docs).
-                let _ = (g.rand_angle(), g.randf(0.0, 0.5), g.randf(1.0, 2.0));
+                // Sparks at the hit (`0x1bfde0`, the query's point) thrown out flat a random way at up to 0.5 a
+                // second and up at 1..2 a second.
+                let g = &mut ctx.game.rng;
+                let a = g.rand_angle();
+                let r = g.randf(0.0, 0.5) * SIXTIETH;
+                let up = g.randf(1.0, 2.0) * SIXTIETH;
+                sparks(ctx, [o.point[0], o.point[1], o.point[2]], [a.cos() * r, a.sin() * r, up]);
             }
+            // One time in two, sparks somewhere down the first 5 under it, drifting a random way up to 2 a second.
+            let g = &mut ctx.game.rng;
             if g.randi(2) == 0 {
-                let _ = (g.randf(0.0, 5.0), g.rand_vec(0.0, f32::from_bits(0x3d08_8889)));
+                let at = [pos[0], pos[1], pos[2] - g.randf(0.0, 5.0)];
+                let v = g.rand_vec(0.0, f32::from_bits(0x3d08_8889));
+                sparks(ctx, at, v);
             }
             let h = w.mobys[id].pv_i(0x3c);
             if h == -1 || !ctx.host.sound_playing(h) {
@@ -1260,8 +1319,110 @@ pub fn update_beam(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 if h != -1 && ctx.host.sound_playing(h) { ctx.host.stop_sound(h); }
                 w.mobys[id].set_pv_i(0x3c, -1);
                 w.delete(id);
+                return;
             }
         }
         _ => {}
+    }
+    // The strips' scroll `+0x2c` and pulse `+0x30` (the scroll as the original steps it: above 1 less 1, else below 1
+    // plus 1, so it takes turns between 0..1 and 1..2, the same on the texture); its draw.
+    let m = &mut w.mobys[id];
+    let mut s = m.pv_f(0x2c) + beam::RATES[0] * SIXTIETH;
+    if 1.0 < s {
+        s -= 1.0;
+    } else if s < 1.0 {
+        s += 1.0;
+    }
+    m.set_pv_f(0x2c, s);
+    let mut t = m.pv_f(0x30) + beam::RATES[1] * SIXTIETH;
+    if 1.0 < t { t -= 1.0; }
+    m.set_pv_f(0x30, t);
+    w.register_draw(id);
+}
+
+/// 1/60 (0x3c888889).
+const SIXTIETH: f32 = f32::from_bits(0x3c88_8889);
+
+/// The laser's look (`$gp+0x1560..+0x15b4` on Endako).
+mod beam {
+    /// `+0x1560` / `+0x1564`: the strips' scroll along and their pulse (a second).
+    pub const RATES: [f32; 2] = [-2.0, 2.0];
+    /// `+0x1580..+0x159c`: the strips' corners' ST before the scroll.
+    pub const ST: [[f32; 2]; 4] = [[0.0, 0.0], [0.0, 1.0], [1.0, 0.0], [1.0, 1.0]];
+    /// `+0x15a0` / `+0x15a4` / `+0x15a8`: the strips' segments, a segment's length, their widest half-width.
+    pub const SEGS: i32 = 6;
+    pub const SEG: f32 = 1.0;
+    pub const HALF: f32 = f32::from_bits(0x3f19_999a);
+    /// `+0x15b0` / `+0x15b4`: the strips' colours by their pulse, narrowest to widest.
+    pub const RGBA: [u32; 2] = [0xff80_4040, 0x0040_2020];
+    /// The strips' FX texture (both additive).
+    pub const FX: usize = 0x2f;
+    /// The four glows: size, FX texture, the colours a random draw picks between.
+    pub const GLOWS: [(f32, usize, u32, u32); 4] = [
+        (1.0, 0x31, 0x5010_3080, 0x6010_3080),
+        (f32::from_bits(0x3f19_999a), 0x31, 0x50ff_ffff, 0x60ff_ffff),
+        (f32::from_bits(0x3fb3_3333), 0xb, 0x0880_3010, 0x1880_3010),
+        (f32::from_bits(0x3f66_6666), 0xb, 0x2080_3010, 0x4080_3010),
+    ];
+}
+
+/// `0x3d20e8` (registered every tick by [`update_beam`]): four glows at it (`0x2eef08`, crate::fx::sprite: each its
+/// colour a random way between its two and a random roll; additive), then two strips of FX 0x2f (additive) straight
+/// down from it in six segments of 1, across the view on the flat (`(0, 0, 1) × the flat way to the camera`): each
+/// strip ±0.6 × its pulse wide (the second half a turn behind the first), its colour by its pulse (its alpha × the
+/// brightness `+0x34` while under 1), fading out down the segments; s along a segment from the scroll (+0.5 for the
+/// second strip), t across.
+pub fn draw_beam(w: &MobyWorld, id: usize, rng: &mut crate::rng::Rng, cam: V3, out: &mut Vec<crate::fx::FxQuad>) {
+    use crate::hud::lerp_rgba;
+    let m = &w.mobys[id];
+    let p = m.pos;
+    for (size, fx, c0, c1) in beam::GLOWS {
+        let c = lerp_rgba(rng.randf(0.0, 1.0), c0, c1);
+        let roll = rng.rand_angle();
+        crate::fx::sprite(out, size, 0.0, roll, p, cam, fx, c, true);
+    }
+    // `0x2eff28(side, flat, up)` = up × flat.
+    let mut flat = sub(cam, p);
+    flat[2] = 0.0;
+    let side = cross([0.0, 0.0, 1.0], unit(flat));
+    let pulse0 = m.pv_f(0x30);
+    let mut pulse1 = pulse0 + 0.5;
+    if 1.0 < pulse1 { pulse1 -= 1.0; }
+    let pulses = [pulse0, pulse1];
+    let mut cols = pulses.map(|t| lerp_rgba(t, beam::RGBA[0], beam::RGBA[1]));
+    let bright = m.pv_f(0x34);
+    if bright < 1.0 { cols = cols.map(|c| lerp_rgba(bright, c & 0xff_ffff, c)); }
+    let scroll = m.pv_f(0x2c);
+    let st: [[[f32; 2]; 4]; 2] = std::array::from_fn(|k| beam::ST.map(|[s, t]| [s + (scroll + k as f32 * 0.5), t]));
+    let step = 1.0 / beam::SEGS as f32;
+    let (mut top, mut z0, mut z1) = (1.0f32, 0.0f32, 0.0f32);
+    for _ in 0..beam::SEGS {
+        let bottom = top - step;
+        z1 -= beam::SEG;
+        for k in 0..2 {
+            let half = beam::HALF * pulses[k];
+            let c = |x: f32, z: f32| add(add(scale(side, x), [0.0, 0.0, z]), p);
+            let (a, b) = (lerp_rgba(top, cols[k] & 0xff_ffff, cols[k]), lerp_rgba(bottom, cols[k] & 0xff_ffff, cols[k]));
+            out.push(crate::fx::FxQuad { fx: beam::FX, additive: true, corners: [c(half, z0), c(-half, z0), c(half, z1), c(-half, z1)], st: st[k], rgba: [a, a, b, b] });
+        }
+        z0 -= beam::SEG;
+        top = bottom;
+    }
+}
+
+/// `0x3d25d0(m, pos, vel)`: two twinkles (`0x33bc30`, crate::particles::twinkle) 0.1 about `pos`, moving `vel` a tick
+/// and falling `randf(3, 7)` / 3600 a tick, by a size `k` (`randf(0.25, 1)`): blue (0x7f800000) from k to 0.2·k over 40
+/// ticks, then grey (0x7f7f7f7f) from 0.7·k to 0.14·k over 60, set at 0x20; turning one way and the other by
+/// `randi(2)`.
+fn sparks(ctx: &mut Ctx, pos: V3, vel: V3) {
+    let g = &mut ctx.game.rng;
+    let k = g.randf(0.25, 1.0);
+    let spin = g.randi(2) as i8;
+    let fall = g.randf(3.0, 7.0) * f32::from_bits(0x3991_a2b4);
+    let at = add(g.rand_vec(0.0, f32::from_bits(0x3dcc_cccd)), pos);
+    if let Some(sys) = ctx.parts.as_deref_mut() {
+        let rng = &mut ctx.game.rng;
+        crate::particles::twinkle(sys, rng, k * f32::from_bits(0x3e4c_cccd), k, fall, at, 0x28, 0x7f80_0000, 0, spin, vel, 0);
+        crate::particles::twinkle(sys, rng, k * f32::from_bits(0x3e0f_5c29), k * f32::from_bits(0x3f33_3333), fall, at, 0x3c, 0x7f7f_7f7f, 1, -spin, vel, 0);
     }
 }

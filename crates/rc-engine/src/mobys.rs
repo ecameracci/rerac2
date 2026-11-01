@@ -66,11 +66,9 @@ pub struct Mobys {
     /// The holding classes 1 / 2 (rc_game::hero::layers: his first 0x17 sequences with the arm holding the item).
     pub hold: [Option<Arc<rc_game::hero::anim::HoldClass>>; 2],
     /// Every class's joint lists (class header `+0x1c`, [`rc_formats::moby::joint_list`]'s chains): what the
-    /// joint queries take as their joint (`0x3175f8(m, 1, [list], out)`: the last joint of list `list`).
+    /// joint queries take as their joint (`0x3175f8(m, 1, [list], out)`: the last joint of list `list`), and the
+    /// joints their modifiers act on ([`Chains::targets`]).
     pub chains: Chains,
-    /// Every class's joint lists' target joints (the second byte list's first, `0x308238`): the joint a manipulator
-    /// on list `l` turns (rc_game::moby::Moby::manips).
-    pub targets: HashMap<i16, Vec<u8>>,
     /// The level's grind paths (the gameplay's section 31).
     pub rails: Vec<rc_game::paths::GrindPath>,
     /// The level's volumes and paths.
@@ -82,8 +80,15 @@ pub struct Mobys {
     pub left_out: Vec<usize>,
 }
 
-/// Joint lists per class: each list the root-to-joint chain whose last joint the query returns.
-pub type Chains = HashMap<i16, Vec<Vec<u8>>>;
+/// Joint lists per class.
+#[derive(Clone, Debug, Default)]
+pub struct Chains {
+    /// Each list's root-to-joint chain, whose last joint the queries return.
+    pub lists: HashMap<i16, Vec<Vec<u8>>>,
+    /// Each list's target joint (the second byte list's first, `0x308238`, rc_formats::moby_anim::list_target; 0xff
+    /// none): the joint a modifier on list `l` acts on (rc_game::moby::Moby::manips, `joint_scales`, `joint_moves`).
+    pub targets: HashMap<i16, Vec<u8>>,
+}
 
 /// Ratchet's animation as the hero update left it, for his attachment points.
 #[derive(Clone, Copy)]
@@ -216,8 +221,13 @@ impl Host<'_> {
         })
     }
 
+    fn has_mods(&self, m: &Moby) -> bool { !(m.manips.is_empty() && m.joint_scales.is_empty() && m.joint_moves.is_empty()) }
+
+    /// The moby's modifiers on its lists' targets ([`moby_mods`]).
+    fn mods_of(&self, m: &Moby) -> Vec<moby_anim::JointModifier> { self.chains.map(|c| moby_mods(&c.targets, m)).unwrap_or_default() }
+
     fn chain(&self, o_class: i16, list: usize) -> Option<&[u8]> {
-        self.chains?.get(&o_class)?.get(list).map(Vec::as_slice).filter(|c| !c.is_empty())
+        self.chains?.lists.get(&o_class)?.get(list).map(Vec::as_slice).filter(|c| !c.is_empty())
     }
 }
 
@@ -330,6 +340,13 @@ impl MobyHost for Host<'_> {
                 let r = r.first()?;
                 [r[3][0], r[3][1], r[3][2]]
             }
+            // A moby with modifiers (its manipulators: `0x3175f8` poses the joints with the moby's `+0x54` list).
+            _ if self.has_mods(m) => {
+                let mods = self.mods_of(m);
+                let r = moby_anim::evaluate_chains_posed(ac, &state, snap.as_ref(), &[chain], &[], &mods);
+                let r = r.first()?;
+                [r[3][0], r[3][1], r[3][2]]
+            }
             _ => {
                 let t = moby_anim::joint_translations(ac, &state, snap.as_ref(), &[chain]);
                 let t = t.first()?;
@@ -341,12 +358,17 @@ impl MobyHost for Host<'_> {
         Some(std::array::from_fn(|k| m.pos[k] + (r[0][k] * p[0] + r[1][k] * p[1] + r[2][k] * p[2]) * s))
     }
 
-    /// `0x312728`: joint `j`'s pose (the chain 0..=j) turned into the world by the moby's rows, scale and place.
+    /// `0x312728`: joint `j`'s pose (the chain 0..=j, with the moby's modifiers: `0x3175f8`) turned into the world by
+    /// the moby's rows, scale and place.
     fn joint_matrix(&self, m: &Moby, j: usize) -> Option<([V3; 3], V3)> {
         let (class, state, snap) = self.state_of(m)?;
         let ac: &MobyAnimClass = self.lv.anim.get(class)?;
         let chain = self.chain(m.o_class, j)?;
-        let p = moby_anim::evaluate_chains(ac, &state, snap.as_ref(), &[chain]);
+        let p = if self.has_mods(m) {
+            moby_anim::evaluate_chains_posed(ac, &state, snap.as_ref(), &[chain], &[], &self.mods_of(m))
+        } else {
+            moby_anim::evaluate_chains(ac, &state, snap.as_ref(), &[chain])
+        };
         let p = p.first()?;
         let rows = m.rows.map(|r| [r[0].to_bits(), r[1].to_bits(), r[2].to_bits(), 0]);
         Some(rows_f(moby_anim::attach_matrix(p, &rows, m.pos, m.scale)))
@@ -678,11 +700,11 @@ impl Mobys {
             })
             .collect();
         let targets = lists.iter().map(|(&c, l)| (c, l.iter().map(|(_, b)| rc_formats::moby_anim::list_target(b).unwrap_or(0xff)).collect())).collect();
-        let chains: Chains = lists.into_iter().map(|(c, l)| (c, l.into_iter().map(|(a, _)| a).collect())).collect();
+        let chains = Chains { lists: lists.into_iter().map(|(c, l)| (c, l.into_iter().map(|(a, _)| a).collect())).collect(), targets };
         let coll = Arc::new(blobs.collision.into_iter().map(|(c, b)| (c as i16, b)).collect());
         let snap = Some(take_snapshot(&world, &coll, host));
         let rails = g2::grind_paths(&lv.gameplay).map_err(|e| eprintln!("mobys: grind paths: {e}")).unwrap_or_default();
-        Mobys { world, shadow_casters: Default::default(), shadow_tris: Default::default(), coll, cache: Arc::new(Mutex::new(PoseCache::default())), hero_moby, snap, created: HashMap::new(), skinned: HashMap::new(), canopy: None, canopy_frame: None, loop_slots: HashMap::new(), hero_chains, hero_targets, hero_seconds, hold, chains, targets, rails, level: {
+        Mobys { world, shadow_casters: Default::default(), shadow_tris: Default::default(), coll, cache: Arc::new(Mutex::new(PoseCache::default())), hero_moby, snap, created: HashMap::new(), skinned: HashMap::new(), canopy: None, canopy_frame: None, loop_slots: HashMap::new(), hero_chains, hero_targets, hero_seconds, hold, chains, rails, level: {
             let mut l = rc_game::level::LevelData::load(&lv.gameplay);
             l.height_map = lv.height_map.clone();
             l.items = crate::play::menu_tables(&crate::level_load::extracted_root(), crate::level_load::level_index()).items;
@@ -861,7 +883,7 @@ impl CreatedDraw {
             let look = moby_render::SlotLook { model, alpha: m.alpha, fading: false, mode: m.mode, glow: m.glow, shine, e, late: mobys.shadow_casters.contains(&id), piece: m.piece, bangles: m.bangles };
             self.extra.show_slot(commands, level, slot, Some((class, look)), meshes, images, materials, buffers);
             shown.push(slot);
-            let mods = moby_mods(&mobys.targets, m);
+            let mods = moby_mods(&mobys.chains.targets, m);
             let pose = |ac: &MobyAnimClass| if mods.is_empty() { moby_anim::evaluate_with_snapshot(ac, &c.state, c.snapshot.as_ref()) } else { moby_anim::evaluate_posed(ac, &c.state, c.snapshot.as_ref(), &[], &mods) };
             if let Some(f) = mobys.skinned.get(&id).cloned().or_else(|| lv.anim.get(c.class).map(pose)) {
                 let at = (slot * SLOT_JOINTS) as usize * 64;
