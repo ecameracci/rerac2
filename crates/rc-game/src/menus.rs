@@ -28,9 +28,12 @@
 //! setting's line), then the port's own Port Options ([`port`]). Progressive Scan (a PS2 video-mode test) is left
 //! out; 16:9 is the port's aspect (4:3 or 16:9) as well as the game's byte `0x1a7bb9`.
 //!
+//! The pause's Special row and its pages (the Specials Menu, Skill Points, Cheats): [`special`].
+//!
 //! Not drawn yet: the dialog frame's GUI-sprite border (`0x339398`).
 
 pub mod port;
+pub mod special;
 
 use crate::front_end::Assets;
 use crate::gui::{self, text_box, Quad, Tex, TextBox};
@@ -170,6 +173,11 @@ pub enum Page {
     Help,
     /// A Help topic's page (Weapons `0x285978`, Gadgets `0x285b78`).
     HelpTopic(HelpTopic),
+    /// The pause's Specials Menu (`0x284698`: the in-game list in its mode 2) and its Skill Points (`0x284950`) and
+    /// Cheats (`0x284820`) pages ([`special`]).
+    Special,
+    SkillPoints,
+    Cheats,
 }
 
 /// The Help pages' item list (`+0x3c480`: `0x43a188` / `0x43a6d0` / `0x43a820`; its list `+0x2c8`: `0x439e98` /
@@ -723,6 +731,13 @@ pub struct Menus {
     /// The Moves list's row and scroll (`+0x40`, `+0x44`).
     moves_row: usize,
     moves_scroll: i32,
+    /// The Specials Menu's row (the in-game list's `+0x1c0`), the Skill Points page's point (`gp−0x3274`) and the
+    /// Cheats page's row (`gp−0x3280`).
+    special_row: usize,
+    skill_row: usize,
+    cheat_row: usize,
+    /// The buttons held last frame (the Skill Points page's arrows light while ↑ / ↓ are held).
+    held: u16,
 }
 
 /// The game's reset to the blank save (`0x299bf8`): the options (`0x1a7b98`, 0x28 bytes) kept, the level 0, no slot.
@@ -785,6 +800,10 @@ impl Menus {
             help_list: HelpList::default(),
             moves_row: 0,
             moves_scroll: 0,
+            special_row: 0,
+            skill_row: 0,
+            cheat_row: 0,
+            held: 0,
         }
     }
 
@@ -803,8 +822,9 @@ impl Menus {
         if self.in_game {
             match page {
                 Page::Pause => None,
-                Page::PauseOptions | Page::Port | Page::Weapons | Page::Gadgets | Page::Items | Page::Help => Some(Page::Pause),
+                Page::PauseOptions | Page::Port | Page::Weapons | Page::Gadgets | Page::Items | Page::Help | Page::Special => Some(Page::Pause),
                 Page::HelpTopic(_) => Some(Page::Help),
+                Page::SkillPoints | Page::Cheats => Some(Page::Special),
                 _ => Some(Page::PauseOptions),
             }
         } else {
@@ -922,12 +942,23 @@ impl Menus {
                 self.pause_options_tick(pressed, cx, &mut out);
                 self.description_tick(PauseOption::ALL[self.options_row].description(), list::DESCRIPTION[3], cx.held);
             }
+            Page::Special => {
+                self.special_tick(pressed, cx, &mut out);
+                self.description_tick(special::description(self.special_row, cx.save), list::DESCRIPTION[3], cx.held);
+            }
+            Page::SkillPoints => {
+                self.skill_points_tick(pressed, &mut out);
+                self.description_tick(special::skill_description(self.skill_row, cx.save), special::skill::DESCRIPTION[3], cx.held);
+            }
+            Page::Cheats => self.cheats_tick(pressed, cx, &mut out),
         }
+        self.held = cx.held;
         out
     }
 
-    /// The pause list (`0x347938` / `0x43f740`): Up / Down wrap past disabled rows (sound 3), ✕ the row's page
-    /// (Options, Port Options; the others are not ported: nothing happens); △, Start, Select back to the game.
+    /// The pause list (`0x347938` / `0x43f740`): Up / Down wrap (sound 3; every row on foot is enabled: Special's test
+    /// `0x359888` always passes), ✕ the row's page (Quick Select is not ported: nothing happens); △, Start, Select back
+    /// to the game.
     fn pause_tick(&mut self, keys: u16, out: &mut Vec<Out>) {
         let rows = pause_rows();
         let n = rows.len();
@@ -936,11 +967,7 @@ impl Menus {
         } else if keys & (pad::UP | pad::DOWN) != 0 {
             out.push(Out::Sound(3));
             let step = if keys & pad::UP != 0 { n - 1 } else { 1 };
-            let start = self.pause_row;
-            loop {
-                self.pause_row = (self.pause_row + step) % n;
-                if pause_enabled(rows[self.pause_row]) || self.pause_row == start { break; }
-            }
+            self.pause_row = (self.pause_row + step) % n;
         } else if keys & pad::CROSS != 0 {
             match rows[self.pause_row] {
                 PauseRow::Options => self.go(Page::PauseOptions, out),
@@ -948,6 +975,7 @@ impl Menus {
                 PauseRow::Gadgets => self.go(Page::Gadgets, out),
                 PauseRow::Items => self.go(Page::Items, out),
                 PauseRow::Help => self.go(Page::Help, out),
+                PauseRow::Special => self.go(Page::Special, out),
                 PauseRow::Port => {
                     self.port_row = 0;
                     self.port_top = 0;
@@ -1295,6 +1323,7 @@ impl Menus {
                 let table = if t == HelpTopic::Gadgets { PictureTable::HelpGadgets } else { PictureTable::HelpWeapons };
                 Some((table, u16::try_from(record(v.tables, v.save, item)?.picture).ok()?))
             }
+            Page::SkillPoints => special::skill_picture(self.skill_row, v.save),
             _ => None,
         }
     }
@@ -1912,6 +1941,9 @@ impl Menus {
             Page::Weapons => return self.draw_weapons(out, a, v, icon),
             Page::Gadgets => return self.draw_gadgets(out, a, v, icon),
             Page::Items => return self.draw_items(out, a, v, icon),
+            Page::Special => return self.draw_special(out, a, v, icon),
+            Page::SkillPoints => return self.draw_skill_points(out, a, v),
+            Page::Cheats => return self.draw_cheats(out, a, v),
             Page::Quit => {
                 self.draw_pause_options(out, a, icon);
                 gui::fill(out, [0, 0, 0, 0x30]);
@@ -1942,7 +1974,7 @@ impl Menus {
                 self.draw_planet(out, a, card);
                 self.draw_message(out, a, card);
             }
-            Page::Options | Page::Toggle(_) | Page::Port | Page::Pause | Page::PauseOptions | Page::Quit | Page::Sound | Page::Camera | Page::Controls | Page::Weapons | Page::Gadgets | Page::Items | Page::Help | Page::HelpTopic(_) => {}
+            Page::Options | Page::Toggle(_) | Page::Port | Page::Pause | Page::PauseOptions | Page::Quit | Page::Sound | Page::Camera | Page::Controls | Page::Weapons | Page::Gadgets | Page::Items | Page::Help | Page::HelpTopic(_) | Page::Special | Page::SkillPoints | Page::Cheats => {}
         }
     }
 
@@ -2194,8 +2226,8 @@ impl Menus {
     }
 
     /// The pause list (`0x43fc18`, button rows): per row the main menu's two button sprites (keyframe 0.37; the
-    /// selected frame pulsing `0x20fffeed`..`0x70fffeed`) and the label centred 11 below (font 1: grey when
-    /// disabled, yellow when selected); the rows centred on the screen.
+    /// selected frame pulsing `0x20fffeed`..`0x70fffeed`) and the label centred 11 below (font 1: yellow when
+    /// selected; grey for a disabled row, which on foot there is none); the rows centred on the screen.
     fn draw_pause(&self, out: &mut Vec<Quad>, a: &Assets) {
         use pause::*;
         let rows = pause_rows();
@@ -2209,7 +2241,7 @@ impl Menus {
             if let Some(s) = a.sprites.get(&FILL.0) { gui::sprite(out, s, at, BUTTON_KEY, [1.0, 1.0], gui::rgba(FILL.1)); }
             let frame = if i == self.pause_row { gui::lerp_colour(t, 0x70ff_feed, 0x20ff_feed) } else { gui::rgba(0x55f0_c070) };
             if let Some(s) = a.sprites.get(&FRAME) { gui::sprite(out, s, at, BUTTON_KEY, [1.0, 1.0], frame); }
-            let colour = if !pause_enabled(row) { 0x8080_8080 } else if i == self.pause_row { 0x70ff_feed } else { 0x80f0_f0f0 };
+            let colour = if i == self.pause_row { 0x70ff_feed } else { 0x80f0_f0f0 };
             let label: &[u8] = if row == PauseRow::Port { b"Port Options" } else { a.strings.get(row.text()) };
             let w = gui::text_width(&a.glyphs, label, 1.0);
             gui::text(out, &a.glyphs, 1, label, AT[0] + LABEL[0] - (w >> 1) as f32, y0 + LABEL[1] + LABEL[2] * i as f32, 1.0, gui::rgba(colour));
@@ -2219,14 +2251,14 @@ impl Menus {
     /// The in-game Options list (`0x438b48`): the frame (sprites 0x91..0x94), the selection (0x95), the title, the
     /// labels (the front end's Options list's places) and the row icons.
     fn draw_pause_options(&self, out: &mut Vec<Quad>, a: &Assets, icon: &dyn Fn(u16, u16) -> Option<(Tex, [f32; 2])>) {
-        let rows: Vec<(u32, u16)> = PauseOption::ALL.iter().enumerate().map(|(i, o)| (o.text(), i as u16)).collect();
-        self.draw_list(out, a, icon, pause::OPTIONS_TEXT, 1.0, pause::OPTIONS_ICON, &rows, self.options_row);
+        let rows: Vec<(u32, (u16, u16))> = PauseOption::ALL.iter().enumerate().map(|(i, o)| (o.text(), (pause::OPTIONS_ICON, i as u16))).collect();
+        self.draw_list(out, a, icon, pause::OPTIONS_TEXT, 1.0, &rows, self.options_row, list::EXIT_AT);
     }
 
     /// The Help list (the in-game list in mode 0: seven rows, the frame's first keyframe).
     fn draw_help(&self, out: &mut Vec<Quad>, a: &Assets, icon: &dyn Fn(u16, u16) -> Option<(Tex, [f32; 2])>) {
-        let rows: Vec<(u32, u16)> = HelpTopic::ALL.iter().enumerate().map(|(i, t)| (t.text(), i as u16)).collect();
-        self.draw_list(out, a, icon, list::HELP_TEXT, 0.0, list::HELP_ICON, &rows, self.help_row);
+        let rows: Vec<(u32, (u16, u16))> = HelpTopic::ALL.iter().enumerate().map(|(i, t)| (t.text(), (list::HELP_ICON, i as u16))).collect();
+        self.draw_list(out, a, icon, list::HELP_TEXT, 0.0, &rows, self.help_row, list::EXIT_AT);
     }
 
     /// The Help Controls page (see [`help_controls`]).
@@ -2310,7 +2342,7 @@ impl Menus {
     /// The in-game list (`0x438b48`): the frame (sprites 0x91..0x94, the mode's keyframe but 0x94's), the selection
     /// (0x95), the title, the rows' labels and icons; then the page's description panel and "△ Exit".
     #[allow(clippy::too_many_arguments)]
-    fn draw_list(&self, out: &mut Vec<Quad>, a: &Assets, icon: &dyn Fn(u16, u16) -> Option<(Tex, [f32; 2])>, title: u32, key: f32, icon_id: u16, rows: &[(u32, u16)], selected: usize) {
+    fn draw_list(&self, out: &mut Vec<Quad>, a: &Assets, icon: &dyn Fn(u16, u16) -> Option<(Tex, [f32; 2])>, title: u32, key: f32, rows: &[(u32, (u16, u16))], selected: usize, exit_at: [f32; 2]) {
         use options::{ICONS_AT, ICON_RGBA, LABELS_AT, SELECTION, SELECTION_AT};
         use pause::*;
         let at = OPTIONS_AT;
@@ -2326,7 +2358,7 @@ impl Menus {
             gui::text(out, &a.glyphs, 1, t, x - (w >> 1) as f32, y, 1.0, gui::rgba(c));
         };
         centred(out, a.strings.get(title), at[0] + OPTIONS_TITLE[0], at[1] + OPTIONS_TITLE[1], 0x80f0_f0f0);
-        for (i, &(text, frame)) in rows.iter().enumerate() {
+        for (i, &(text, (icon_id, frame))) in rows.iter().enumerate() {
             let c = if i == selected { 0x70ff_feed } else { 0x80f0_f0f0 };
             centred(out, a.strings.get(text), at[0] + LABELS_AT[0], at[1] + LABELS_AT[1] + LABELS_AT[2] * i as f32, c);
             let (x, y) = (at[0] + ICONS_AT[0], at[1] + ICONS_AT[1] + ICONS_AT[2] * i as f32);
@@ -2338,7 +2370,7 @@ impl Menus {
         self.draw_description(out, a, list::DESCRIPTION);
         let t = a.strings.get(options::EXIT_TEXT);
         let w = gui::text_width(&a.glyphs, t, 1.0);
-        gui::text(out, &a.glyphs, 1, t, list::EXIT_AT[0] - w as f32, list::EXIT_AT[1], 1.0, gui::rgba(0x80f0_f0f0));
+        gui::text(out, &a.glyphs, 1, t, exit_at[0] - w as f32, exit_at[1], 1.0, gui::rgba(0x80f0_f0f0));
     }
 
     /// The selection's colour (`0x2aa3f0(0x60442d00, 0x70fffeed, 20)`).
@@ -2576,8 +2608,6 @@ fn thousands(n: i32) -> String { if n < 1000 { n.to_string() } else { format!("{
 /// The pause list's rows on foot.
 pub fn pause_rows() -> &'static [PauseRow] { &PauseRow::ALL }
 
-/// A pause row can be taken: Special once its menu is unlocked (`0x359888`, not ported: never yet).
-fn pause_enabled(r: PauseRow) -> bool { r != PauseRow::Special }
 
 /// What the pages show besides their own state: the card, the save data's options, the port's settings, the Options
 /// rows.

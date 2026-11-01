@@ -1922,7 +1922,7 @@ struct GameHud {
 }
 
 /// The pause pages' item pictures: two 256 × 256 textures of the layer a page's pictures are read into when they
-/// change (the picture panel `0x3548f0` streams them from `HUD.WAD` the same way).
+/// change (the picture panel `0x3548f0` streams them from `HUD.WAD`, the skill points' from `BONUS.WAD`, the same way).
 struct ItemPictures {
     slots: [usize; 2],
     shown: [Option<(PictureTable, u16)>; 2],
@@ -1955,9 +1955,9 @@ impl ItemPictures {
     fn show(&mut self, k: usize, want: Option<(PictureTable, u16)>, layer: &crate::hud_render::Layer, images: &mut Assets<Image>) {
         if want.is_none() || want == self.asked[k] { return; }
         self.asked[k] = want;
-        let Some(&part) = want.and_then(|w| self.parts.get(&w)) else { return };
+        let Some((&part, file)) = want.and_then(|w| Some((self.parts.get(&w)?, w.0.file()))) else { return };
         let read = || -> anyhow::Result<_> {
-            let raw = crate::disc_source::read_range(&crate::level_load::extracted_root(), "G/HUD.WAD", part.bytes())?;
+            let raw = crate::disc_source::read_range(&crate::level_load::extracted_root(), file, part.bytes())?;
             Ok(rc_formats::disc::item_picture::parse(&raw)?)
         };
         match read() {
@@ -2040,6 +2040,8 @@ fn draw_hud(
                 }
                 // The pause's pages (rc_game::menus): the Options and Help icons, the save slots' icons and picture.
                 let menu = (0..8).flat_map(|f| [(0xea9eu16, f), (0xea9d, f)]).chain([(rc_game::menus::ICON_SLOT, 2), (rc_game::menus::ICON_SLOT, 3), (rc_game::menus::ICON_SLOT, 4), (rc_game::menus::ICON_PICTURE, 0)]);
+                // The Specials Menu's row icons (rc_game::menus::special).
+                let menu = menu.chain(rc_game::menus::special::ICONS);
                 // The vendors' (rc_game::vendor): the armours' icons, the mods' frames 0..3, the platinum bolt.
                 let menu = menu.chain((1..=4).map(|l| (rc_game::vendor::armor::ICON + l, 0))).chain((0..4).map(|f| (rc_game::vendor::mods::ICON, f))).chain([(rc_game::vendor::mods::PLATINUM_ICON, 0)]);
                 // The item records' icons (the Weapons page's cells, every upgrade's).

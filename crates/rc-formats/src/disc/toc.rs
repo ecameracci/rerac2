@@ -16,7 +16,8 @@ pub const MISC_FRONT_END: usize = 4;
 const HUD_GUI_BLOCK: usize = 0x1350;
 
 /// The pause pages' item pictures (the picture panel `0x3548f0`'s tables, `{sector, sectors}` pairs, sectors from
-/// `HUD.WAD`'s start `0x14b8ac`): per page, its table in the `HUD` header and its rows. An unused row has no sectors.
+/// `HUD.WAD`'s start `0x14b8ac`, or `BONUS.WAD`'s `0x14d11c` with the panel's flag 0x10000): per page, its table in
+/// the WAD's header and its rows. An unused row has no sectors.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum PictureTable {
     /// `0x14cea8`.
@@ -35,10 +36,13 @@ pub enum PictureTable {
     /// The ship's map page's backdrop (`0x14c950`, a row per level: the picture widget `0x286fd8`, flags 0x40022,
     /// streams the selected level's photo, 256 × 128, drawn over the whole screen by `0x3546e0`).
     Galaxy,
+    /// The Skill Points page's (`0x14d920` in the `BONUS` header, a row per point: the panel `0x284ad8`, flags
+    /// 0x10221).
+    SkillPoints,
 }
 
 impl PictureTable {
-    pub const ALL: [PictureTable; 9] = [
+    pub const ALL: [PictureTable; 10] = [
         PictureTable::Gadgets,
         PictureTable::Weapons,
         PictureTable::Items,
@@ -48,6 +52,7 @@ impl PictureTable {
         PictureTable::ControlsLeft,
         PictureTable::ControlsRight,
         PictureTable::Galaxy,
+        PictureTable::SkillPoints,
     ];
 
     fn table(self) -> (usize, usize) {
@@ -61,8 +66,15 @@ impl PictureTable {
             PictureTable::ControlsLeft => (0xa68, 5),
             PictureTable::ControlsRight => (0xa90, 5),
             PictureTable::Galaxy => (0x10a8, 28),
+            PictureTable::SkillPoints => (0x808, 30),
         }
     }
+
+    /// The global WAD holding the table and its pictures.
+    pub fn global(self) -> Global { if self == PictureTable::SkillPoints { Global::Bonus } else { Global::Hud } }
+
+    /// The file of [`PictureTable::global`].
+    pub fn file(self) -> &'static str { if self == PictureTable::SkillPoints { "G/BONUS.WAD" } else { "G/HUD.WAD" } }
 
     /// The pictures' height (their panel's `+0x3c`; all are 256 wide).
     pub fn height(self) -> u32 {
@@ -135,10 +147,10 @@ impl<'a> Toc<'a> {
         Ok(Part { sector: h.u32(HUD_GUI_BLOCK)?, sectors: h.u32(HUD_GUI_BLOCK + 4)? })
     }
 
-    /// Row `i` of item picture table `t` in `HUD.WAD` (a WAD stream of an [`crate::disc::item_picture`]); `None` past
-    /// the table or for an unused row.
+    /// Row `i` of item picture table `t` in its WAD ([`PictureTable::file`]: a WAD stream of an
+    /// [`crate::disc::item_picture`]); `None` past the table or for an unused row.
     pub fn item_picture(&self, t: PictureTable, i: usize) -> Result<Option<Part>> {
-        let h = self.header(Global::Hud)?;
+        let h = self.header(t.global())?;
         let (at, rows) = t.table();
         if rows <= i { return Ok(None); }
         let o = at + i * 8;

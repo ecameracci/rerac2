@@ -134,13 +134,20 @@ pub fn sprite(out: &mut Vec<Quad>, s: &Sprite, pos: [f32; 2], frame: f32, scale:
 
 #[allow(clippy::too_many_arguments)]
 pub fn sprite_with(out: &mut Vec<Quad>, id: Option<u32>, s: &Sprite, pos: [f32; 2], frame: f32, scale: [f32; 2], colour: [u8; 4], tan: f32) {
+    sprite_mat(out, id, s, pos, frame, [[scale[0], 0.0], [0.0, scale[1]]], colour, tan);
+}
+
+/// `FUN_003819a8(x, y, frame, sprite, colour, matrix)` with the matrix's x and z rows `m` (before the sprite's
+/// scale): a vertex's `(x, z)` becomes `(m[0][0]·x + m[0][1]·z, m[1][0]·x + m[1][1]·z)`, then lands as [`sprite`]'s.
+#[allow(clippy::too_many_arguments)]
+pub fn sprite_mat(out: &mut Vec<Quad>, id: Option<u32>, s: &Sprite, pos: [f32; 2], frame: f32, m: [[f32; 2]; 2], colour: [u8; 4], tan: f32) {
     if colour[3] == 0 { return; }
     let (x_scale, y_scale) = scales(tan);
     let bones = pose(s, frame);
     let pts: Vec<([f32; 2], [u8; 4], [f32; 2])> = s.vertices.iter().map(|v| {
-        let p = bones.get(v.bone).map_or(v.pos, |m| apply(m, v.pos));
-        let x = pos[0] + x_scale * scale[0] * s.scale * p[0] / 16.0 + 0.5;
-        let y = pos[1] - y_scale * scale[1] * s.scale * p[2] / 16.0 + 0.5;
+        let p = bones.get(v.bone).map_or(v.pos, |b| apply(b, v.pos));
+        let x = pos[0] + (x_scale * m[0][0] * s.scale * p[0] + x_scale * m[0][1] * s.scale * p[2]) / 16.0 + 0.5;
+        let y = pos[1] - (y_scale * m[1][1] * s.scale * p[2] + y_scale * m[1][0] * s.scale * p[0]) / 16.0 + 0.5;
         let c = std::array::from_fn(|i| ((v.rgba[i] as u32 * colour[i] as u32) >> 7).min(0xff) as u8);
         ([x, y], c, v.uv)
     }).collect();

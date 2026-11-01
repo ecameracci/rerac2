@@ -32,9 +32,7 @@
 //! (`0x41d510` → `0x41d838`, `0x41e138` → `0x41e480`) and 0x0ffd (`0x41f9b0` → `0x4201b8`, `0x420598`): 0x1c
 //! (`0x1a7a84`; level 3, Endako); the debug code entry (`0x358550`). The reward flag `0x1a903c` (L01 `0x1a907c`) and its hint
 //! (`0x2b22d0`: the vendor and armour hints 0x1b90 / 0x1b91 / 0x1b93 after a reward, by the count and the planet, 300
-//! ticks apart); the GUI's Skill Points page (`0x34a3b8`: a cursor over the 30, each earned point's text
-//! `0x2a153a + 6·k` and its picture) and Cheats page (`0x349d80`, the cheat bytes `0x1a7a48`, chunk 7): the port's
-//! pause keeps its Special row shut (crate::menus `pause_enabled`).
+//! ticks apart). The pause's Skill Points and Cheats pages read the bytes and the count: crate::menus::special.
 
 use crate::game::GameState;
 
@@ -79,8 +77,11 @@ impl GameState {
     }
 
     /// `0x327df0`: the points earned, at most 30.
-    pub fn skill_point_count(&self) -> i32 { (self.skill_points.iter().filter(|&&b| b != 0).count() as i32).clamp(0, USED) }
+    pub fn skill_point_count(&self) -> i32 { count(&self.skill_points) }
 }
+
+/// `0x327df0` over the bytes `0x1a7a68..`: those set, at most 30.
+pub fn count(bytes: &[u8]) -> i32 { (bytes.iter().take(LEN).filter(|&&b| b != 0).count() as i32).clamp(0, USED) }
 
 #[cfg(test)]
 mod tests {
