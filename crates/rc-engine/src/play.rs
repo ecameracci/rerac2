@@ -824,8 +824,10 @@ fn tick(
         }
         // The left-handed cheat (byte 5): his SetAnim swaps the sequences 0x31 / 0x32 (`0x2d2508`).
         p.anim.mirror = p.game.cheat(rc_game::cheats::cheat::LEFT_HANDED);
+        // The view the hero reads (`0x1b8d40` / `0x1b8f70`): the first-person camera's or a blend's, else the follow camera's.
+        let (hero_cam_pos, hero_cam_rows) = p.game.cameras.hero_view().unwrap_or((p.camera.pos, p.camera.rows));
         let env = Env {
-            coll, pad: &p.pad, cam_yaw: p.camera.yaw(), cam_pos: p.camera.pos, cam_rows: p.camera.rows, mirror: false, scene: scene.as_ref(), hero_moby: mobys.hero_moby, targets: &targets, hit, death_z,
+            coll, pad: &p.pad, cam_yaw: hero_cam_rows[0][1].atan2(hero_cam_rows[0][0]), cam_pos: hero_cam_pos, cam_rows: hero_cam_rows, mirror: false, scene: scene.as_ref(), hero_moby: mobys.hero_moby, targets: &targets, hit, death_z,
             // Clank away from his back (`0x18c31c`, rc_game::hero::body): no packs.
             clank: p.game.clank && !p.hero.body.clank_away, pack: if p.hero.body.clank_away { -1 } else { p.game.pack() }, boots: p.game.boots, charge_boots: p.game.charge_boots, grind_boots: p.game.grind_boots, rails: &mobys.rails, level: p.game.level, arena_on: p.game.arena_on, cheats: p.game.cheats, classes: &classes, nodes: &nodes, hooks: &hooks, pulls: &pulls,
         };
@@ -903,7 +905,9 @@ fn tick(
         let pose = crate::mobys::HeroPose { class: p.class, state: &p.anim.state, snapshot: p.anim.snapshot.as_ref(), pos: p.hero.pos, rows: p.hero.rows, scale: p.scale, mods: &mods, layers: &hl };
         // The items' sounds (the wrench's hits and whirr) play like the loop's.
         let sound = audio.as_deref_mut().map(|o| crate::mobys::HostSound { system: o.system(), listener: listener(&p.camera), tick: p.ticks, loops: &mut mobys.loop_slots });
-        let mut host = crate::mobys::Host { lv: &lv.mobys, occl: occl.as_deref(), anim: anim.as_deref_mut(), created: &mut mobys.created, hero: Some(pose), hero_chains: &mobys.hero_chains, chains: Some(&mobys.chains), camera: p.camera.pos, camera_rows: p.camera.rows, sound };
+        // The items read the view shown (the first-person weapon, the look stance's throw).
+        let (item_cam_pos, item_cam_rows) = p.game.cameras.hero_view().unwrap_or((p.camera.pos, p.camera.rows));
+        let mut host = crate::mobys::Host { lv: &lv.mobys, occl: occl.as_deref(), anim: anim.as_deref_mut(), created: &mut mobys.created, hero: Some(pose), hero_chains: &mobys.hero_chains, chains: Some(&mobys.chains), camera: item_cam_pos, camera_rows: item_cam_rows, sound };
         // The write-back's `0x313dc0`: his moby's sphere and grid cells follow him (the hits find him there).
         if let Some(i) = mobys.hero_moby { mobys.world.rebuild(i, &host); }
         let scene = crate::mobys::scene_of(&mobys.snap, &mobys.coll, &mobys.cache);
@@ -1007,13 +1011,29 @@ fn tick(
         let l1 = p.pad.held & rc_game::pad::button::L1 != 0;
         let (frame, mode) = (p.game.frame, p.game.scenes.mode);
         p.game.cameras.placed_views(&mut p.camera, &p.hero, &mobys.level, frame, mode, l1);
+        // The first-person camera's activation (rc_game::first_person, `0x428188`); its reset of the follow camera
+        // (`0x2da160`).
+        if p.game.cameras.first_person_hook(&mut p.camera, &p.hero) { p.camera = FollowCamera::new(&inp); }
         p.camera.update(&inp, &mut p.game.cam_tweaks);
     }
     // The rest of the camera update `0x2d9f38`: the fade back in (`0x2d9d98`), the level cameras' choice and the
     // current one's update (`0x2d8618`: the fly-bys).
     p.game.scenes.fade_step();
-    let g = &mut p.game;
-    let mut cam = g.cameras.tick(&p.hero, &mobys.level, (p.camera.pos, p.camera.rows), &mut g.scenes.fade, &mut g.scenes.fade_in);
+    let mut cam = {
+        // What the first-person camera's update reads (rc_game::first_person): the sticks, the pitch option, its eye's
+        // sphere test.
+        let scene = crate::mobys::scene_of(&mobys.snap, &mobys.coll, &mobys.cache);
+        let mut inp = cam_input(&p.hero, Some(coll), [0.0; 2]);
+        (inp.scene, inp.hero_moby) = (scene.as_ref(), mobys.hero_moby);
+        let blocked = |c: [f32; 3]| inp.sphere(0.3, c, 0x12).is_some();
+        let pitch_normal = card.as_deref().is_none_or(|c| c.save.i32(rc_game::save::Scope::Global, rc_game::menus::opt::PITCH_NORMAL) != 0);
+        let pad = rc_game::first_person::Pad { right: [p.pad.rx.to_f32(), p.pad.ry.to_f32()], left: [p.pad.lx.to_f32(), p.pad.ly.to_f32()], held: p.pad.held };
+        let fp = rc_game::cameras::FpIn { pad, pitch_normal, blocked: &blocked, up: p.camera.up() };
+        let g = &mut p.game;
+        g.cameras.tick(&p.hero, &mobys.level, (p.camera.pos, p.camera.rows), &mut g.scenes.fade, &mut g.scenes.fade_in, &fp)
+    };
+    // The first-person camera's view lock (`0x18c0d5`: Ratchet hides and faces the view, rc_game::hero).
+    if cam.view_lock && p.hero.view_lock == 0 { p.hero.view_lock = 1; }
     // The ship's camera (class 0x19, rc_game::ship): its update flies the ship and is the view.
     if p.game.cameras.current_class() == rc_game::ship::CLASS {
         if p.ship.is_none() {
@@ -1070,6 +1090,14 @@ fn tick(
     if cam.follow_reset { p.camera = FollowCamera::new(&cam_input(&p.hero, Some(coll), [0.0; 2])); }
     // The script camera's hand-over with its pose kept (`0x2d8168` with the release flag 3 / 5, the init's `0x4247a0`).
     if let Some((pos, rows)) = cam.follow_pose { p.camera = FollowCamera::from_pose(&cam_input(&p.hero, Some(coll), [0.0; 2]), pos, rows); }
+    // The switch blend (`0x2d8ab0` / `0x2d8d00`, rc_game::first_person::Blend) between the view shown last tick and
+    // this one's.
+    {
+        let cur = cam.view.unwrap_or((p.camera.pos, p.camera.rows));
+        let blending = p.game.cameras.blending();
+        let v = p.game.cameras.blend_view(cur, p.hero.carry);
+        if blending { cam.view = Some(v); }
+    }
     p.game.scenes.bars_step();
     // The camera update's end (`0x2d9f38`): the underwater test, then the light regions' fog at the camera
     // (rc_game::fog). Outside play (`0x1a8f00 ≠ 0`) not under water; the camera's mode 6 is not modelled.
@@ -1137,7 +1165,8 @@ fn tick(
     }
     if let Some(o) = occl.as_mut() {
         let lights = mobys.hero_moby.and_then(|i| mobys.world.mobys.get(i)).and_then(|h| crate::mobys::moby_lights(&lv.mobys, p.hero.rows, h.light, h.ambient));
-        o.drive(p.instance, p.hero.pos, p.hero.rows, p.scale, lights.as_ref(), false);
+        // `0x2a9678` → `0x2d3570`: Ratchet hidden under the view lock (`0x18c0d5`, the first-person camera).
+        o.drive(p.instance, p.hero.pos, p.hero.rows, p.scale, lights.as_ref(), p.hero.view_lock != 0);
         if let (Some(a), Some(k)) = (anim.as_mut(), o.anim_index(p.instance)) {
             let mut s = p.anim.state;
             s.skip_advance = true;
@@ -1675,7 +1704,9 @@ fn travel_frame(p: &mut Play, lv: &mut crate::level_load::LoadedLevel, commands:
             if let Some(o) = occl { o.drive(p.instance, p.hero.pos, p.hero.rows, p.scale, None, false); }
             // The camera: the cameras' choice (the script camera at its targets) into the view.
             let g = &mut p.game;
-            let cam = g.cameras.tick(&p.hero, &mobys.level, (p.camera.pos, p.camera.rows), &mut g.scenes.fade, &mut g.scenes.fade_in);
+            let still = |_: [f32; 3]| false;
+            let fp = rc_game::cameras::FpIn { pad: Default::default(), pitch_normal: true, blocked: &still, up: [0.0, 0.0, 1.0] };
+            let cam = g.cameras.tick(&p.hero, &mobys.level, (p.camera.pos, p.camera.rows), &mut g.scenes.fade, &mut g.scenes.fade_in, &fp);
             let far = g.view_far * 1024.0;
             if let Some((pos, rows)) = cam.view {
                 commands.insert_resource(PlayView { view: scene_view(&rc_game::scene_camera::SceneCamera { eye: pos, rows, tan_half_fov: g.cameras.tan, cut: false }), tan_half_fov: g.cameras.tan, far });

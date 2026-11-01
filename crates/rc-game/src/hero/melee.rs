@@ -490,13 +490,15 @@ impl Hero {
     }
 
     /// `0x2ba610`: the throw — once per throw (`0x18b05a`), the wrench moby leaves the hand (state 10) along the
-    /// facing (or the look stance's camera from 0x1 / 0x1d after 0x15 ticks), with the throw's push (0.383) and its
-    /// sequence 6; the flight is the wrench's update.
+    /// facing, or along the view from the look stance 1 / 0x1d after 0x15 ticks (from another state while the
+    /// first-person weapon is drawn, `0x18b320`; the aim: crate::hero::items's `throw_dir`), with the throw's push
+    /// (0.383) and its sequence 6; the flight is the wrench's update.
     pub fn throw_wrench(&mut self) {
         if self.items.thrown != 0 { return; }
         let Some(_) = self.items.hand.filter(|_| self.items.hand_class == 0x47) else { return };
         self.items.thrown = 1;
-        self.items.throw = Some(super::items::Throw { dir: self.rows[0], push: 0.383_333_33 });
+        let look = if matches!(self.state, 1 | 0x1d) { 0x15 <= self.timer } else { self.items.fp.on };
+        self.items.throw = Some(super::items::Throw { dir: self.rows[0], push: 0.383_333_33, look });
     }
 
     /// `0x2c96d0` for the wrench (item 10): □ within 10 ticks, on the ground (groups 0 / 1, or a landed jump), the

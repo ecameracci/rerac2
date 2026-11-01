@@ -124,7 +124,7 @@ fn sub_rot(a: f32, b: f32) -> f32 { crate::hero::physics::sub_rot(a, b) }
 
 /// `0x2d7e98(cur, tgt, k, d, max, &v)`: `v += k·(tgt − cur) − d·v`, clamped to ±max (max ≠ 0) and ±|tgt − cur|;
 /// returns `cur + v`.
-fn interp(cur: f32, tgt: f32, k: f32, d: f32, max: f32, v: &mut f32) -> f32 {
+pub(crate) fn interp(cur: f32, tgt: f32, k: f32, d: f32, max: f32, v: &mut f32) -> f32 {
     let e = tgt - cur;
     *v += k * e - d * *v;
     if max != 0.0 { *v = v.clamp(-max, max); }
@@ -147,7 +147,7 @@ fn ang_interp(cur: f32, tgt: f32, k: f32, d: f32, max: f32, v: &mut f32) -> f32 
 }
 
 /// `0x321c00(θ, out, v, axis)`: v rotated by θ about `axis` (counter-clockwise; below 1e-5 unchanged).
-fn rot(v: V3, theta: f32, axis: V3) -> V3 {
+pub(crate) fn rot(v: V3, theta: f32, axis: V3) -> V3 {
     if theta.abs() < 1e-5 { return v; }
     let k = norm(axis, 1.0);
     let (s, c) = theta.sin_cos();
@@ -156,7 +156,7 @@ fn rot(v: V3, theta: f32, axis: V3) -> V3 {
 }
 
 /// `0x31bdc0(a, b, t)`: the cosine blend.
-fn cos_interp(a: f32, b: f32, t: f32) -> f32 {
+pub(crate) fn cos_interp(a: f32, b: f32, t: f32) -> f32 {
     if t == 0.0 { return a; }
     if t == 1.0 { return b; }
     a + (b - a) * (1.0 - (t * std::f32::consts::PI).cos()) * 0.5
@@ -326,7 +326,7 @@ impl CamInput<'_> {
     /// `0x2de878(a, b, flags, Ratchet, 0)`: the hit point.
     fn line(&self, a: V3, b: V3, flags: u32) -> Option<V3> { self.coll.and_then(|c| coll_line_m(c, self.scene, a, b, QueryFlags(flags), self.hero_moby)).map(|o| o.point) }
     /// `0x2df8d8(r, c, flags, …)`: the closest point and the pushed-out centre.
-    fn sphere(&self, r: f32, c: V3, flags: u32) -> Option<(V3, V3)> {
+    pub fn sphere(&self, r: f32, c: V3, flags: u32) -> Option<(V3, V3)> {
         self.coll.and_then(|m| coll_sphere_m(m, self.scene, c, r, QueryFlags(flags), self.hero_moby)).map(|o| (o.point, o.pushed_centre.unwrap_or(c)))
     }
 }
@@ -649,6 +649,8 @@ impl FollowCamera {
 
     /// The camera's yaw (`0x1b8d58`): the forward row's.
     pub fn yaw(&self) -> f32 { self.rows[0][1].atan2(self.rows[0][0]) }
+    /// `0x1b8dd0`: the camera's up (the smoothed up the motion pre-step keeps).
+    pub fn up(&self) -> V3 { self.up2 }
     /// The pitch from the forward row.
     pub fn pitch(&self) -> f32 { (-self.rows[0][2]).atan2((self.rows[0][0] * self.rows[0][0] + self.rows[0][1] * self.rows[0][1]).sqrt()) }
 

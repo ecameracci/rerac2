@@ -421,13 +421,22 @@ impl Hero {
     }
 
     /// `0x2b4070`: the run's turn rates from the stick magnitude (k 0.01..0.022, max 0.032..0.0931 rad/tick, d 0.18;
-    /// the quick turn `0x18a22f`: 0.035 / 0.1949), then [`Hero::turn_to`]. The weapon-stance rates (held items 0x10,
-    /// 0x1c..0x1e, 0x27, 0x2e) are not ported.
+    /// the quick turn `0x18a22f`: 0.035 / 0.1949), then [`Hero::turn_to`]. In use (`0x18c0d8`, not quick-turning) the
+    /// items 0x10, 0x1c..0x1e, 0x27, 0x2e turn slower: past 0.95 of the stick k 0.017, d 0.18, max 0.1454; else k
+    /// 0.009·m, d 0.15, max 0.0785·m.
+    ///
+    /// The original's d outside the weapon case is 0.27 (`0x3e8a3d71` in f23); the port keeps 0.18 here until the
+    /// hero's feel pass takes it up (normal play is left as it was).
     pub fn run_turn(&mut self) {
         let m = self.stick_mag;
         let (mut k, mut max) = if m == 1.0 { (0.022, 0.093_084_25) } else { ((m * 0.02).clamp(0.01, 0.022), (m * 0.063_995_41).clamp(0.031_997_707, 0.093_084_25)) };
+        let mut d = 0.18;
         if self.quick_turn != 0 { (k, max) = (0.035, 0.194_895_13); }
-        self.turn_to(k, 0.18, max, 0);
+        let item = if self.items.ready == 2 { self.items.item } else { -1 };
+        if matches!(item, 0x10 | 0x1c | 0x1d | 0x1e | 0x27 | 0x2e) && self.items.using && self.quick_turn == 0 {
+            (k, d, max) = if 0.95 < m { (0.017, 0.18, 0.145_444_12) } else { (m * 0.009, 0.15, m * 0.078_539_83) };
+        }
+        self.turn_to(k, d, max, 0);
     }
 
     /// `0x2b42c0(acc, dec)`: the speed `0x189fd4` approaches the target `0x189fd0`, by `acc` when below it, else by

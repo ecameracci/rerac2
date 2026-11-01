@@ -489,6 +489,7 @@ impl Mobys {
         let mut v: Vec<(u32, crate::moby_anim::InstanceLayer)> = l
             .hold
             .iter()
+            .chain(l.fire.iter())
             .chain(std::iter::once(&l.face))
             .filter_map(|n| {
                 let n = n.as_ref()?;

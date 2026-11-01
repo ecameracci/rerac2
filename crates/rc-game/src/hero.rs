@@ -268,6 +268,10 @@ pub struct Hero {
     pub cam_mode: u8,
     /// `0x18c0d4`: the body (0 = Ratchet).
     pub mode: u8,
+    /// `0x18c0d5`: the view lock — 1 set by the first-person camera once its blend in is over (crate::first_person;
+    /// SetState clears a 1): Ratchet hidden with his items (the hand item drawn as the first-person weapon,
+    /// crate::hero::items), facing the view in the look stance.
+    pub view_lock: u8,
     pub jump: JumpBlock,
     /// `0x18bbb0` (32 × vec4) and `0x18c1e4` / `0x18c1e8`: position history, index, count; `0x18c15c` / `0x18c1dc` /
     /// `0x18c1e0`: yaw history.
@@ -429,7 +433,7 @@ impl Hero {
             slope: 0.0, last_ground_point: [0.0; 3], surface: -1, footstep: 0, grounded_ticks: 0, air_ticks: 0, f16c: 0, snap_vel: 0.0,
             drag: [0.0; 3], drag_src: [0.0; 3], stick: [0.0; 2], stick_mag: 0.0, stick_mag_prev: 0.0, run_hold: 0,
             quick_turn: 0, run_dir: [1.0, 0.0, 0.0], run_yaw: 0.0, anim_speed: 1.0, state: 0, substate: 0, group: 0,
-            prev_state: 0, prev_group: 0, prev2_state: 0, prev2_group: 0, prev_timer: 0, cam_mode: 0, mode: 0, jump: JumpBlock { air_turn: 0.250_011_4, terminal: 0.833_333_3, ..JumpBlock::default() },
+            prev_state: 0, prev_group: 0, prev2_state: 0, prev2_group: 0, prev_timer: 0, cam_mode: 0, mode: 0, view_lock: 0, jump: JumpBlock { air_turn: 0.250_011_4, terminal: 0.833_333_3, ..JumpBlock::default() },
             pos_hist: [[0.0; 3]; HISTORY], pos_hist_idx: 0, pos_hist_count: 0, yaw_hist: [0.0; HISTORY], yaw_hist_idx: 0,
             yaw_hist_count: 0, melee: Default::default(), items: Default::default(), carry: [0.0; 3], carry_yaw: 0.0, ledge: Default::default(), anim_frame: 0.0, damage: Default::default(), pending_damage: None, show_health: None, underwater_write: None,
             surf: Default::default(), wall: Default::default(), ahead: Default::default(), frame: 0, ground_moby: None, ground_class: -1, wall_moby: None, push_moby: None,

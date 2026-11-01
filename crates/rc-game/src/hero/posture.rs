@@ -15,8 +15,14 @@
 //! held while nothing is in the way of the eyes. A weapon's aim (`0x18aa18`, set by its update each tick it holds a
 //! lock) turns the spine and chest onto the target instead.
 //!
-//! Not ported: the arms at a wall (`0x2ab250`: only for a held item whose hold kind, `0x26250c` of its row, is not 0;
-//! the wrench's is 0), the teeter at an edge (the ahead probe's edge test), the lean on gravity frames and magnetic walkways
+//! **The arm at a wall** (`0x2ab250`, after the feet; R&C1's `0x22b700`, rerac 9f138cd): holding an item of a stance
+//! (`0x18c0db` ≠ 0, not tucked away), a line 1.3 ahead at hand height (0.7 in use, else 0.57; from inside his capsule)
+//! that meets the world — in use, not a crate — raises the weapon arm: record 9 (list 12, springs 0.05 / 0.3) pitches
+//! by (1.3 − (distance − radius)) / 1.04 · −70°, within −70°..−30°, and turns by that share of 40° (at most 40°) for
+//! the items 0x1b / 0x2c; record 8 (his other arm) takes the same with both hands (stance 2); `0x18c30c` says so
+//! (the standing use then keeps his sequence: crate::hero::items).
+//!
+//! Not ported: the wall test's hold-off `0x18a042` (no writer found), the teeter at an edge (the ahead probe's edge test), the lean on gravity frames and magnetic walkways
 //! (`0x2b7820`), the dust at the feet, the records of Clank on the back and of Clank's body (kinds 1..5).
 
 use super::physics::*;
@@ -580,6 +586,33 @@ impl Hero {
         }
     }
 
+    /// `0x2ab250` (module docs).
+    fn arm_at_wall(&mut self, env: &Env) {
+        self.items.raised = false;
+        if self.items.stance == 0 || self.items.tucked { return; }
+        let using = self.items.using;
+        let h = if using { 0.7 } else { 0.57 };
+        // `0x2ab180(h, 1.3)`: from (radius − 0.02, 0, h) to (1.3, 0, h) in his frame (`0x2d39d8`).
+        let at = |x: f32| add(self.pos, add(scale(self.rows[0], x), scale(self.rows[2], h)));
+        let from = at(self.cap_radius - 0.02);
+        let Some(o) = env.line(from, at(1.3), 2) else { return };
+        let crate_hit = o.moby.and_then(|m| env.classes.get(m)).is_some_and(|&c| (500..=540).contains(&c));
+        if using && crate_hit { return; }
+        let k = (1.3 - (dist(self.pos, o.point) - self.cap_radius)) * 0.961_538_5;
+        let pitch = (k * -1.221_730_6).clamp(-1.221_730_6, -0.523_598_85);
+        let turn = if matches!(self.items.item, 0x1b | 0x2c) { (k * 0.698_131_8).min(0.698_131_8) } else { 0.0 };
+        let p = &mut self.posture;
+        p.recs[9].set_spring(0.05, 0.3);
+        p.recs[9].target[0] = turn;
+        if self.items.stance == 2 {
+            p.recs[8].set_spring(0.05, 0.3);
+            p.recs[8].target[0] = turn;
+            p.recs[8].target[1] = pitch;
+        }
+        p.recs[9].target[1] = pitch;
+        self.items.raised = true;
+    }
+
     /// The posture's tick (module docs), after the transitions.
     pub(super) fn posture_tick(&mut self, env: &Env, anim: &mut dyn AnimCtl) {
         // `0x2a5840` (Clank's body, `0x2a65d8`): his head's scale toward 1.0, or 1.8 (`0x3fe66666`) with Clank's
@@ -590,6 +623,7 @@ impl Hero {
         }
         if self.mode != 0 { return; }
         self.feet_tilt();
+        self.arm_at_wall(env);
         self.head_idle(env, anim);
         self.head_look(env, anim);
         self.twitch(anim);

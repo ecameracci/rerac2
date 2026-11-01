@@ -43,7 +43,11 @@
 //! **The script camera** (class 5) is `crate::script_camera`: switched in by its callers, not the choice; its
 //! release hands back to the follow camera with a cut or with its pose carried over ([`Out::follow_pose`]).
 //!
-//! Not ported: the classes 4 (first person: Ratchet's camera mode 4 / 0x51), 6, 7 (no Swingshot on Aranos), the
+//! **The first-person camera** (class 4, crate::first_person): its activation runs before the follow camera's update
+//! ([`Cameras::first_person_hook`]), its release before the choice, its init on the switch and its update as the
+//! current camera's; the switch blend it asks for (in, and out on its release 2) is [`Cameras::blend_view`].
+//!
+//! Not ported: the classes 6, 7 (no Swingshot on Aranos), the
 //! placed view's record angles (`+0x14` / `+0x18`, used when its pvars' are both 0: not on Aranos); the blends (`0x2d8ab0`,
 //! `0x2d9488`: none between Aranos's cameras); the fly-by's look at a moby (+0x28 with the offset +0x2c: none on
 //! Aranos); the pre hooks; the camera-moby list `0x2d80c0`.
@@ -131,6 +135,8 @@ pub struct Out {
     pub hero_state: Option<i32>,
     /// `0x1b1868`: the letterbox up or down.
     pub letterbox: Option<bool>,
+    /// The first-person camera sets the view lock `0x18c0d5` (when it is 0).
+    pub view_lock: bool,
 }
 
 /// The system.
@@ -152,6 +158,20 @@ pub struct Cameras {
     pub reset_pending: bool,
     /// The Spiderbot's camera (class 0x1b; crate::moby::classes::spiderbot, which switches it in and runs it).
     pub bot: crate::moby::classes::spiderbot::BotCamera,
+    /// The first-person camera (class 4) and the switch blend (`0x1b8e90`, crate::first_person).
+    pub fp: crate::first_person::FirstPerson,
+    pub blend: crate::first_person::Blend,
+    /// The view shown last tick (the blend's capture of the old camera).
+    pub shown: (V3, [V3; 3]),
+}
+
+/// What the first-person camera's update reads besides Ratchet (crate::first_person::FirstPerson::update).
+pub struct FpIn<'a> {
+    pub pad: crate::first_person::Pad,
+    pub pitch_normal: bool,
+    pub blocked: &'a dyn Fn(V3) -> bool,
+    /// The camera's up `0x1b8dd0` (the release's angle).
+    pub up: V3,
 }
 
 /// The level path `i` with each point's w its chord to the next (the last's to the first), and the length of the
@@ -328,10 +348,42 @@ impl Cameras {
         s.b(0x38) != 0 && s.b(0x39) == 0
     }
 
+    /// `0x428188` for the first-person record (not current), before the follow camera's update as `0x2d8618`'s choice
+    /// comes before the update: its verdict kept for the choice; taking over from the follow camera it raises its
+    /// priority to 5. Returns true when the follow camera must be reset behind Ratchet (`0x2da160`).
+    pub fn first_person_hook(&mut self, follow: &mut FollowCamera, hero: &Hero) -> bool {
+        let Some(i) = self.slots.iter().position(|s| s.class == crate::first_person::CLASS) else { return false };
+        if Some(i) == self.current || self.slots[i].header.priority == 0 { return false; }
+        let cur = self.current_class();
+        let reset = self.fp.activation(hero, follow, cur, cur);
+        if self.fp.want && cur == CLASS_FOLLOW { self.slots[i].header.priority = 5; }
+        reset
+    }
+
+    /// The view shown (`0x2d9f38`'s tail): with a switch blend asked or running ([`crate::first_person::Blend::step`]),
+    /// the blend from the view shown last tick toward `cur`, else `cur`. `carry`: Ratchet's platform carry.
+    pub fn blend_view(&mut self, cur: (V3, [V3; 3]), carry: V3) -> (V3, [V3; 3]) {
+        let v = self.blend.step(self.shown, cur, carry);
+        self.last_view = v;
+        v
+    }
+
+    /// The blend asked for or running (the view is then [`Cameras::blend_view`]'s).
+    pub fn blending(&self) -> bool { self.blend.mode != 0 }
+
+    /// The view the hero code reads (`0x1b8d40` / `0x1b8f70`) when it is not the follow camera's: the first-person
+    /// camera's or a blend's (the port's other cameras leave the hero the follow camera's).
+    pub fn hero_view(&self) -> Option<(V3, [V3; 3])> {
+        (self.current_class() == crate::first_person::CLASS || self.blending()).then_some(self.last_view)
+    }
+
     /// The class's activation hook: −1 no, 1 yes, 0 go on.
     fn hook(&self, i: usize, best: Option<usize>, hero: &Hero, level: &LevelData) -> i32 {
         let s = &self.slots[i];
         match s.class {
+            // `0x428188`, run before the follow camera's update ([`Cameras::first_person_hook`]). Not chosen otherwise
+            // (its record's activation kind is never met: it would beat the follow camera every tick).
+            crate::first_person::CLASS => if self.fp.want { 1 } else { -1 },
             CLASS_FLYBY => {
                 // `0x42b0d8`.
                 if s.b(0x39) != 0 { return -1; }
@@ -372,9 +424,14 @@ impl Cameras {
 
     /// `0x2d8618`: the choice, the switch, the current camera's update. `fade` is `0x1b1860` and its fade-in
     /// (`fade_in`: the rate per tick, 0 none).
-    pub fn tick(&mut self, hero: &Hero, level: &LevelData, follow: (V3, [V3; 3]), fade: &mut f32, fade_in: &mut f32) -> Out {
+    pub fn tick(&mut self, hero: &Hero, level: &LevelData, follow: (V3, [V3; 3]), fade: &mut f32, fade_in: &mut f32, fp: &FpIn) -> Out {
         let mut out = Out::default();
         out.follow_reset = std::mem::take(&mut self.reset_pending);
+        self.shown = self.last_view;
+        // `0x2d85d0`: the current camera's release hook (the first-person camera's `0x4285d0`).
+        if let Some(i) = self.current.filter(|&i| self.slots[i].class == crate::first_person::CLASS) {
+            if let Some(r) = self.fp.release(hero, fp.up, &mut self.blend) { self.slots[i].release = r; }
+        }
         let mut best = self.current;
         let mut switched = false;
         for i in 0..self.slots.len() {
@@ -389,6 +446,9 @@ impl Cameras {
             // `0x2d8168`: the old camera's release flag 3 / 5 carries its pose into the new slot (entered 2); its
             // flags cleared; the new one's init.
             let keep_pose = prev.is_some_and(|p| matches!(self.slots[p].release, 3 | 5));
+            // `0x2d8168`: the old camera's release 2 blends the new one in (`0x1b8e90` = 1 / 2; the port: the
+            // first-person camera's only).
+            if prev.is_some_and(|p| self.slots[p].release == 2 && self.slots[p].class == crate::first_person::CLASS) { self.blend.ask(); }
             if let Some(p) = prev.and_then(|p| self.slots.get_mut(p)) {
                 p.release = 0;
                 p.entered = 0;
@@ -405,6 +465,10 @@ impl Cameras {
                 // (crate::ship::Flight::new).
                 crate::ship::CLASS => out.hero_state = Some(0x31),
                 CLASS_SCRIPT => self.script_init(),
+                crate::first_person::CLASS => {
+                    let prev_fwd = if prev.is_some_and(|p| self.slots[p].class == CLASS_FOLLOW) { follow.1[0] } else { self.shown.1[0] };
+                    self.fp.init(hero, prev_fwd, &mut self.blend);
+                }
                 _ if keep_pose => out.follow_pose = Some(prev_view),
                 _ => out.follow_reset = true,
             }
@@ -415,6 +479,10 @@ impl Cameras {
                 out.view = Some((self.pos, self.rows));
             }
             CLASS_SCRIPT => self.script_update(hero, &mut out),
+            crate::first_person::CLASS => {
+                out.view_lock = self.fp.update(hero, &fp.pad, self.blend.mode != 0, fp.pitch_normal, fp.blocked);
+                out.view = Some((self.fp.pos, self.fp.rows));
+            }
             // `0x4575e8` ran in the bot's update (crate::moby::classes::spiderbot::camera_update).
             crate::moby::classes::spiderbot::CAMERA_CLASS => out.view = Some((self.bot.pos, self.bot.rows)),
             _ => {}

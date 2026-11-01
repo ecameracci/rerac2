@@ -98,6 +98,9 @@ pub struct ItemRecord {
     /// `+0x88` / `+0x8c` / `+0x90`: its weapon mods' prices in platinum bolts by slot (0: no such mod; the mod
     /// vendor `0x373268`).
     pub mods: [i32; 3],
+    /// `+0xa0..+0xa8` / `+0xb0..+0xb8` (f32 bits): the first-person weapon's place in the camera's frame and its
+    /// rotation (Euler angles) there (`0x2d5ce0`).
+    pub first_person: [u32; 6],
 }
 
 /// A level's pause tables.
@@ -146,6 +149,7 @@ impl MenuTables {
                     vendor_text: i16_at(b + 0x36).unwrap_or(0),
                     base: i16_at(b + 0x3c).unwrap_or(0),
                     mods: [i32_at(b + 0x88).unwrap_or(0), i32_at(b + 0x8c).unwrap_or(0), i32_at(b + 0x90).unwrap_or(0)],
+                    first_person: [0xa0, 0xa4, 0xa8, 0xb0, 0xb4, 0xb8].map(|o| i32_at(b + o).unwrap_or(0) as u32),
                 });
             }
         }

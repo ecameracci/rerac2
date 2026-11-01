@@ -12,6 +12,7 @@ pub mod cheats;
 pub mod collision;
 pub mod front_end;
 pub mod exhaust;
+pub mod first_person;
 pub mod fog;
 pub mod fx;
 pub mod game;

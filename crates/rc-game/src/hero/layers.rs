@@ -22,7 +22,15 @@
 //! else 0x72; 0.7 in the look stance), one health left (0x74 at 0.8, not in the sequences 0x51 / 0x7b / 0x57 when not
 //! blending), the Lancer (items 0x1e / 0x1c / 0x1d) in use (0x6f at 0.8).
 //!
-//! Not ported: the firing arm's layers (`0x2af5e0` with a row's `+0x1c`: the Lancer has none), the swap face
+//! **The firing arm** (`0x18acb8` / `0x18acbc`, kept in crate::hero::items::ItemBlock and copied here for the draw):
+//! made by a use away from standing (`0x2af5e0`: weight 1, the use's blend) or by leaving standing during a kept use
+//! (`0x2af450`: weight 0, blend 15) on list 12 (and 13 with both hands), playing his own sequence the row gives
+//! (`+0x1c`, crouched `+0x20`); each tick (`0x2af8d8`) it follows that sequence (blend 8 on a change), advances, and
+//! grows 0.2 a tick to 1 — a use that does not keep the stance ends when its sequence wraps (the layer stops and
+//! leaves) — or, leaving (`0x18acc4`), fades 0.07 a tick (0.25 with 2) and goes. While it is out and not leaving the
+//! holding layers fade 0.15 a tick to 0.
+//!
+//! Not ported: the swap face
 //! (`0x18a01c`, the items 0xe / 0x1a / 0x1b / 0x2b / 0x2c), the tuck in two of the transitions' falls (`0x2cb650`).
 
 use super::physics::approach;
@@ -47,6 +55,8 @@ pub struct Layers {
     /// The look-kind byte (`+0x2c` of its health block) of the enemy the head looks at (`0x18c2b0`), set by the item
     /// pass; 0 none or no kind.
     pub look: Option<u8>,
+    /// The firing arm's layers as [`upkeep`] left them (crate::hero::items::ItemBlock::fire), for the draw.
+    pub fire: [Option<AnimLayer>; 2],
 }
 
 /// `0x2ae060(seq)`: his key-B sequences in which the holding layers leave his arms to a fixed pose (the holding class's
@@ -68,8 +78,67 @@ fn node(h: &mut Hero, list: u8) -> AnimLayer {
 
 /// `0x2afc38`'s layers: the holding layers, then the face.
 pub fn upkeep(h: &mut Hero, anim: &dyn AnimCtl) {
+    use_requests(h, anim);
     hold_update(h, anim);
+    fire_update(h, anim);
     face_update(h, anim);
+    h.layers.fire = h.items.fire;
+}
+
+/// The item pass's and SetState's requests: `0x2ab458` (the idle look and the twitches back to rest, the look's timer
+/// drawn 90..120: `0x18afc0`) and the firing arm's layers (`0x2af5e0`: made anew; `0x2af450`: only where there are
+/// none) on list 12, and 13 with both hands (stance 2).
+fn use_requests(h: &mut Hero, anim: &dyn AnimCtl) {
+    if std::mem::take(&mut h.items.use_reset) {
+        let p = &mut h.posture;
+        p.look = [0.0; 2];
+        p.twitch = [[0.0; 2]; 4];
+        p.look_timer = h.rng.rand_range(0x5a, 0x78);
+    }
+    let Some((seq, blend, weight)) = h.items.fire_start.take() else { return };
+    let fresh = weight != 0.0;
+    for i in 0..2 {
+        if i == 1 && h.items.stance != 2 { break; }
+        if !fresh && h.items.fire[i].is_some() { continue; }
+        let mut l = node(h, HOLD_LISTS[i]);
+        l.weight = weight;
+        l.start(anim, seq, 0, blend, fresh);
+        h.items.fire[i] = Some(l);
+        h.items.fire_leave = 0;
+    }
+}
+
+/// `0x2af8d8`'s layers (module docs). Its first part (a kept use ends with the ammo out) is the item pass's.
+pub fn fire_update(h: &mut Hero, anim: &dyn AnimCtl) {
+    for i in 0..2 {
+        let Some(mut l) = h.items.fire[i] else { continue };
+        let it = &mut h.items;
+        if it.ready == 2 && it.item == it.use_item {
+            let seq = super::items::row(it.item).map_or(-1, |r| r.fire_seq[(h.group == 0xc) as usize]);
+            if seq != -1 && l.seq_b as i32 != seq {
+                it.use_seq = seq;
+                l.start(anim, seq as u8, 0, 8, true);
+            }
+        }
+        l.advance(anim);
+        if it.fire_leave == 0 {
+            approach(1.0, 0.2, &mut l.weight);
+            if l.flags & 2 != 0 && !it.keep {
+                it.fire_leave = 1;
+                l.speed = 0.0;
+                it.using = false;
+                it.fire[i] = Some(l);
+                return;
+            }
+        } else {
+            approach(0.0, if it.fire_leave == 2 { 0.25 } else { 0.07 }, &mut l.weight);
+            if l.weight == 0.0 {
+                it.fire[i] = None;
+                return;
+            }
+        }
+        it.fire[i] = Some(l);
+    }
 }
 
 /// `0x2aede0`.
@@ -106,8 +175,12 @@ pub fn hold_update(h: &mut Hero, anim: &dyn AnimCtl) {
         }
         let Some(mut l) = n else { continue };
         let steady = v.seq_a == v.seq_b;
-        // The firing arm's layer (`0x18acb8`, not ported: none) would take the arm over.
-        if !l.kill { approach(1.0, 0.25, &mut l.weight); }
+        // The firing arm's layer out and not leaving (`0x18acb8`, `0x18acc4`) takes the arm over.
+        if h.items.fire[0].is_some() && h.items.fire_leave == 0 {
+            approach(0.0, 0.15, &mut l.weight);
+        } else if !l.kill {
+            approach(1.0, 0.25, &mut l.weight);
+        }
         l.own_blend = !steady && v.blending() && l.seq_b != v.seq_b && l.seq_a != l.seq_b;
         let angle = special(v.seq_b, v.frame);
         if angle.is_none() && !l.special {

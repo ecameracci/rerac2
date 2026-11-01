@@ -64,7 +64,7 @@ impl Hero {
     /// ends the use. True when he stood.
     pub(super) fn gun_stance(&mut self, anim: &mut dyn AnimCtl, env: &Env) -> bool {
         let it = self.items;
-        if !(it.using && it.keep) { return false; }
+        if !(it.using && it.keep) || it.raised { return false; }
         if it.ready != 2 || it.item != it.use_item {
             let idle = self.idle_seq();
             self.items.use_end(self.state, anim.view().seq_b, idle);
@@ -75,6 +75,8 @@ impl Hero {
         if 0.025 < len(self.momentum) { self.momentum = set_len(self.momentum, 0.025); }
         self.speed = self.speed.min(0.025);
         self.set_anim(anim, 11.0, r.use_seq as u8, 0);
+        // The firing arm's layers leave (`0x18acc4`).
+        if self.items.fire[0].is_some() { self.items.fire_leave = 1; }
         self.items.use_seq = r.use_seq;
         true
     }
@@ -84,6 +86,13 @@ impl Hero {
         if self.surf.ice { self.drag(0.7, 0.0) } else { self.drag(0.5, 1.0 / 30.0) }
         self.edge_brake(env, 3.7, 0.0);
         self.stick_target(env, 1.0, 0);
+        // The look stance under the first-person camera's view lock (`0x18c0d5`): he turns to the view's forward and
+        // yaw at once (`0x2b4000(1, 0, 2.90888)`).
+        if matches!(self.state, 1 | 0x1d) && self.view_lock != 0 {
+            self.stick_dir = env.cam_rows[0];
+            self.target_yaw = env.cam_yaw;
+            self.turn_to(1.0, 0.0, 2.908_882_6, 0);
+        }
         // `0x2ba8e0`: the stop (3) with a weapon in use that keeps the stance becomes the stance (`0x2cb1c8`).
         if self.state == 3 && self.gun_stance(anim, env) { return; }
         if self.state == 4 {
@@ -186,7 +195,8 @@ impl Hero {
                 None
             }
             1 | 0x1d => {
-                if self.mode == 0 && !self.items.keep {
+                // His sequence (✕-less R1: the crouch's 0xd) unless a use keeps the stance; under the view lock always.
+                if self.mode == 0 && (!self.items.keep || self.view_lock != 0) {
                     let seq = if held & button::R1 != 0 { 0xd } else { self.idle_seq() };
                     if anim.view().seq_b != seq { self.set_anim(anim, 8.0, seq, 0); }
                 }
@@ -195,7 +205,8 @@ impl Hero {
                 } else {
                     // The wrench busy (thrown or swinging) keeps the stance too.
                     let busy = self.items.thrown != 0;
-                    if (held & button::L1 != 0 || busy) && self.timer < 0x1f { return None; }
+                    // Held past 31 ticks only under the first-person camera's view lock.
+                    if (held & button::L1 != 0 || busy) && (self.view_lock != 0 || self.timer < 0x1f) { return None; }
                     if held & button::R1 != 0 { return Some(4); }
                 }
                 if self.set_state(anim, env, 0, false) {

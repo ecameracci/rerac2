@@ -46,8 +46,16 @@ impl Hero {
         self.prev_state = self.state;
         self.prev_group = self.group;
         self.substate = 0;
+        // `0x18c0d5`: the first-person camera's view lock goes with the state.
+        if self.view_lock == 1 { self.view_lock = 0; }
         self.state = id;
         self.cam_mode = 0;
+        // `0x2af450(prev, id)`: out of standing (0) with a use that keeps the stance, the firing arm's layers come in
+        // for the moving sequence (`+0x1c`; weight 0, blend 15) when there are none (crate::hero::layers).
+        if self.mode == 0 && self.items.using && self.items.keep && self.prev_state == 0 && id != 0 && self.items.fire[0].is_none() {
+            let item = if self.items.ready == 2 { self.items.item } else { -1 };
+            if let Some(seq) = super::items::row(item).map(|r| r.fire_seq[0]).filter(|&q| q != -1) { self.items.fire_start = Some((seq as u8, 0xf, 0.0)); }
+        }
         // `0x18afa8`: the blink's interval (`posture`).
         self.posture.blink_every = if super::posture::BLINK_STATES.contains(&id) { 0x68 } else { 0 };
         // `0x18c0dc` (the items kept away) and `0x18c0d7` (no △ menu) clear on every change; the entries set them.

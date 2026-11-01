@@ -58,6 +58,8 @@ pub struct ItemRow {
     /// `+0x18`: Ratchet's sequence while it is used standing; `+0x24`: the use keeps his stance (`0x18c0da`).
     pub use_seq: i32,
     pub keep: bool,
+    /// `+0x1c` / `+0x20`: the firing arm's sequence while it is used moving / crouched (group 0xc); −1 none.
+    pub fire_seq: [i32; 2],
     /// `+0x40`: its shots' speed (per second); `+0x44` the shots a second; `+0x60` the damage.
     pub speed: f32,
     pub rate: f32,
@@ -71,14 +73,14 @@ pub struct ItemRow {
 /// The rows the port has (L00 `0x262dc0`, `0x263f40`, `0x2649c0`; the Dynamo's from Oozla's live table; the
 /// Electrolyzer's and the Spiderbot Glove's from L02's; the Swingshot's from L03's).
 pub const ROWS: [ItemRow; 8] = [
-    ItemRow { item: WRENCH, attach: 0, class: WRENCH_CLASS, stance: 0, icon: 0, use_seq: 0, keep: false, speed: 0.0, rate: 0.0, damage: 1.0, ammo: false, max_ammo: 0, start_ammo: 0 },
-    ItemRow { item: LANCER, attach: 0, class: LANCER_CLASS, stance: 1, icon: 0xea64, use_seq: 0x38, keep: true, speed: 60.0, rate: 7.0, damage: 0.5, ammo: true, max_ammo: 200, start_ammo: 200 },
-    ItemRow { item: DYNAMO, attach: 1, class: DYNAMO_CLASS, stance: 1, icon: 0xea7f, use_seq: 0x8d, keep: false, speed: 0.0, rate: 0.0, damage: 0.0, ammo: false, max_ammo: 0, start_ammo: 0 },
-    ItemRow { item: GRAVITY_BOMB, attach: 0, class: GRAVITY_BOMB_CLASS, stance: 2, icon: 0xea65, use_seq: 0x36, keep: false, speed: 0.0, rate: 0.5, damage: 0.0, ammo: true, max_ammo: 8, start_ammo: 8 },
-    ItemRow { item: TRACTOR, attach: 0, class: TRACTOR_CLASS, stance: 1, icon: 0xea80, use_seq: 0, keep: true, speed: 0.0, rate: 0.0, damage: 0.0, ammo: false, max_ammo: 0, start_ammo: 0 },
-    ItemRow { item: ELECTROLYZER, attach: 0, class: ELECTROLYZER_CLASS, stance: 1, icon: 0xea81, use_seq: 0, keep: false, speed: 0.0, rate: 0.0, damage: 0.0, ammo: false, max_ammo: 0, start_ammo: 0 },
-    ItemRow { item: SPIDERBOT, attach: 6, class: SPIDERBOT_CLASS, stance: 0, icon: 0xea6e, use_seq: 0x2c, keep: false, speed: 0.0, rate: 0.0, damage: 12.0, ammo: true, max_ammo: 8, start_ammo: 8 },
-    ItemRow { item: SWINGSHOT, attach: 1, class: SWINGSHOT_CLASS, stance: 1, icon: 0xea8b, use_seq: 0, keep: false, speed: 0.0, rate: 0.0, damage: 0.0, ammo: false, max_ammo: 0, start_ammo: 0 },
+    ItemRow { item: WRENCH, attach: 0, class: WRENCH_CLASS, stance: 0, icon: 0, use_seq: 0, keep: false, fire_seq: [0, 0], speed: 0.0, rate: 0.0, damage: 1.0, ammo: false, max_ammo: 0, start_ammo: 0 },
+    ItemRow { item: LANCER, attach: 0, class: LANCER_CLASS, stance: 1, icon: 0xea64, use_seq: 0x38, keep: true, fire_seq: [-1, 0x3e], speed: 60.0, rate: 7.0, damage: 0.5, ammo: true, max_ammo: 200, start_ammo: 200 },
+    ItemRow { item: DYNAMO, attach: 1, class: DYNAMO_CLASS, stance: 1, icon: 0xea7f, use_seq: 0x8d, keep: false, fire_seq: [0x8e, 0x8d], speed: 0.0, rate: 0.0, damage: 0.0, ammo: false, max_ammo: 0, start_ammo: 0 },
+    ItemRow { item: GRAVITY_BOMB, attach: 0, class: GRAVITY_BOMB_CLASS, stance: 2, icon: 0xea65, use_seq: 0x36, keep: false, fire_seq: [-1, 0x46], speed: 0.0, rate: 0.5, damage: 0.0, ammo: true, max_ammo: 8, start_ammo: 8 },
+    ItemRow { item: TRACTOR, attach: 0, class: TRACTOR_CLASS, stance: 1, icon: 0xea80, use_seq: 0, keep: true, fire_seq: [-1, -1], speed: 0.0, rate: 0.0, damage: 0.0, ammo: false, max_ammo: 0, start_ammo: 0 },
+    ItemRow { item: ELECTROLYZER, attach: 0, class: ELECTROLYZER_CLASS, stance: 1, icon: 0xea81, use_seq: 0, keep: false, fire_seq: [0, 0], speed: 0.0, rate: 0.0, damage: 0.0, ammo: false, max_ammo: 0, start_ammo: 0 },
+    ItemRow { item: SPIDERBOT, attach: 6, class: SPIDERBOT_CLASS, stance: 0, icon: 0xea6e, use_seq: 0x2c, keep: false, fire_seq: [0x42, 0x2c], speed: 0.0, rate: 0.0, damage: 12.0, ammo: true, max_ammo: 8, start_ammo: 8 },
+    ItemRow { item: SWINGSHOT, attach: 1, class: SWINGSHOT_CLASS, stance: 1, icon: 0xea8b, use_seq: 0, keep: false, fire_seq: [0, 0], speed: 0.0, rate: 0.0, damage: 0.0, ammo: false, max_ammo: 0, start_ammo: 0 },
 ];
 
 /// Item `item`'s row.
@@ -99,11 +101,36 @@ pub const FEET_SECOND_ATTACH: usize = 3;
 /// left foot 100..103, his right 94..97.
 pub const FEET_JOINTS: [[u8; 4]; 2] = [[100, 101, 102, 103], [94, 95, 96, 97]];
 
-/// A throw request (`0x2ba610`).
+/// A throw request (`0x2ba610`): `look` thrown from the look stance (state 1 / 0x1d past 0x15 ticks), along the
+/// view ([`throw_dir`]).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Throw {
     pub dir: V3,
     pub push: f32,
+    pub look: bool,
+}
+
+/// The first-person weapon (`0x18b2c0..0x18b338`; `0x2d54f8`'s look-stance part and `0x2d5ce0`).
+#[derive(Clone, Copy, Debug, Default)]
+pub struct FpWeapon {
+    /// `0x18b320`: drawn in first person.
+    pub on: bool,
+    /// `0x18b2c0`: the hand item's place when it started, in Ratchet's frame; `0x18b2d0` its rotation.
+    pub start_pos: V3,
+    pub start_q: crate::quat::Q,
+    /// `0x18b318` / `0x18b31c`: the blend from there (0 → 1) and its speed.
+    pub t: f32,
+    pub t_v: f32,
+    /// `0x18b328` / `0x18b324` / `0x18b32c`: the pull back toward the eye (≤ 0) where the weapon would meet the world,
+    /// its speed, its target.
+    pub pull: f32,
+    pub pull_v: f32,
+    pub pull_to: f32,
+    /// `0x18b330` / `0x18b334`: the bob's phase and its speed.
+    pub bob: f32,
+    pub bob_v: f32,
+    /// `0x18b2e0`: the rotation it was drawn at last (the blend back to the hand's).
+    pub q: crate::quat::Q,
 }
 
 /// The item slot block (slot 0, `0x18b040..0x18b090`) and the flags the states set.
@@ -171,9 +198,61 @@ pub struct ItemBlock {
     pub aim_target: Option<(usize, f32)>,
     /// A sequence for Ratchet `(blend, seq)` the use stance asks for (`0x2d2508`; the engine plays it after the pass).
     pub hero_anim: Option<(f32, u8)>,
+    /// The first-person weapon ([`first_person_weapon`]).
+    pub fp: FpWeapon,
+    /// `0x18c30c`: the weapon arm raised at a wall (crate::hero::posture, `0x2ab250`).
+    pub raised: bool,
+    /// `0x18acb8` / `0x18acbc`: the firing arm's layers (lists 12 / 13, his own sequences), `0x18acc4` leaving them
+    /// (1; 2 faster); the requests the item pass and SetState leave for crate::hero::layers: a firing layer to make
+    /// `(sequence, blend, weight)`, the idle look started over (`0x2ab458`, its timer drawn 90..120: `0x18afc0`).
+    pub fire: [Option<crate::hero::anim::AnimLayer>; 2],
+    pub fire_leave: u8,
+    pub fire_start: Option<(u8, i32, f32)>,
+    pub use_reset: bool,
+    /// `0x18b350` (16 × 3 rows), `0x18c1ec` / `0x18c1f0`: the ring of the hand attachment's last rows, its next slot
+    /// and fill; `0x18c1f4`: how many the average takes ([`ItemBlock::smoothed`]).
+    pub ring: [[V3; 3]; 16],
+    pub ring_at: usize,
+    pub ring_fill: usize,
+    pub ring_n: i32,
 }
 
 impl ItemBlock {
+    /// `0x2b05a0`'s record: the attachment's rows into the ring.
+    pub fn ring_push(&mut self, rows: [V3; 3]) {
+        self.ring[self.ring_at] = rows;
+        self.ring_at = (self.ring_at + 1) % 16;
+        self.ring_fill = (self.ring_fill + 1).min(16);
+    }
+
+    /// `0x2b05a0(item, rows, 1)`: the rows an item of a stance takes — the average of the ring's last n (n stepping 1 a
+    /// tick toward 11, 5 while running `run`; at least 2; at most 3 in the first 10 ticks of a use), the ones off from
+    /// the others by more than a fifth of the most left out when one or two are (`0x2b04f8`: the summed differences of
+    /// their entries); orthonormal through their Euler angles (`0x320000`). `None` while the ring holds fewer.
+    pub fn smoothed(&mut self, run: bool) -> Option<[V3; 3]> {
+        let target = if run { 5 } else { 0xb };
+        if self.ring_n < target { self.ring_n += 1 } else if target < self.ring_n { self.ring_n -= 1 }
+        let mut n = self.ring_n.max(2) as usize;
+        if self.using && self.use_ticks < 10 && 3 < n { n = 3; }
+        if self.ring_fill < n { return None; }
+        let at = |i: usize| self.ring[(self.ring_at + 15 - i) % 16];
+        let diff = |a: [V3; 3], b: [V3; 3]| (0..3).flat_map(|r| (0..3).map(move |c| (r, c))).map(|(r, c)| (a[r][c] - b[r][c]).abs()).sum::<f32>();
+        let d: Vec<f32> = (0..n).map(|i| (0..n).filter(|&j| j != i).map(|j| diff(at(i), at(j))).sum()).collect();
+        let most = d.iter().copied().fold(0.0f32, f32::max);
+        let off = d.iter().filter(|&&x| most * 0.2 < x).count();
+        let mut acc = [[0.0f32; 3]; 3];
+        let mut used = 0;
+        for (i, &x) in d.iter().enumerate() {
+            if x <= most * 0.2 || off < 1 || 2 < off {
+                let r = at(i);
+                for k in 0..3 { for c in 0..3 { acc[k][c] += r[k][c]; } }
+                used += 1;
+            }
+        }
+        let acc = acc.map(|r| r.map(|x| x / used as f32));
+        Some(crate::moby::attach::rows_of(crate::moby::attach::angles_of(&acc)))
+    }
+
     /// `0x3227d8(item)` for a hand item (its record's slot kind `+0x0c` is 0): the hand item asked for (`0x18c0e8`),
     /// taken by the next change; 0 asks for none (0x77), the item already held asks for nothing. Only the items the
     /// hero can hold ([`ROWS`]); the head, feet and back slots (kinds 1..3) are not ported. True when asked.
@@ -202,9 +281,11 @@ impl ItemBlock {
         if n <= *a { *a -= n; true } else { false }
     }
 
-    /// `0x2af5e0`: the held item in use. Its row's stance: kept (`+0x24`); standing (group 0), Ratchet takes its
-    /// sequence (`+0x18`) blended over 0xb ticks (stance type 0), 2 (sequence 0x36, items 0x24 / 0x1a) or 5 (items
-    /// 0x1e / 0x19 / 0x46). Moving, its upper-body layer (`+0x1c`, not ported; the Lancer has none).
+    /// `0x2af5e0`: the held item in use, keeping the stance by its row (`+0x24`). Standing (group 0, the arm not raised
+    /// at a wall, `0x18c30c`), Ratchet takes its sequence (`+0x18`) blended over 0xb ticks (stance type 0), 2 (sequence
+    /// 0x36, items 0x24 / 0x1a), 5 (items 0x1e / 0x19 / 0x46) or SetAnim's −1; else the firing arm's layers play its
+    /// moving sequence (`+0x1c`; crouched `+0x20`) over the same blend (−1: 0xb), on both arms with stance 2
+    /// (crate::hero::layers). The idle look starts over (`0x2ab458`).
     pub fn use_start(&mut self, group: i32) {
         if self.ready != 2 { return; }
         let Some(r) = row(self.item) else { return };
@@ -220,19 +301,25 @@ impl ItemBlock {
             -1
         };
         self.use_item = self.item;
-        if group == 0 {
+        self.use_reset = true;
+        let layer = r.fire_seq[(group == 0xc) as usize];
+        if group == 0 && !self.raised {
             self.use_seq = r.use_seq;
             self.hero_anim = Some((blend as f32, r.use_seq as u8));
+        } else if layer != -1 {
+            self.use_seq = layer;
+            self.fire_start = Some((layer as u8, if blend < 0 { 0xb } else { blend }, 1.0));
         }
     }
 
     /// `0x2cb650`'s standing case: while a use keeps the stance and the hand item is still the one used, Ratchet's
     /// sequence is its use sequence (set again, blend −4, when it is not and no blend runs); another item ends it.
     pub fn use_stance(&mut self, state: i32, seq_b: u8, blending: bool, idle: u8) {
-        if !self.using || blending || !self.keep { return; }
+        if !self.using || blending || !self.keep || self.raised { return; }
         if self.ready == 2 && self.item == self.use_item {
             let s = row(self.item).map_or(0, |r| r.use_seq);
             if seq_b as i32 != s {
+                if self.fire[0].is_some() { self.fire_leave = 1; }
                 self.use_seq = s;
                 self.hero_anim = Some((-4.0, s as u8));
             }
@@ -241,13 +328,35 @@ impl ItemBlock {
         }
     }
 
-    /// `0x2af848`: the use over; standing (state 0) in the use's sequence, Ratchet's idle back (blend −2).
+    /// `0x2af848`: the use over; with the firing arm's layers out they leave, else standing (state 0) in the use's
+    /// sequence Ratchet's idle comes back (blend −2).
     pub fn use_end(&mut self, state: i32, seq_b: u8, idle: u8) {
         if !self.using { return; }
-        if state == 0 && seq_b as i32 == self.use_seq { self.hero_anim = Some((-2.0, idle)); }
+        if self.fire[0].is_some() {
+            self.fire_leave = 1;
+        } else if state == 0 && seq_b as i32 == self.use_seq {
+            self.hero_anim = Some((-2.0, idle));
+        }
         self.keep = false;
         self.using = false;
     }
+}
+
+/// The items' part of the hero update `0x2a6dd0`: the item pass (`0x2b21f0`, [`hand_pass`]), then — under the view
+/// lock `0x18c0d5` — his items hidden (`0x2d3208`: the hand, head and feet; the wrench in flight stays), and the
+/// first-person weapon (`0x2d54f8`, [`first_person_weapon`]).
+pub fn item_pass(world: &mut MobyWorld, ctx: &mut Ctx) {
+    hand_pass(world, ctx);
+    if ctx.hero.view_lock != 0 {
+        let it = &ctx.hero.items;
+        for id in [it.hand, it.head, it.feet[0], it.feet[1]].into_iter().flatten() {
+            if let Some(m) = world.mobys.get_mut(id) { m.mode |= 1; }
+        }
+        if let Some(m) = it.hand.filter(|_| it.item == WRENCH).and_then(|id| world.mobys.get_mut(id)) {
+            if m.state != 0 { m.mode &= !0x41; }
+        }
+    }
+    first_person_weapon(world, ctx);
 }
 
 /// After the hero's transitions (`0x2b21f0`): create the hand item when there is none ([`create_hand`]), place it at
@@ -255,7 +364,7 @@ impl ItemBlock {
 /// rows, mode 6: out of the moby loop), carry out the states' requests, test for a change ([`switch`]) and run its
 /// update (`0x2b2060`: the item slots' updates are called here, not by the moby loop; the item tick `0x18b060`
 /// counts).
-pub fn item_pass(world: &mut MobyWorld, ctx: &mut Ctx) {
+fn hand_pass(world: &mut MobyWorld, ctx: &mut Ctx) {
     // The body's hits of this tick (the Thruster-Pack's ram).
     for h in std::mem::take(&mut ctx.hero.hits_out) {
         let t = crate::moby::hits::HitTemplate::new(h.damage, ctx.hero_moby, h.flags, [h.dir[0], h.dir[1], h.dir[2], 0.0]);
@@ -285,26 +394,46 @@ pub fn item_pass(world: &mut MobyWorld, ctx: &mut Ctx) {
         switch(world, ctx);
         return;
     };
-    let it = &mut ctx.hero.items;
-    if let Some((seq, frame, blend)) = it.hand_anim.take() { ctx.host.set_anim(&world.mobys[id], seq, frame, blend); }
-    if let Some(t) = it.throw.take() {
+    if let Some((seq, frame, blend)) = ctx.hero.items.hand_anim.take() { ctx.host.set_anim(&world.mobys[id], seq, frame, blend); }
+    if let Some(mut t) = ctx.hero.items.throw.take() {
+        let rows = throw_dir(world, ctx, &mut t);
         let m = &mut world.mobys[id];
         m.pvars.resize(crate::moby::PVAR_BYTES, 0);
         crate::moby::classes::wrench::start_throw(m, t);
+        m.rows = rows;
+        let f = rows[0];
+        m.rot = [0.0, -f[2].atan2((f[0] * f[0] + f[1] * f[1]).sqrt()), f[1].atan2(f[0])];
         ctx.host.set_anim(&world.mobys[id], 6, 0, 5);
     }
+    let it = &mut ctx.hero.items;
     // `0x313420`: the hand item is out of the moby loop; its placement `0x2b09e0` advances its animation.
     ctx.host.advance(&world.mobys[id]);
     if it.thrown == 0 {
         let attach = row(it.item).map_or(0, |r| r.attach);
-        if let Some((rows, pos)) = ctx.host.hero_attach(attach) {
+        if let Some((rows, mut pos)) = ctx.host.hero_attach(attach) {
+            let stance = row(it.item).is_some_and(|r| r.stance != 0);
+            // `0x2b05a0`: the attachment's rows into the ring; an item of a stance turns as their recent average.
+            it.ring_push(rows);
+            let mut out = if stance { it.smoothed(ctx.hero.state == 2).unwrap_or(world.mobys[id].rows) } else { rows };
+            // `0x2b09e0`: out of first person the weapon blends back from where it was drawn there (`0x18b318` eased to
+            // 0: 1/240 a tick, at most 1/6; the place in Ratchet's frame `0x18b2c0`, the rotation `0x18b2e0`).
+            let fp = &mut ctx.hero.items.fp;
+            if stance && 0.0 < fp.t && !fp.on {
+                let (mut t, mut v) = (fp.t, fp.t_v);
+                crate::hero::physics::ease(0.0, 15.0 / 3600.0, 15.0 / 3600.0, 10.0 / 60.0, &mut t, &mut v);
+                (fp.t, fp.t_v) = (t, v);
+                let (hp, hr, sp) = (ctx.hero.pos, ctx.hero.rows, fp.start_pos);
+                let start = [0, 1, 2].map(|c| hp[c] + hr[0][c] * sp[0] + hr[1][c] * sp[1] + hr[2][c] * sp[2]);
+                pos = [0, 1, 2].map(|c| pos[c] + (start[c] - pos[c]) * t);
+                out = crate::quat::rows(crate::quat::nlerp(crate::quat::from_rows(&out), fp.q, t));
+            }
             {
                 let m = &mut world.mobys[id];
                 m.pos = pos;
                 m.mode |= mode::NO_UPDATE | mode::NO_MATRIX | mode::KEEP_ROWS;
-                m.rows = rows;
+                m.rows = out;
                 // `+0xf4` / `+0xf8`: the pitch and yaw of the first row.
-                let f = rows[0];
+                let f = out[0];
                 m.rot = [0.0, -f[2].atan2((f[0] * f[0] + f[1] * f[1]).sqrt()), f[1].atan2(f[0])];
             }
             world.rebuild(id, &*ctx.host);
@@ -554,4 +683,147 @@ pub fn head_pass(world: &mut MobyWorld, ctx: &mut Ctx) {
         m.rot = [0.0, -f[2].atan2((f[0] * f[0] + f[1] * f[1]).sqrt()), f[1].atan2(f[0])];
     }
     world.rebuild(id, &*ctx.host);
+}
+
+/// `0x2ba610`'s aim, for the throw `t` taken by the item pass: the direction of flight and the wrench's rows. From the
+/// look stance (`t.look`) along the view: `0x2ba518`'s line 10 out along the camera's yaw and pitch (flags 4,
+/// Ratchet left out) — met, at the point it meets from Ratchet's point (0.5, 0, 0.5) in his frame (`0x2d3a80`); else
+/// the camera's yaw and its pitch raised 7° — kept as the throw's yaw and pitch (`0x18aa24` / `0x18aa28`), his sound
+/// 0x11, the wrench turned as the camera. Else along his facing (`0x2d3b38`: his yaw's direction, in the gravity
+/// frames his forward row), the wrench turned as he is.
+fn throw_dir(_world: &MobyWorld, ctx: &mut Ctx, t: &mut Throw) -> [V3; 3] {
+    use crate::hero::physics::{add, atan2, len2, scale, sub};
+    let h = &mut *ctx.hero;
+    if !t.look {
+        t.dir = if h.gravity.mode != 0 { h.rows[0] } else { [h.rot[2].cos(), h.rot[2].sin(), 0.0] };
+        return h.rows;
+    }
+    let (cam, rows) = (ctx.host.camera_pos(), ctx.host.camera_rows());
+    let f = rows[0];
+    let (cam_yaw, cam_up) = (f[1].atan2(f[0]), f[2].atan2((f[0] * f[0] + f[1] * f[1]).sqrt()));
+    let along = |yaw: f32, pitch: f32| [yaw.cos() * pitch.cos(), yaw.sin() * pitch.cos(), pitch.sin()];
+    let hit = ctx.coll.and_then(|c| crate::collision::coll_line_m(c, ctx.scene, cam, add(cam, scale(along(cam_yaw, cam_up), 10.0)), crate::collision::QueryFlags(4), ctx.hero_moby));
+    match hit {
+        Some(o) => {
+            let from = add(h.pos, add(scale(h.rows[0], 0.5), scale(h.rows[2], 0.5)));
+            let d = sub(o.point, from);
+            h.melee.throw_yaw = atan2(d[0], d[1]);
+            h.melee.throw_pitch = atan2(len2(d), d[2]);
+        }
+        None => {
+            h.melee.throw_yaw = cam_yaw;
+            h.melee.throw_pitch = crate::hero::physics::add_rot(cam_up, 0.122_173_05);
+        }
+    }
+    h.sounds.push((0x11, 0));
+    t.dir = along(h.melee.throw_yaw, h.melee.throw_pitch);
+    rows
+}
+
+/// `0x2d54f8`'s look-stance part: the hand item becomes the first-person weapon once the look stance (1 / 0x1d) has
+/// run 15 ticks (`$gp−0x7308`), starting from where it was in Ratchet's hand (its place in his frame and its
+/// rotation, blended from there: `t` 0); out of the stance it is placed once more, then left where it is (`t` 1).
+/// Not ported: the First Person Mode's aim (`0x1a790c`, `0x18b300..0x18b314`: the Specials page's mode is not ported).
+pub fn first_person_weapon(world: &mut MobyWorld, ctx: &mut Ctx) {
+    use crate::hero::physics::{dot, sub};
+    let (look, hero_pos, hero_rows) = (matches!(ctx.hero.state, 1 | 0x1d), ctx.hero.pos, ctx.hero.rows);
+    let local = move |p: V3| { let d = sub(p, hero_pos); [dot(d, hero_rows[0]), dot(d, hero_rows[1]), dot(d, hero_rows[2])] };
+    let not_wrench = ctx.hero.items.hand.filter(|_| ctx.hero.items.hand_class != WRENCH_CLASS).and_then(|id| world.mobys.get(id)).map(|m| (local(m.pos), crate::quat::from_rows(&m.rows)));
+    if !look || ctx.hero.timer < 15 {
+        if !look {
+            if !ctx.hero.items.fp.on { return; }
+            view_model(world, ctx);
+            let at = ctx.hero.items.hand.filter(|_| ctx.hero.items.hand_class != WRENCH_CLASS).and_then(|id| world.mobys.get(id)).map(|m| local(m.pos));
+            let fp = &mut ctx.hero.items.fp;
+            if let Some(p) = at {
+                fp.start_pos = p;
+                (fp.t_v, fp.t) = (0.0, 1.0);
+            }
+            fp.on = false;
+            return;
+        }
+    } else if !ctx.hero.items.fp.on {
+        let fp = &mut ctx.hero.items.fp;
+        if let Some((p, q)) = not_wrench { (fp.start_pos, fp.start_q) = (p, q); }
+        fp.on = true;
+        (fp.pull_to, fp.t, fp.t_v) = (0.0, 0.0, 0.0);
+    }
+    if ctx.hero.items.fp.on { view_model(world, ctx); }
+}
+
+/// `0x2d5ce0`: the first-person weapon. The wrench shows only in flight. The others (but items 0xc / 0x11, hidden,
+/// `0x2adf50`) sit in the view's frame at their record's place (`+0xa0`: its x pulled back by `0x18b328`; y mirrored
+/// with the mirror cheat) bobbing (its phase speeding to 90′ a tick standing, 600′ moving, at 0.4° a tick; 0.02 · sin
+/// up), turned by the record's angles (`+0xb0`) in the view's frame, with the platform's carry; blended in from the
+/// hand (`t` eased to 1: 1/6 a tick up, 1/240 down, at most 1/6). Every other frame a line from the eye to 1.2 of the
+/// weapon's sphere behind its centre (along −row 1) finds the world in the way: the pull back's target is how far it
+/// would go in (at most 1.5), eased toward (1/240, 1/240, at most 1/12).
+///
+/// Not ported: the call of the item's `+0x64` hook after the placement.
+fn view_model(world: &mut MobyWorld, ctx: &mut Ctx) {
+    use crate::hero::physics::{add, add_rot, approach, dist, ease, euler_rows, scale, set_len, sub};
+    let Some(id) = ctx.hero.items.hand else { return };
+    if world.mobys.get(id).is_none() { return; }
+    if ctx.hero.items.hand_class == WRENCH_CLASS {
+        let m = &mut world.mobys[id];
+        if ctx.hero.items.flying == 0 && m.state == 0 { m.mode |= 1 } else { m.mode &= !1 }
+        return;
+    }
+    let item = ctx.hero.items.item;
+    if matches!(item, 0xc | 0x11) && ctx.hero.items.ready == 2 {
+        world.mobys[id].mode |= 1;
+        world.rebuild(id, &*ctx.host);
+        return;
+    }
+    let Some(rec) = ctx.level.items.get(item.max(0) as usize).copied() else { return };
+    let w = rec.first_person.map(f32::from_bits);
+    let (cam, cam_rows) = (ctx.host.camera_pos(), ctx.host.camera_rows());
+    let mirror = ctx.game.cheat(crate::cheats::cheat::MIRROR);
+    let (hero_pos, hero_rows, carry, moving) = (ctx.hero.pos, ctx.hero.rows, ctx.hero.carry, 0.02 < ctx.hero.eff_len_xy);
+    let fp = &mut ctx.hero.items.fp;
+    let mut off = [w[0] + fp.pull, w[1], w[2]];
+    if mirror { off[1] = -off[1]; }
+    let rate = if moving { 600.0 } else { 90.0 } * 0.000_290_888_2;
+    approach(rate, 0.006_981_317, &mut fp.bob_v);
+    fp.bob = add_rot(fp.bob, fp.bob_v);
+    off[2] += fp.bob.sin() * 0.02;
+    let mut pos = add(cam, add(add(scale(cam_rows[0], off[0]), scale(cam_rows[1], off[1])), scale(cam_rows[2], off[2])));
+    pos = add(pos, carry);
+    let e = euler_rows([w[3], w[4], w[5]]);
+    let mut rows: [V3; 3] = std::array::from_fn(|i| add(add(scale(cam_rows[0], e[i][0]), scale(cam_rows[1], e[i][1])), scale(cam_rows[2], e[i][2])));
+    fp.q = crate::quat::from_rows(&rows);
+    if fp.t < 1.0 {
+        let (mut t, mut v) = (fp.t, fp.t_v);
+        ease(1.0, 10.0 / 60.0, 15.0 / 3600.0, 10.0 / 60.0, &mut t, &mut v);
+        (fp.t, fp.t_v) = (t, v);
+        let s = fp.start_pos;
+        let start = add(hero_pos, add(add(scale(hero_rows[0], s[0]), scale(hero_rows[1], s[1])), scale(hero_rows[2], s[2])));
+        pos = add(start, scale(sub(pos, start), t));
+        rows = crate::quat::rows(crate::quat::nlerp(fp.start_q, crate::quat::from_rows(&rows), t));
+    }
+    {
+        let m = &mut world.mobys[id];
+        m.pos = pos;
+        m.rows = rows;
+        m.mode = (m.mode | mode::NO_UPDATE | mode::NO_MATRIX | mode::KEEP_ROWS) & !1;
+        let f = rows[0];
+        m.rot = [0.0, -f[2].atan2((f[0] * f[0] + f[1] * f[1]).sqrt()), f[1].atan2(f[0])];
+    }
+    world.rebuild(id, &*ctx.host);
+    if ctx.game.frame & 1 == 0 {
+        let b = world.mobys[id].bsphere;
+        let r = b[3] / 1024.0;
+        let c = [b[0] / 1024.0, b[1] / 1024.0, b[2] / 1024.0];
+        let far = add(c, set_len(world.mobys[id].rows[1], r * -1.2));
+        let hit = ctx.coll.and_then(|k| crate::collision::coll_line_m(k, ctx.scene, cam, far, crate::collision::QueryFlags(0), ctx.hero_moby));
+        let fp = &mut ctx.hero.items.fp;
+        fp.pull_to = match hit {
+            Some(o) => (fp.pull - r + dist(o.point, c)).clamp(-1.5, 0.0),
+            None => 0.0,
+        };
+    }
+    let fp = &mut ctx.hero.items.fp;
+    let (mut p, mut v) = (fp.pull, fp.pull_v);
+    ease(fp.pull_to, 1.0 / 240.0, 1.0 / 240.0, 1.0 / 12.0, &mut p, &mut v);
+    (fp.pull, fp.pull_v) = (p, v);
 }
