@@ -191,45 +191,10 @@ fn face_point(w: &mut MobyWorld, id: usize, p: V3) {
     face(w, id, atan2(p[0] - q[0], p[1] - q[1]));
 }
 
-/// `0x34aa08(path, from, to, &out)`: the first crossing of the path's walls on the way `from → to` (in the frame along
-/// it), the way's fraction there.
-fn first_crossing(path: &[[f32; 4]], from: V3, to: V3) -> Option<f32> {
-    let d = sub(to, from);
-    let l = len2(d);
-    if l == 0.0 { return None; }
-    let (ax, ay) = (d[0] / l, d[1] / l);
-    let local = |p: [f32; 4]| { let q = sub([p[0], p[1], p[2]], from); [q[0] * ax + q[1] * ay, -q[0] * ay + q[1] * ax, p[3]] };
-    let mut best = None;
-    let mut f = 1.0;
-    let mut prev = local(*path.first()?);
-    for p in &path[1..] {
-        let cur = local(*p);
-        if (prev[2] != 0.0 || cur[2] != 0.0) && cur[1] * prev[1] < 0.0 {
-            let x = ((prev[0] - cur[0]) / (prev[1] - cur[1])) * -cur[1] + cur[0];
-            if 0.0 < x && x < f {
-                f = x;
-                best = Some(f);
-            }
-        }
-        prev = cur;
-    }
-    best
-}
-
-/// `0x3302b8(r, from, to, &out, path)`: a point toward `to` kept inside the path: stopped short (0.99) of the first
-/// wall crossed, then kept `r` from the walls (crate::moby::ai::fence); its height `to`'s.
+/// `0x3302b8(r, from, to, &out, path)`: a point toward `to` kept inside the path (crate::path_network::keep_in).
 pub(crate) fn keep_in_path(ctx: &Ctx, r: f32, from: V3, to: V3, path: i32) -> V3 {
     let Some(pts) = usize::try_from(path).ok().and_then(|p| ctx.level.paths.get(p)) else { return to };
-    let p = match first_crossing(pts, from, to) {
-        Some(f) => {
-            let hit = add(from, sub(to, from).map(|c| c * f));
-            add(from, sub(hit, from).map(|c| c * f32::from_bits(0x3f7d_70a4)))
-        }
-        None => to,
-    };
-    let mut out = ai::fence(pts, r, p).unwrap_or(p);
-    out[2] = to[2];
-    out
+    crate::path_network::keep_in(pts, r, from, to)
 }
 
 /// The stroll's start (states 2 / 5): sequence 6, a point `randf(2, 5)` from home a random way, kept in its path.

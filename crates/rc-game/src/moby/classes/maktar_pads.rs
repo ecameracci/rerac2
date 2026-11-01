@@ -4,10 +4,13 @@
 //! the robot on it opens its two doors (`[1]` / `[2]`, the sliding doors 0x0aab / 0x0aac of
 //! crate::moby::classes::maktar, hooked).
 //!
-//! **The critter** (`0x3cba00`; pvars: its movement block at `+0x190` (`+0x9c` its address), the drag block at
-//! `+0x140` (crate::moby::classes::tractor::drag_at: the hold distance `+0x174` 4, the range `+0x178` 12), its path
-//! network's list `+0x390` / fence path `+0x394` / cuboid `+0x398`, the glow's phase `+0x3b0`, the sound's timer
-//! `+0x3b4`, the idle's length `+0x3c0`):
+//! **The critter** (`0x3cba00`; mode 0x20, on crate::moby::ai's framework; pvars: its health block `+0x20`, movement
+//! block `+0x50` (`[0x18]`; its aim joint `+0x9c` → `+0x190`), the drag block at `+0x140`
+//! (crate::moby::classes::tractor::drag_at: the hold distance `+0x174` 4, the range `+0x178` 12), its path network
+//! (crate::path_network: the records `+0x290`, eight at most, their count `+0x3b6`, built from the path `+0x390`; the
+//! records it and its goal are in `+0x3b8` / `+0x3bc`, the one it strolls in `+0x3c4`), its fence path `+0x394`, cuboid
+//! `+0x398`, group `+0x39c`, the walk's goal `+0x3a0`, the glow's phase `+0x3b0`, the sound's timer `+0x3b4`, the idle's
+//! length `+0x3c0`):
 //! * Every tick: drawn within 24 of the camera, its shadow's slab probed (range 0x16, `0x321db0`); in sub-state 0,
 //!   held by the Tractor Beam (`0x18a3e0`) it is dragged (5, sub 1; `+0x150` its place), else a target (mode 0x1000)
 //!   while Ratchet is within `+0x178` across. Drawn, its glow `+0x78` pulses (`sin` of the phase stepping 400°/s, from
@@ -15,11 +18,24 @@
 //! * **0**: its scale the class's, the movement block's set-up (`+0x50..+0x88`), the ranges, its path network built
 //!   (`0x32f8b0`); updated within 0x80, a target (1).
 //! * **1**: idles: on its first tick a sequence of the two idles (`randi(2)`; set, `randi(2)` again, when it is not the
-//!   one it plays).
+//!   one it plays); past its idle's length, a stroll (2).
+//! * **2**, the stroll: on its first tick sequence 4 (blend 0x14), the walk's limits (`0x333ac0`: turn accel and brake
+//!   0.05°, at most 6° a tick; walk accel 0.0011, most 4/60 a tick) and a goal ([`pick_goal`]); then it walks there
+//!   ([`walk`]); at the goal (the movement's flag 0x80) or after 300 ticks, 1.
+//! * **3**, the run (let go of the beam): sequence 5, accel 0.2° and brake 0.2°, at most 24° a tick; walk accel 0.0039,
+//!   most 7/60; a goal; after 420 ticks, 1.
+//! * The goal ([`pick_goal`], `0x3cc3c0`): in the record `+0x3c4`, a point a random way from the middle of its path's
+//!   first point and its middle point, as far as the first point is, kept 2 inside the path from the middle
+//!   (crate::path_network::keep_in, the openings to the network's other records not walls); in the first record, a way
+//!   that passes within 3 across of a moby of its group (`+0x39c`) it is not already that near: it stays where it is.
+//! * The walk ([`walk`], `0x3cc348`): the heading through the network (crate::path_network::steer, its radius `+0x50`
+//!   narrowing the openings), then the framework's move (`0x3329b8`, crate::moby::ai::move_step) to the goal.
+//! * Every 32 frames (its slot's turn): the record that holds Ratchet, taken for its strolls when deeper in the network
+//!   than the one it has and its path's first point more than 8 from its middle point (not the narrow links).
 //! * **5**, dragged: its sequence by how it turns (along its facing the drag's velocity under −1/30: 10, over 1/30: 9,
-//!   else 7); it turns to face Ratchet (`0x333980`: `0x323628` with its block's limits, those of its walk: accel and
-//!   brake 0.05°, at most 6° a tick), is dragged (`0x32af70(0.7, 0.5, 0.1, m, +0x140, +0x394)`) and makes its sound;
-//!   hooked (`+0xbe` bit 2) 6; let go, 3 (sub 0).
+//!   else 7); it turns to face Ratchet (`0x333980`: `0x323628` with its block's limits, its last walk's), is dragged
+//!   (`0x32af70(0.7, 0.5, 0.1, m, +0x140, +0x394)`) and makes its sound; hooked (`+0xbe` bit 2) 6; let go, the run (3,
+//!   sub 0).
 //! * **6**: sequence 0xd, it faces Ratchet and makes its sound.
 //! * Its sound (`0x3cc5e8`): class sound 1 every `rand_range(30, 180)` ticks (`+0x3b4`, at once when dragged).
 //!
@@ -39,24 +55,35 @@
 //! * 2 and 3: `[6]` 5°, `[7]` 2° a tick, `[0xc]` + 1 every other frame (to 0xff), the fade toward 1.
 //! * **4**: the fade toward 0; out, its uid counted (`0x19b4a8`), 5.
 //!
-//! Not ported: the critter's walks (states 2, 3, 4: about its path network `0x32f8b0` / `0x32fd40` / `0x330180` /
-//! `0x3329b8`, the network's paths `+0x290` and the one nearest Ratchet `+0x3c4` every 32 frames: a missing system,
-//! G-CLS-011): it idles where it is instead (its idle's end `+0x3c0` does not start a walk; let go, it idles (1, sub 0)
-//! rather than walk off (3)); its fall (7: no code found that enters it). Of the pads: their draw (`0x3e36b8`, rings of
-//! effect quads by `[6]` / `[7]` / `[8]` / `[0xa]` / `[0xb]`), the voice line `[0x12]` taken even with the dialogue
+//! Not ported: the critter's walk to Ratchet (4: sequence 5, turns at 0.2° and at most 12° a tick, walk accel 0.0022,
+//! most 7/60, until within 6) and its fall (7): no code enters either; its aim joint (`+0x9c`, the framework's joint
+//! aims are not ported); the 32 frames' turn is the slot's index (the original's, its address `>> 8`, counts from the
+//! moby table's base). Of the pads: their draw (`0x3e36b8`, rings of effect quads by `[6]` / `[7]` / `[8]` / `[0xa]` / `[0xb]`), the voice line `[0x12]` taken even with the dialogue
 //! busy (here only when free), the dialogue's start `0x3354e0` (`0x1a641a` = 3).
 
-use crate::hero::physics::{add, add_rot, approach, atan2, dist2, dot, turn_ease};
-use crate::moby::{mode, Ctx, MobyWorld};
+use crate::hero::physics::{add, add_rot, approach, atan2, dist, dist2, dot, sub, turn_ease, V3};
+use crate::moby::{ai, mode, Ctx, MobyWorld};
+use crate::path_network;
 use super::tractor;
 
 /// The critter's class and the pads'.
 pub const CRITTER: i16 = 0x09bc;
 pub const PAD: i16 = 0x0a61;
 
-/// The critter's drag block (crate::moby::classes::tractor::drag_at) and movement block.
+/// The critter's drag block (crate::moby::classes::tractor::drag_at) and movement block (its pvars' `[0x18]`).
 const DRAG: usize = 0x140;
-const MOVE: usize = 0x190;
+const MOVE: usize = 0x50;
+/// Its path network (crate::path_network): the records, their count (a short), the path it is built from, the
+/// records it and its goal are in, the record it strolls in; its group; the walk's goal; the idle's length.
+const NODES: usize = 0x290;
+const COUNT: usize = 0x3b6;
+const START: usize = 0x390;
+const AT: usize = 0x3b8;
+const TO: usize = 0x3bc;
+const NEAR: usize = 0x3c4;
+const GROUP: usize = 0x39c;
+const GOAL: usize = 0x3a0;
+const IDLE: usize = 0x3c0;
 /// The movement block's turn limits (`+0x14` accel, `+0x18` brake, `+0x1c` most) and turn speed (`+0xb4`).
 const ACCEL: usize = MOVE + 0x14;
 const BRAKE: usize = MOVE + 0x18;
@@ -101,6 +128,63 @@ fn face_hero(w: &mut MobyWorld, id: usize, ctx: &Ctx) {
     m.set_pv_f(TURN_SPEED, v);
 }
 
+/// Its network's records.
+fn nodes(w: &MobyWorld, id: usize) -> Vec<path_network::Node> {
+    let m = &w.mobys[id];
+    path_network::read_nodes(&m.pvars, NODES, (m.pv_s(COUNT).max(0) as usize).min(8))
+}
+
+/// A path's first point and its middle one (`count >> 1`).
+fn ends(ctx: &Ctx, path: i32) -> Option<(V3, V3)> {
+    let pts = usize::try_from(path).ok().and_then(|p| ctx.level.paths.get(p))?;
+    let (a, b) = (pts.first()?, pts.get(pts.len() >> 1)?);
+    Some(([a[0], a[1], a[2]], [b[0], b[1], b[2]]))
+}
+
+/// `0x3cc3c0(m, goal)`: the stroll's goal (module docs).
+fn pick_goal(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    let nodes = nodes(w, id);
+    let near = w.mobys[id].pv_i(NEAR);
+    let Some(k) = usize::try_from(near).ok().filter(|&k| k < nodes.len()) else { return };
+    let Some((first, middle)) = ends(ctx, nodes[k].path) else { return };
+    let mid = add(first, sub(middle, first).map(|c| c * 0.5));
+    let r = dist(mid, first);
+    let a = ctx.game.rng.rand_angle();
+    let goal = add([a.cos() * r, a.sin() * r, 0.0], mid);
+    let goal = path_network::keep_in(&path_network::opened(ctx.level, &nodes, k), 2.0, mid, goal);
+    w.mobys[id].set_pv_v(GOAL, goal);
+    if near != 0 { return; }
+    let g = w.mobys[id].pv_i(GROUP);
+    if g & 0xff == 0xff { return; }
+    let members = usize::try_from(g).ok().and_then(|g| w.groups.get(g)).cloned().unwrap_or_default();
+    for o in members {
+        let Some(c) = w.mobys.get(o).map(|m| m.pos) else { continue };
+        let m = &mut w.mobys[id];
+        let (p, goal) = (m.pos, m.pv_v(GOAL));
+        // `0x321238`: the point of the way `p → goal` nearest `c` across.
+        let d = sub(goal, p);
+        let l2 = d[0] * d[0] + d[1] * d[1];
+        let q = if 0.0001 <= l2 {
+            let t = (((c[0] - p[0]) * d[0] + (c[1] - p[1]) * d[1]) / l2).clamp(0.0, 1.0);
+            add(p, d.map(|x| x * t))
+        } else {
+            p
+        };
+        if dist2(q, c) < 3.0 && 3.0 < dist2(p, c) { m.set_pv_v(GOAL, p); }
+    }
+}
+
+/// `0x3cc348(m, goal)`: the heading through its network, then the framework's move to `goal`.
+fn walk(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, goal: V3) {
+    let nodes = nodes(w, id);
+    let m = &mut w.mobys[id];
+    let (mut at, mut to, mut yaw) = (m.pv_i(AT), m.pv_i(TO), 0.0);
+    path_network::steer(ctx.level, &nodes, m.pv_f(MOVE), m.pos, goal, &mut yaw, &mut at, &mut to);
+    m.set_pv_i(AT, at);
+    m.set_pv_i(TO, to);
+    ai::move_step(w, id, ctx, yaw, goal);
+}
+
 /// 0x09bc (`0x3cba00`): see the module.
 pub fn update_critter(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     crate::shadow_volumes::probe_near(w, id, ctx, 24.0, 0x16);
@@ -129,13 +213,12 @@ pub fn update_critter(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             m.set_pv_i(0x88, m.pv_i(0x88) | 1);
             m.set_pv_f(DRAG + 0x34, 4.0);
             m.set_pv_f(DRAG + 0x38, 12.0);
-            // The turn limits its first walk sets (`0x333ac0(0x3a91a2b4, 4/60, 0x3a64c38a, 0x3dd67752)`; the game walks
-            // at once, before it can be taken): accel and brake 0.05°, at most 6° a tick.
-            m.set_pv_f(ACCEL, f32::from_bits(0x3a64_c38a));
-            m.set_pv_f(BRAKE, f32::from_bits(0x3a64_c38a));
-            m.set_pv_f(MOST, f32::from_bits(0x3dd6_7752));
             // The port's: no slide sound playing yet (the drag's handle).
             m.set_pv_i(DRAG + 0x40, -1);
+            let mut nodes = path_network::read_nodes(&m.pvars, NODES, 8);
+            let n = path_network::build(ctx.level, m.pv_i(START), &mut nodes);
+            path_network::write_nodes(&mut m.pvars, NODES, &nodes[..n]);
+            m.set_pv_s(COUNT, n as i16);
             m.set_state(1, -1);
             m.update_dist = 0x80;
             m.mode |= mode::TARGET;
@@ -149,6 +232,29 @@ pub fn update_critter(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                     ctx.host.set_anim(&w.mobys[id], s, 0, 10);
                 }
             }
+            let m = &mut w.mobys[id];
+            if m.pv_i(IDLE) < m.state_ticks as u16 as i32 { m.set_state(2, -1); }
+        }
+        2 | 3 => {
+            let run = w.mobys[id].state == 3;
+            if w.mobys[id].first() {
+                let s = if run { 5 } else { 4 };
+                if super::props::seq(w, id, ctx) != s { ctx.host.set_anim(&w.mobys[id], s, 0, 0x14); }
+                let m = &mut w.mobys[id];
+                // `$gp+0x1058` / `$gp+0x105c`: 4 and 7 a second.
+                if run {
+                    ai::senses(m, f32::from_bits(0x3b7e_dcbb), 7.0 * 0.016_666_668, f32::from_bits(0x3b64_c38a), f32::from_bits(0x3ed6_7752));
+                } else {
+                    ai::senses(m, f32::from_bits(0x3a91_a2b4), 4.0 * 0.016_666_668, f32::from_bits(0x3a64_c38a), f32::from_bits(0x3dd6_7752));
+                }
+                pick_goal(w, id, ctx);
+            }
+            let goal = w.mobys[id].pv_v(GOAL);
+            walk(w, id, ctx, goal);
+            let m = &mut w.mobys[id];
+            let t = m.state_ticks as u16;
+            let done = if run { 0x1a4 <= t } else { m.pv_i(MOVE + 0x94) & 0x80 != 0 || 300 <= t };
+            if done { m.set_state(1, -1); }
         }
         5 => {
             if w.mobys[id].first() {
@@ -167,7 +273,7 @@ pub fn update_critter(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             if w.mobys[id].once & 4 != 0 {
                 w.mobys[id].set_state(6, -1);
             } else if tractor::held(w) != Some(id) {
-                w.mobys[id].set_state(1, 0);
+                w.mobys[id].set_state(3, 0);
             }
         }
         6 => {
@@ -183,6 +289,17 @@ pub fn update_critter(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         m.set_pv_f(GLOW, a);
         m.glow = crate::hud::lerp_rgba(a.sin() * 0.5 + 0.5, 0x80c0_c0c0, 0x8060_6060);
     }
+    if ctx.game.frame & 0x1f == id as i32 & 0x1f {
+        let nodes = nodes(w, id);
+        let mut k = w.mobys[id].pv_i(NEAR);
+        path_network::locate(ctx.level, &nodes, ctx.hero.pos, &mut k);
+        if w.mobys[id].pv_i(NEAR) < k {
+            if let Some((first, middle)) = ends(ctx, nodes[k as usize].path) {
+                if 8.0 < dist(first, middle) { w.mobys[id].set_pv_i(NEAR, k); }
+            }
+        }
+    }
+    let m = &mut w.mobys[id];
     m.state_ticks = m.state_ticks.wrapping_add(1);
 }
 

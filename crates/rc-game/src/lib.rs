@@ -28,6 +28,7 @@ pub mod menus;
 pub mod moby;
 pub mod pad;
 pub mod particles;
+pub mod path_network;
 pub mod paths;
 pub mod point_lights;
 pub mod prompt;
