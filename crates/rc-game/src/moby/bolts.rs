@@ -59,7 +59,14 @@ pub fn drop(w: &mut MobyWorld, id: usize, flags: u32, limit: i32, ctx: &mut Ctx)
     // ported).
     if w.mobys[id].xp != 0 { g.show_health = Some(0x2d0); }
     let table = &BOLT_PERCENT[g.uid_flag(uid) as usize];
-    let value = table[g.uid_count(uid) as usize] as i32 * base as i32 / 100;
+    let mut value = table[g.uid_count(uid) as usize] as i32 * base as i32 / 100;
+    // In an arena challenge (`0x1aa1b0` ≠ −1): the arena's count, `0x1a8a38` on Maktar (6) else `0x1a8a36` (25),
+    // ten times for a boss (the boss slots `0x1b3770` / `0x1b3774`).
+    if g.arena_drop != -1 {
+        let each = if g.level == 2 { 6 } else { 25 };
+        let boss = matches!(w.mobys[id].o_class, crate::moby::classes::bosses::C9F8 | crate::moby::classes::bosses::CA44);
+        value = if boss { each * 10 } else { each };
+    }
     g.bump_uid(uid);
     let mission = w.mobys[id].mission;
     g.uid_gone(uid, mission);

@@ -898,6 +898,7 @@ fn menu_camera(ctx: &mut Ctx) {
 /// cuboid `+0x78` (before the first win, facing 2.16) or the desk's `+0x74` (facing −1.59), the checkpoint, the
 /// fighters pooled, the plates and 0x0b89s down, the resort's music asked for.
 fn leave(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    ctx.game.arena_drop = -1;
     let n = 0x25 + ctx.game.rng.randi(2);
     say(w, id, ctx, n);
     w.mobys[id].set_state(1, -1);
@@ -939,7 +940,8 @@ fn reward(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, n: i32) {
         ctx.game.xp += xp(&ctx.level.arena, ctx.game, n);
         let b = prize(&ctx.level.arena, ctx.game, n);
         w.mobys[id].set_pv_i(pv::PRIZE, b);
-        ctx.game.bolt_bank += b;
+        // `$gp − 0x75f0` = `0x1a7a00`: the bolts themselves (not the bank `0x1a7a1c`).
+        ctx.game.bolts = (ctx.game.bolts as i32 + b).max(0) as u32;
         ctx.game.show_bolts = Some(0x168);
     }
     if let Some(k) = win_flag(n) {
@@ -1526,8 +1528,13 @@ fn menu(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 }
 
 /// State 8: the challenge (module docs).
+/// `0x3fb090(n)`: the challenge's arena drop index (crate::game::GameState::arena_drop), −1 for 2, 4, 9 and 0xc.
+fn drop_index(n: i32) -> i32 { match n { 0 => 0, 1 => 3, 3 => 2, 5 => 4, 6 => 1, 7 => 5, 8 => 8, 10 => 6, 0xb => 7, 0xd => 9, _ => -1 } }
+
 fn fight(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let ch = w.mobys[id].pv_s(pv::CHALLENGE) as i32;
+    // `0x1aa1b0` each tick of the challenge when it has an index (`0x3fb1b0`'s state 8 tail; else kept).
+    if drop_index(ch) != -1 { ctx.game.arena_drop = drop_index(ch); }
     if w.mobys[id].first() {
         let m = &mut w.mobys[id];
         m.set_pv_s(pv::WAVE, 0);
