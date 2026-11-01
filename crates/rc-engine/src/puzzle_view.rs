@@ -2,7 +2,9 @@
 //! draw (`0x2ea328`) runs with the draw flags 0xf0, so no sky (bit 1), tfrags (2), ties (4) or shrubs (8) — only the
 //! mobys, the effects and the HUD — over the background `0x2f5120(0, 0, 0)` set black (`0x3609b0` and each frame of
 //! `0x3784e8`; `0x360a50` puts the level's back). Here the world's tfrag, tie, shrub and billboard entities go to a
-//! layer no camera draws, and the sky camera draws nothing and clears to black; leaving the mode puts them back.
+//! layer no camera draws, and the sky camera draws nothing (no layer at all: on the hidden layer it drew the hidden
+//! world itself, the skyline seen at the top left of Endako's Hacker screen) and clears to black; leaving the mode
+//! puts them back.
 
 use bevy::camera::visibility::RenderLayers;
 use bevy::camera::ClearColorConfig;
@@ -37,7 +39,7 @@ pub fn apply(
             for (mut cam, mut layers) in &mut sky {
                 state.sky = Some((cam.clear_color.clone(), layers.clone()));
                 cam.clear_color = ClearColorConfig::Custom(Color::BLACK);
-                *layers = RenderLayers::layer(HIDDEN_LAYER);
+                *layers = RenderLayers::none();
             }
         }
     } else if state.on {

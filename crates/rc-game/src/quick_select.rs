@@ -366,12 +366,12 @@ impl QuickSelect {
     }
 }
 
-/// The slots (`0x2f83d0`): the saved items with their records' icons, names and ammo (the record is the item's row:
-/// the port keeps no upgrades' rows).
+/// The slots (`0x2f83d0`): the saved items with their records' icons, names and ammo (the record is the item's current
+/// row, `0x139568`: crate::upgrades).
 pub fn slots(game: &crate::game::GameState, records: &[rc_formats::disc::menu_tables::ItemRecord]) -> [Slot; SLOTS] {
     std::array::from_fn(|k| {
         let item = game.ring[k];
-        let Some(r) = usize::try_from(item).ok().filter(|_| item != 0).and_then(|i| records.get(i)) else { return Slot::default() };
+        let Some(r) = (item != 0).then(|| game.record(records, item)).flatten() else { return Slot::default() };
         let ammo = game.ammo.get(item as usize).copied().unwrap_or(0);
         Slot { item, icon: r.icon, name: r.name, ammo, uses_ammo: r.uses_ammo, max: r.max_ammo as i32 }
     })

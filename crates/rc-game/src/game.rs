@@ -265,6 +265,8 @@ pub struct GameState {
     pub screen_callback: Option<crate::hud::ScreenCallback>,
     /// The blocking fade under way ([`GameState::blocking_fade`]): the frame `k` of `n`.
     pub held_fade: Option<(u32, u32)>,
+    /// The weapons' rows and experience (`0x139568`, `0x139868`) and the arena's kills (crate::upgrades).
+    pub upgrades: crate::upgrades::Upgrades,
 }
 
 /// The flag bytes `0x1395b8..0x139685` ([`GameState::flags`]): the save's global chunk 5 (0xcd bytes).
@@ -285,7 +287,7 @@ impl Default for GameState {
             clank: false, thruster: false, boots: false, charge_boots: false, grind_boots: false, nanotech: [false; 10], level_xp: [0; 2], death_z: None, boss_bar: None, boss_icon: 0, shadow: Default::default(), water_base: 0.0, water_z: 0.0, water_scroll: [[0.0; 2]; 2], water_cam: [0.0; 3], missions: vec![0; 0x200], mission_area: 0, cam_tweaks: Default::default(), shakes: Default::default(), uid_pending: vec![0; 0x800], uid_dead: vec![0; 0x800], mission_table: vec![0; 0x100],
             mission_xp: vec![0; 0x30], mission_bolts: vec![0; 0x30], checkpoint: None, checkpoint_bits: Vec::new(), last_checkpoint: None, messages: Vec::new(), help_state: 0, help_req: None, help_counts: vec![0; 0x100], help_shift: 0, help_shift_ticks: 0, help_aux: vec![0; 0x100], help_last: vec![0; 0x100], help_levels: vec![0; 0x100], help_queue: Vec::new(), help_close: None, hint_flags: [0; 5], no_item_area: false, variant: 0, chunk_request: None, items: vec![0; 0x40], quick_select: vec![0; 28], planets: vec![0; 0x1c], travel: Default::default(), ring: [0; 8], ammo: vec![0; 0x50], held: 0, wrench_out: false, trail_phase: 0.0, view_far: 1024.0, sky: Default::default(), markers: Vec::new(), scenes_seen: vec![false; 0x100], scenes: Default::default(), cameras: Default::default(), ship_parts: Vec::new(), underwater: false, fog: Default::default(), fog_flash: Default::default(), area_ask: Vec::new(), area_hero: Vec::new(), next_level: None, next_level_save: false, bolt_help_done: false, space_bolts: 0, space_bolts_shown: 0, rider_hits: 0, store_left: 0, path_openings: Vec::new(), robot_blast_frame: 0, skill_points: [0; crate::skill_points::LEN], cheats: [0; crate::cheats::LEN], play_time: 0, visited: vec![0; 0x1c], puzzle: Default::default(), hacker: Default::default(),
             stock: [0xff; crate::vendor::STOCK_SLOTS], challenge: false, rac1_weapons: 0, vendor_open: None, vendor_virtual: None, vendor_phase: [0.0; 3], vendor_beam: [0.0; 2], prompt: Default::default(),
-            armor: 0, armor_offer: 0, mods_available: [0; 0x38], mods_bought: [0; 0x38], platinum_spent: 0, platinum_found: 0, platinum: vec![0; 0x70], flags: vec![0; FLAGS_LEN], arena_menu: None, arena_hud: None, arena_wipe: None, arena_results: None, arena_on: false, arena_drop: -1, fade_black: 0.0, fade_white: 0.0, screen_callback: None, held_fade: None,
+            armor: 0, armor_offer: 0, mods_available: [0; 0x38], mods_bought: [0; 0x38], platinum_spent: 0, platinum_found: 0, platinum: vec![0; 0x70], flags: vec![0; FLAGS_LEN], arena_menu: None, arena_hud: None, arena_wipe: None, arena_results: None, arena_on: false, arena_drop: -1, fade_black: 0.0, fade_white: 0.0, screen_callback: None, held_fade: None, upgrades: Default::default(),
         }
     }
 }
@@ -358,6 +360,7 @@ impl GameState {
             platinum: old.platinum,
             skill_points: old.skill_points,
             cheats: old.cheats,
+            upgrades: old.upgrades,
             ..Default::default()
         };
         // The level start (`0x2a3b88`): visited.
@@ -386,10 +389,12 @@ impl GameState {
     /// `0x2f46e0(item)`: the item had, with its row's starting ammo when it has none, into the vendor's stock as
     /// owned (`0x2f47c0`, crate::vendor), and a slot of the quick select for it (`0x2f45e0`).
     pub fn get_item(&mut self, item: i32) {
+        let r = crate::hero::items::row(self, item).copied();
         let Some(have) = self.items.get_mut(item.max(0) as usize) else { return };
         if *have != 0 { return; }
         *have = 1;
-        if let (Some(r), Some(a)) = (crate::hero::items::row(item), self.ammo.get_mut(item.max(0) as usize)) {
+        // The item's current row (`0x139568`): its starting ammo.
+        if let (Some(r), Some(a)) = (r, self.ammo.get_mut(item.max(0) as usize)) {
             if r.ammo && *a == 0 { *a = r.start_ammo; }
         }
         self.stock_add_raw(item);

@@ -55,14 +55,26 @@ fn attach_armour_row(root: &Path, core: &level::LevelCore, mobys: &mut crate::mo
 pub const GADGETS: [i32; 7] = [rc_game::hero::items::LANCER_CLASS as i32, rc_game::hero::items::GRAVITY_BOMB_CLASS as i32, rc_game::hero::items::DYNAMO_CLASS as i32, rc_game::hero::items::TRACTOR_CLASS as i32, rc_game::hero::items::ELECTROLYZER_CLASS as i32, rc_game::hero::items::SPIDERBOT_CLASS as i32, rc_game::hero::items::SWINGSHOT_CLASS as i32];
 
 /// The hand classes loaded with level `index`: [`GADGETS`] and those of the weapons the level's vendors sell
-/// (`rc_game::vendor::STOCK_LEVELS` up to the level, the item records' `+0x04`): the game loads one as the vendor
-/// previews it (`0x306258`); the port has them from the start.
+/// (`rc_game::vendor::STOCK_LEVELS` up to the level, the item records' `+0x04`), and their upgrades' rows' classes: the
+/// game loads one as the vendor previews it (`0x306258`) or the upgrade screen swaps to it; the port has them from the
+/// start.
 pub fn gadgets(root: &Path, index: u32) -> Vec<i32> {
     let mut out: Vec<i32> = GADGETS.to_vec();
     let tables = crate::play::menu_tables(root, index);
     for &(item, _) in rc_game::vendor::STOCK_LEVELS.iter().filter(|&&(_, first)| first <= index as i32 && (index as i32) < rc_game::vendor::LAST_STOCK_LEVEL) {
         let Some(c) = tables.items.get(item as usize).map(|r| r.classes[0]).filter(|&c| c != 0) else { continue };
         if !out.contains(&c) { out.push(c); }
+    }
+    // The upgrades' hand classes of those items (rc_game::upgrades: the records' `+0x3a` chain from each base row; the
+    // game streams the new class at the upgrade screen's swap, `0x3805e0`).
+    for item in 0..0x38usize {
+        let Some(base) = tables.items.get(item).filter(|r| out.contains(&r.classes[0])) else { continue };
+        let mut next = base.next;
+        for _ in 0..8 {
+            let Some(r) = usize::try_from(next).ok().filter(|&n| n != 0).and_then(|n| tables.items.get(n)) else { break };
+            if r.classes[0] != 0 && !out.contains(&r.classes[0]) { out.push(r.classes[0]); }
+            next = r.next;
+        }
     }
     out
 }

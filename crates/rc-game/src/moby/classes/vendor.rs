@@ -200,9 +200,10 @@ fn tail(world: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     }
 }
 
-/// `0x374628`'s write: the menu over, state 1.
+/// `0x374628`'s write: the menu over, state 1 (a vendor's, or the mod vendor 0x0ddc's: crate::moby::classes::mod_vendor).
 pub fn on_exit(world: &mut MobyWorld, id: usize) {
-    if let Some(m) = world.mobys.get_mut(id).filter(|m| m.o_class == crate::vendor::CLASS) { m.state = 1; }
+    let ours = |c: i16| c == crate::vendor::CLASS || c == super::mod_vendor::CLASS;
+    if let Some(m) = world.mobys.get_mut(id).filter(|m| ours(m.o_class)) { m.state = 1; }
 }
 
 /// `0x381568`'s beam: the 3 × 3 points of a fan in the (y, z) plane (`0x2900b0`), two wide at the hologram (z 2.6)

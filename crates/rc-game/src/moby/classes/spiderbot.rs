@@ -819,7 +819,7 @@ fn blast(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     if w.mobys[id].pv_i(pv::TIMER) < BLAST_TICKS - 0x14 { return; }
     let Some(sc) = ctx.scene else { return };
     let (at, r) = (w.mobys[id].pos, w.mobys[id].pv_f(pv::REACH).min(BLAST_MAX));
-    let damage = row(SPIDERBOT).map_or(0.0, |r| r.damage);
+    let damage = row(ctx.game, SPIDERBOT).map_or(0.0, |r| r.damage);
     for t in crate::collision::coll_sphere_mobys(sc, at, r, QueryFlags(0), Some(id)) {
         let Some(x) = w.mobys.get(t) else { continue };
         if !(aim::health(w, t).is_some() || x.mode & mode::LINE != 0) || Some(t) == ctx.hero_moby { continue; }

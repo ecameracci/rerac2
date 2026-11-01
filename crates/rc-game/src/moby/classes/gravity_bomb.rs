@@ -43,6 +43,13 @@ use crate::moby::{aim, countdown, mode, Ctx, MobyWorld};
 pub const HAND_CLASS: i16 = 0xce3;
 pub const BOMB_CLASS: i16 = 0xce4;
 pub const BLAST_CLASS: i16 = 0xce5;
+/// The Mini-Nuke (the Gravity Bomb's upgrade, rows 0x47 / 0x51 / 0x52, crate::upgrades): its hand 0x0a5a (`0x3c4410`,
+/// this hand's update with its own constants, the same values), its bomb 0x0c07 (`0x3e86f0`, made by `0x3e8ad0`: this
+/// bomb with its own hand left out of the sweep) and its blast 0x0c06 (`0x3e6070`, made by `0x3e6640`,
+/// [`update_mini_blast`]).
+pub const MINI_HAND: i16 = 0xa5a;
+pub const MINI_BOMB: i16 = 0xc07;
+pub const MINI_BLAST: i16 = 0xc06;
 
 /// `gp+0x17c0..+0x17cc`: the throw's reach with nothing aimed at, the least (1e-5), the gravity (a second²) and
 /// the speed across (a second).
@@ -65,7 +72,7 @@ const MARKER_RGBA: [u32; 2] = [0x70f0_f0b0, 0x50f0_f0b0];
 
 /// `0x3ef940`.
 pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
-    let Some(r) = row(GRAVITY_BOMB) else { return };
+    let Some(r) = row(ctx.game, GRAVITY_BOMB) else { return };
     w.mobys[id].pvars.resize(crate::moby::PVAR_BYTES, 0);
     let hand = ctx.host.joint(&w.mobys[id], 0).unwrap_or(w.mobys[id].pos);
     if let Some(a) = ctx.host.anim(&w.mobys[id]) {
@@ -200,10 +207,11 @@ fn landing(w: &MobyWorld, ctx: &Ctx, id: usize, from: V3, vel: V3) -> Option<(V3
 }
 
 /// `0x3f0190`: the bomb (class 0xce4) at the hand with the throw's velocity, two spins of 3°..6° a tick, a hundredth
-/// of its size.
+/// of its size; from the Mini-Nuke's hand its bomb 0x0c07 the same way (`0x3e8ad0`).
 fn throw(w: &mut MobyWorld, ctx: &mut Ctx, hand: usize, at: V3, vel: V3) {
-    if w.class(BOMB_CLASS).is_none() { return; }
-    let id = w.create(BOMB_CLASS);
+    let class = if w.mobys[hand].o_class == MINI_HAND { MINI_BOMB } else { BOMB_CLASS };
+    if w.class(class).is_none() { return; }
+    let id = w.create(class);
     let g = &mut ctx.game.rng;
     let spins = [g.randf(0.052_359_88, 0.104_719_76), g.randf(0.052_359_88, 0.104_719_76)];
     let m = &mut w.mobys[id];
@@ -245,7 +253,8 @@ fn sweep(w: &MobyWorld, ctx: &Ctx, id: usize, from: V3, to: V3, vel: &mut V3) ->
     let hit = crate::collision::coll_sphere_m(c, ctx.scene, to, 0.25, q, Some(id)).map(|h| (h.pushed_centre.unwrap_or(h.point), h))
         .or_else(|| w.coll_line(ctx, from, to, 0, Some(id)).map(|h| (h.point, h)));
     let Some((at, h)) = hit else { return (Sweep::None, to, [0.0; 3], None, to) };
-    if h.moby.is_some_and(|m| m == id || Some(m) == ctx.hero_moby || w.mobys.get(m).is_some_and(|x| x.o_class == HAND_CLASS || x.o_class == 0)) {
+    let own_hand = if w.mobys[id].o_class == MINI_BOMB { MINI_HAND } else { HAND_CLASS };
+    if h.moby.is_some_and(|m| m == id || Some(m) == ctx.hero_moby || w.mobys.get(m).is_some_and(|x| x.o_class == own_hand || x.o_class == 0)) {
         return (Sweep::None, to, [0.0; 3], None, to);
     }
     let n = crate::hero::physics::unit(h.normal);
@@ -320,7 +329,7 @@ pub fn update_bomb(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         2 => {
             ctx.host.play_sound(&w.mobys[id], 0, 0);
             let (at, n, hand) = (w.mobys[id].pos, w.mobys[id].pv_v(0x20), w.mobys[id].pv_link(0x30));
-            blast(w, ctx, at, n, hand);
+            if w.mobys[id].o_class == MINI_BOMB { mini_blast(w, ctx, at, n, hand) } else { blast(w, ctx, at, n, hand) }
             w.delete(id);
         }
         _ => {}
@@ -328,11 +337,19 @@ pub fn update_bomb(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 }
 
 /// `0x3f0860`: the blast (class 0xce5) at `at` with the surface's normal; the last one goes.
-fn blast(w: &mut MobyWorld, ctx: &mut Ctx, at: V3, n: V3, hand: Option<usize>) {
-    if let Some(old) = w.mobys.iter().position(|m| m.o_class == BLAST_CLASS && m.state < 0x80) { w.delete(old); }
-    let id = w.create(BLAST_CLASS);
+fn blast(w: &mut MobyWorld, ctx: &mut Ctx, at: V3, n: V3, hand: Option<usize>) { place_blast(w, ctx, at, n, hand, BLAST_CLASS, update_blast); }
+
+/// `0x3e6640`: the Mini-Nuke's blast (class 0x0c06), made as the Gravity Bomb's (`gp+0x159c`: the last one goes).
+fn mini_blast(w: &mut MobyWorld, ctx: &mut Ctx, at: V3, n: V3, hand: Option<usize>) {
+    if w.class(MINI_BLAST).is_none() { return; }
+    place_blast(w, ctx, at, n, hand, MINI_BLAST, update_mini_blast);
+}
+
+fn place_blast(w: &mut MobyWorld, ctx: &mut Ctx, at: V3, n: V3, hand: Option<usize>, class: i16, update: crate::moby::UpdateFn) {
+    if let Some(old) = w.mobys.iter().position(|m| m.o_class == class && m.state < 0x80) { w.delete(old); }
+    let id = w.create(class);
     let m = &mut w.mobys[id];
-    m.update = Some(update_blast);
+    m.update = Some(update);
     m.mode = (m.mode & !mode::NO_UPDATE) | mode::KEEP_ROWS;
     m.pvars.resize(crate::moby::PVAR_BYTES, 0);
     m.update_dist = 0xff;
@@ -424,6 +441,86 @@ pub fn update_blast(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 if w.gravity_bomb.blast == Some(id) { w.gravity_bomb.blast = None; }
                 w.delete(id);
             }
+        }
+    }
+}
+
+/// The Gravity Bomb's current row's `+0x64` (`0x262564 + 0xe0·0x139568[0x2a]`): the Mini-Nuke's blast damage by row.
+fn nuke_damage(row: usize) -> f32 {
+    match row { 0x47 => 12.0, 0x51 => 150.0, 0x52 => 250.0, _ => 4.0 }
+}
+
+/// `0x3e6070`: the Mini-Nuke's blast. Made (state 0 → 1): its size 0 growing 2/3 a tick, its alpha 0x7f, `+0x24`
+/// 0x6f, 20 ticks; a smoke burst a unit above it (`0x3210a8(2, 20, blast, ..)`, crate::moby::blast::smoke_burst) and
+/// the camera shake as the Gravity Bomb's (0.45 over 40 ticks, in view within 100). Each tick its size grows by the
+/// growth. **1** (20 ticks): `+0x24` down 5 a tick (at least 0); every moby with health or one the lines test (mode
+/// 0x4000), not Ratchet nor class 0x0a5a, inside a sphere growing to 8 takes the Gravity Bomb's current row's `+0x64`
+/// ([`nuke_damage`]) with flags 0x830000 along the line from the centre; then **2** (40 ticks): the alpha
+/// `0x7f·t/40`, then down 1 a tick; at 0 **6**: the growth eased down 1/60 a tick to 1/12, gone once its effect is.
+///
+/// Not ported: its effect — the trail slot it takes (`0x32b1b8`, as the Chopper's: lost, it goes), its particle buffers
+/// and their update and draw (`0x3e7978`, `0x3e67c0` at its start and 20 ticks into state 2, `0x3e7aa8`, `0x3e6ad0`, the
+/// scrolls `gp+0x1594` / `+0x1598`); so state 6 ends at once. The statistics (`0x3f9f70`).
+pub fn update_mini_blast(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    if w.mobys[id].state == 0 {
+        let m = &mut w.mobys[id];
+        m.state = 1;
+        m.set_pv_f(0x10, 0.0);
+        m.set_pv_f(0x18, 0.666_666_7);
+        m.set_pv_i(0x1c, 0x7f);
+        m.set_pv_i(0x24, 0x6f);
+        m.set_pv_i(0x14, 0x14);
+        let at = m.pos;
+        crate::moby::blast::smoke_burst(w, ctx, 2.0, 20.0, Some(id), add(at, [0.0, 0.0, 1.0]), -1);
+        if !ctx.view.is_some_and(|v| v.culled(100.0, [at[0], at[1], at[2] + 1.0, 2.0])) {
+            ctx.game.shakes.ask(0, 0.45, 0x28);
+        }
+    }
+    let damage = nuke_damage(ctx.game.item_row(GRAVITY_BOMB));
+    let m = &mut w.mobys[id];
+    match m.state {
+        1 => {
+            m.set_pv_i(0x24, (m.pv_i(0x24) - 5).max(0));
+            m.set_pv_f(0x10, m.pv_f(0x10) + m.pv_f(0x18));
+            let r = (1.0 - m.pv_i(0x14) as f32 / 20.0) * 8.0 + 0.001;
+            let at = m.pos;
+            if let Some(sc) = ctx.scene {
+                for t in crate::collision::coll_sphere_mobys(sc, at, r, crate::collision::QueryFlags(0), Some(id)) {
+                    let Some(x) = w.mobys.get(t) else { continue };
+                    if !(aim::health(w, t).is_some() || x.mode & mode::LINE != 0) || Some(t) == ctx.hero_moby || x.o_class == MINI_HAND { continue; }
+                    let d = crate::hero::physics::unit(sub(x.pos, at));
+                    let mut tm = HitTemplate::new(damage, Some(id), 0x0083_0000, [d[0], d[1], d[2], NO_KNOCK_LIMIT]);
+                    tm.kind = (x.o_class as u16 as u32) << 16 | 0x0305;
+                    let p = x.pos;
+                    w.deliver_hit_any(t, &tm, [p[0], p[1], p[2], 1.0]);
+                }
+            }
+            let m = &mut w.mobys[id];
+            let mut t = m.pv_i(0x14);
+            if countdown(&mut t) {
+                m.state = 2;
+                t = 0x28;
+            }
+            m.set_pv_i(0x14, t);
+        }
+        2 => {
+            m.set_pv_f(0x10, m.pv_f(0x10) + m.pv_f(0x18));
+            let mut t = m.pv_i(0x14);
+            let f = t as f32;
+            if !countdown(&mut t) {
+                m.set_pv_i(0x1c, (127.0 * f * 0.025) as i32);
+            } else if m.pv_i(0x1c) == 0 {
+                m.state = 6;
+            } else {
+                m.set_pv_i(0x1c, m.pv_i(0x1c) - 1);
+            }
+            m.set_pv_i(0x14, t);
+        }
+        _ => {
+            let g = (m.pv_f(0x18) - 0.016_666_668).max(0.083_333_336);
+            m.set_pv_f(0x18, g);
+            m.set_pv_f(0x10, m.pv_f(0x10) + g);
+            w.delete(id);
         }
     }
 }

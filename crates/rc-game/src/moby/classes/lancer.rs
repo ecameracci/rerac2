@@ -23,6 +23,9 @@
 //!
 //! The markers (`0x2db498`): the lock's green reticle and, in the look stance's twin, the crosshair.
 //!
+//! The Heavy Lancer (row 0x3c, hand class 0x0c05, both hands: stance 2, Ratchet's sequence 0x33) runs this update
+//! (`0x3e5dc8`) with its row's speed, rate and damage (crate::upgrades).
+//!
 //! Not ported: the pad rumble (`0x2d6d60`), the stats (`0x18c8dc..`), the first-person aim (`0x18b320`).
 
 use crate::hero::items::{row, LANCER};
@@ -31,6 +34,8 @@ use crate::moby::hits::HitTemplate;
 use crate::moby::{aim, countdown, Ctx, MobyWorld};
 use crate::point_lights::PointLight;
 
+/// The Heavy Lancer's hand class (rows 0x3c / 0x4f / 0x50, crate::upgrades): its update `0x3e5dc8` is this one's.
+pub const HEAVY_CLASS: i16 = 0xc05;
 /// `$gp+0x37fc` for the Lancer: the shots' range; the lock delay `$gp+0x684` and hold `$gp+0x680`.
 pub const RANGE: f32 = 20.0;
 const LOCK_DELAY: i32 = 5;
@@ -68,7 +73,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         w.mobys[id].state = 2;
         start(w, id);
     }
-    let Some(r) = row(LANCER) else { return };
+    let Some(r) = row(ctx.game, LANCER) else { return };
     let muzzle = ctx.host.joint(&w.mobys[id], 0).unwrap_or(w.mobys[id].pos);
     w.mobys[id].set_pv_v(0x14, muzzle);
     let (hero_pos, hero_rows, hero_rot, hero_state) = (ctx.hero.pos, ctx.hero.rows, ctx.hero.rot, ctx.hero.state);

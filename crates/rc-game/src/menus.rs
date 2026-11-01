@@ -34,6 +34,7 @@
 
 pub mod port;
 pub mod special;
+pub mod upgrade;
 
 use crate::front_end::Assets;
 use crate::gui::{self, text_box, Quad, Tex, TextBox};

@@ -74,8 +74,6 @@
 //! at once) and logs its state changes on stdout.
 //!
 //! Not ported:
-//! * Its camera's turn toward it (`0x3f7b28` writes the follow camera's yaw rate `+0x1d4` and scripted yaw `+0x1dc`; the
-//!   moby update has no camera): only the tweak (distance 8, pivot 3, priority 5) is asked for.
 //! * The pilot's second aim (`0x327aa8`), the hero word `0x18a03e`
 //!   (0xf0) of its taunt, the line's start held for its stream (`0x330128`: the port's dialogue starts at once; the
 //!   pilot's sequence 1 starts with the line).
@@ -154,6 +152,8 @@ mod pv {
     pub const MUSIC: usize = 0xb0;
     pub const MUSIC_END: usize = 0xb4;
     pub const STINGER_END: usize = 0xb8;
+    /// The follow camera's turn speed toward it (`0x3f7b28`).
+    pub const CAM_TURN: usize = 0xcc;
     /// The turrets' and the pilot's aim blocks (`0x325588`): `+0x48` the turn, `+0x58` its speed, `+0x68` the turn
     /// asked for this tick.
     pub const AIM_GUN: [usize; 2] = [0x110, 0x190];
@@ -929,7 +929,10 @@ fn glide(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     m.rot = m.pv_v(pv::ROT);
 }
 
-/// `0x3f7b28`: from sub 2 its camera tweak (priority 5, `0x2d8038`): distance 8, pivot 3 (module docs).
+/// `0x3f7b28`: from sub 2 its camera tweak (priority 5, `0x2d8038`): distance 8, pivot 3; and the follow camera turned
+/// toward it (crate::camera::CamTweaks::turn_toward): the yaw from Ratchet (`0x189ea0`) to it against the camera's
+/// facing (its offset's yaw + π), eased at 0.2° a tick² to at most 12° a tick (`0x3b64c38a`, `0x3e567752`) on the
+/// speed `+0xcc`; the stick's yaw still wins (no script bits).
 fn camera(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let m = &mut w.mobys[id];
     if m.sub_state < 2 { return; }
@@ -942,6 +945,10 @@ fn camera(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         t.dist = tune::CAM[0];
         t.pivot_h = tune::CAM[1];
     }
+    let to = atan2(m.pos[0] - ctx.hero.pos[0], m.pos[1] - ctx.hero.pos[1]);
+    let mut v = m.pv_f(pv::CAM_TURN);
+    ctx.game.cam_tweaks.turn_toward(to, f32::from_bits(0x4049_0fdb), f32::from_bits(0x3b64_c38a), f32::from_bits(0x3e56_7752), &mut v, 0);
+    m.set_pv_f(pv::CAM_TURN, v);
 }
 
 /// `0x3f7c50`: the rotor (joint list 7, −0.416 a tick: `0x2f0b60(angle, q, 2)`) and the turrets' aims (lists 0, 1).
@@ -960,7 +967,7 @@ fn crates_back(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     if ctx.game.frame & 0x3f != 0 { return; }
     let low = (0..0x38).any(|k| {
         let had = ctx.game.items.get(k).is_some_and(|&b| b != 0);
-        let most = ctx.level.items.get(k).map_or(0, |r| r.max_ammo as i16);
+        let most = ctx.game.record(&ctx.level.items, k as i32).map_or(0, |r| r.max_ammo as i16);
         had && most != 0 && (ctx.game.ammo.get(k).copied().unwrap_or(0) as f32) < most as f32 * 0.1
     });
     if !low { return; }

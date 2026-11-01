@@ -8,8 +8,8 @@ use crate::level_overlay::{LevelOverlay, Relocation};
 /// Aranos's (level 0, the reference) address the code forms for the item records (their base − 0x10).
 const ITEM_ANCHOR: u32 = 0x2624f0;
 const ITEM_BASE_FROM_ANCHOR: u32 = 0x10;
-/// The records read (the 0x38 items, then the upgrades' rows).
-pub const ITEM_ROWS: usize = 0x60;
+/// The records read (the 0x38 items, then the upgrades' rows up to the last, 0x76).
+pub const ITEM_ROWS: usize = 0x77;
 pub const ITEM_STRIDE: u32 = 0xe0;
 
 /// A pause page's grid (the grid drawer `0x42e0c8`'s table).
@@ -64,6 +64,8 @@ pub struct ItemRecord {
     pub class: u8,
     /// `−0x08`: its name (text id).
     pub name: u32,
+    /// `−0x04`: Ratchet's item slot it goes in (0 the hand; `0x18b040 + 0x50·slot`, `0x1a7398 + 4·slot`).
+    pub slot: i32,
     /// `−0x0a`: its picture on the pause pages (the page's [`crate::disc::toc::PictureTable`] row; < 0: none).
     pub picture: i16,
     /// `+0x2c`: its icon (GUI image id; 0xea7e: none).
@@ -131,6 +133,7 @@ impl MenuTables {
                     mega: i32_at(b - 0x10).unwrap_or(0) != 0,
                     class: t.read(b - 0x0c, 1).map_or(0, |x| x[0]),
                     name: i32_at(b - 0x08).unwrap_or(0) as u32,
+                    slot: i32_at(b - 0x04).unwrap_or(0),
                     picture: i16_at(b - 0x0a).unwrap_or(-1),
                     icon: icon as u16,
                     description: i16_at(b + 0x32).unwrap_or(0),

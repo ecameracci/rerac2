@@ -559,6 +559,7 @@ impl Hero {
         if 0 < self.grind.pole_rest { self.grind.pole_rest -= 1; }
         for r in &mut self.fidget_rest { if 0 < *r { *r -= 1; } }
         if 0 < self.slide_hold { self.slide_hold -= 1; }
+        if 0 < self.items.swap_face { self.items.swap_face -= 1; }
         self.frame_hold();
     }
 

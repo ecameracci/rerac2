@@ -19,12 +19,12 @@
 //!
 //! Clank's rescue **0x0a08** (`0x3d2fd0`) and Clank's body **0x0057** (`0x394728`) are crate::moby::classes::endako_clank.
 //! The hacking panel **0x0b29** (`0x3e5c90`) is crate::moby::classes::hacker_panel, its puzzle crate::hacker.
+//! The mod vendor **0x0ddc / 0x0e0d** (`0x40a8a8` / `0x40b110`) is crate::moby::classes::mod_vendor.
 //!
 //! Not ported (set B's other classes):
 //! * The robots **0x093c / 0x0940** (`0x3c31f8`, 49 functions: they walk the network of **0x0f2d** (`0x41b0b0`, built
 //!   by `0x32b318` from its list of paths) and raise 0x0e87 and stand on 0x097a): too large for this pass. The boss
 //!   **0x0c8a** (`0x3f5c78`) is crate::moby::classes::endako_boss.
-//! * **0x0ddc / 0x0e0d** (`0x40a8a8` / `0x40b110`): a vendor asked through game mode 5 (G-TRI-005).
 //! * **0x0cfc / 0x094c** (`0x3c9430`: Ghidra has no function there), **0x097b** (`0x3cc2b0`: a scrolling-texture draw
 //!   `0x3cc380` through the first draw list, G-REN-003), **0x0f16** (`0x41af70`: the colour flash of scene 7's actor
 //!   `0x1bd810` and a pose word of scene 5's `0x1bd814`, the scene actors the port does not hand to classes).

@@ -58,8 +58,7 @@
 //! no ship upgrades, paint jobs or skill points); the armour vendor's Ratchet preview (`0x37a8e8`'s mode 3: his
 //! model in the armour, the helmet 0x50a and the boots 0xa73 posed on it) and the armour's change on him until the
 //! next level load (the engine attaches his armour row then); the mods' effect on the weapons (the port's weapons
-//! have none); the Mega purchase's row switch (`0x2f4bf8`: the port keeps no
-//! upgrade rows; the challenge mode never runs); the Gadgetron vendor's R&C1-save talk (`0x37a5d0`, the free
+//! have none); the Gadgetron vendor's R&C1-save talk (`0x37a5d0`, the free
 //! weapons `0x37a518` of `0x1a7a28`); the items 0x17 / 0x19's help after a purchase (`0x2f6638`); the preview's
 //! draw over the panel (`0x37ba50` draws it after the frame sprites and the HUD, clipped to 158..360 × 115..206:
 //! the port's preview is a world moby under the HUD layer, so the centre box covers it until the engine draws
@@ -321,8 +320,8 @@ pub struct Entry {
     pub slot: i32,
 }
 
-/// Item `item`'s row (`0x139568[item]`: the port keeps no upgrade rows, so the item's own).
-fn record(records: &[ItemRecord], item: i32) -> Option<&ItemRecord> { usize::try_from(item).ok().and_then(|i| records.get(i)) }
+/// Item `item`'s record: its current row (`0x139568[item]`, crate::upgrades).
+fn record<'a>(game: &GameState, records: &'a [ItemRecord], item: i32) -> Option<&'a ItemRecord> { game.record(records, item) }
 
 /// `0x2f4338(item)`: the upgrades past the base row (the `+0x3c` chain down to the base, the `+0x3a` chain up).
 pub fn upgrades(records: &[ItemRecord], item: i32) -> i32 {
@@ -418,7 +417,7 @@ impl GameState {
     /// `0x2fd028(level)`: every item the level sells into the stock (never item 0).
     pub fn stock_for_level(&mut self, level: i32, records: &[ItemRecord]) {
         for item in 1..0x38 {
-            if self.sold_on(item, level) { self.stock_add(item, record(records, item)); }
+            if self.sold_on(item, level) { self.stock_add(item, record(self, records, item)); }
         }
     }
 
@@ -453,7 +452,7 @@ fn mod_sold_on(level: i32, item: i32, slot: usize) -> bool { mods::PLANETS.iter(
 /// mode) marked on offer (`0x1a7ac0`), then each owned weapon's mods on offer, priced and not bought (`0x1a7a88`).
 pub fn mods_list(game: &mut GameState, records: &[ItemRecord], level: i32) -> Vec<Entry> {
     for item in 0..0x38 {
-        let Some(r) = record(records, item) else { continue };
+        let Some(r) = record(game, records, item) else { continue };
         if !r.mega { continue; }
         for slot in 0..3 {
             if mod_sold_on(level, item, slot) || (r.mods[slot] != 0 && game.challenge) { game.mods_available[item as usize] |= 1 << slot; }
@@ -461,7 +460,7 @@ pub fn mods_list(game: &mut GameState, records: &[ItemRecord], level: i32) -> Ve
     }
     let mut out = Vec::new();
     for item in 1..0x38 {
-        let Some(r) = record(records, item) else { continue };
+        let Some(r) = record(game, records, item) else { continue };
         if !(r.mega && game.owns(item)) { continue; }
         let on = game.mods_available[item as usize];
         for slot in 0..3 {
@@ -478,14 +477,14 @@ pub fn build_list(game: &mut GameState, records: &[ItemRecord], gadgetron: bool,
     // The challenge mode: every vendor record into the stock.
     if game.challenge {
         for item in (0..0x38).filter(|&i| i != 10) {
-            if record(records, item).is_some_and(|r| r.mega) { game.stock_add(item, record(records, item)); }
+            if record(game, records, item).is_some_and(|r| r.mega) { game.stock_add(item, record(game, records, item)); }
         }
     }
     let mut out: Vec<Entry> = Vec::new();
     // A Mega entry of an owned weapon (its base row reaches the Mega level, its current row not, no experience
     // left to earn, the challenge mode on).
     let mega_entry = |game: &GameState, item: i32| -> Option<Entry> {
-        let r = record(records, item)?;
+        let r = record(game, records, item)?;
         if !(r.mega && game.owns(item)) { return None; }
         if !reaches_mega(item, upgrades(records, item)) || item == 0x10 { return None; }
         if !r.mega { return None; }
@@ -493,7 +492,7 @@ pub fn build_list(game: &mut GameState, records: &[ItemRecord], gadgetron: bool,
         if 0 < r.xp_max || !game.challenge { return None; }
         Some(Entry { item, ammo: false, mega: true, class: r.classes[0], ..Default::default() })
     };
-    let hand_class = |item: i32| record(records, item).map_or(0, |r| r.classes[0]);
+    let hand_class = |item: i32| record(game, records, item).map_or(0, |r| r.classes[0]);
     if !gadgetron {
         for k in 0..game.stock_len() {
             let b = game.stock[k];
@@ -507,12 +506,12 @@ pub fn build_list(game: &mut GameState, records: &[ItemRecord], gadgetron: bool,
                     let class = if item == 9 || item == 0x49 { 0x259 } else { hand_class(item) };
                     out.push(Entry { item, ammo: false, mega: false, class, ..Default::default() });
                 }
-            } else if record(records, item).is_some_and(|r| r.ammo_price != 0) {
+            } else if record(game, records, item).is_some_and(|r| r.ammo_price != 0) {
                 out.push(Entry { item, ammo: true, mega: false, class: hand_class(item), ..Default::default() });
             }
         }
         for item in 0..0x38 {
-            let Some(r) = record(records, item) else { continue };
+            let Some(r) = record(game, records, item) else { continue };
             if r.mega && game.owns(item) {
                 if let Some(e) = mega_entry(game, item) {
                     // The item listed already as a Mega entry: nothing more for it.
@@ -529,7 +528,7 @@ pub fn build_list(game: &mut GameState, records: &[ItemRecord], gadgetron: bool,
     } else {
         for item in GADGETRON_ITEMS {
             let owned = game.owns(item);
-            if !owned || record(records, item).is_some_and(|r| r.ammo_price != 0) {
+            if !owned || record(game, records, item).is_some_and(|r| r.ammo_price != 0) {
                 out.push(Entry { item, ammo: owned, mega: false, class: hand_class(item), ..Default::default() });
             }
         }
@@ -691,7 +690,8 @@ impl Vendor {
         } else if e.free {
             0
         } else {
-            record(records, e.item).map_or(0, |r| r.price)
+            // A weapon for sale is not had: its row is its base row (`0x139568[item]` = the item).
+            usize::try_from(e.item).ok().and_then(|i| records.get(i)).map_or(0, |r| r.price)
         }
     }
 
@@ -710,7 +710,7 @@ impl Vendor {
     /// `0x37a8e8`'s mode-0 part: the preview of the selection — an ammo entry's crate, else the weapon's hand
     /// class (its description on the ticker), placed by [`PREVIEW`] (`0x37b728`, at once: the port has every
     /// class).
-    fn rebuild_preview(&mut self, _game: &GameState, records: &[ItemRecord], texts: &dyn Fn(u32) -> Vec<u8>) {
+    fn rebuild_preview(&mut self, game: &GameState, records: &[ItemRecord], texts: &dyn Fn(u32) -> Vec<u8>) {
         if self.kind == Kind::Armor {
             // Mode 3: the armour's description ("Can't buy any armor" without one); Ratchet's model in it is not ported.
             let text = match self.current().filter(|e| e.level != 0) {
@@ -730,7 +730,7 @@ impl Vendor {
             p.entry = self.sel;
             p.class = e.class;
             let row = PREVIEW.get(e.item.max(0) as usize).copied().unwrap_or(PREVIEW[0]);
-            let upgraded = record(records, e.item).is_some_and(|r| r.class != 0);
+            let upgraded = record(game, records, e.item).is_some_and(|r| r.class != 0);
             let (rot, place) = if upgraded { (row[2], row[3]) } else { (row[0], row[1]) };
             p.rot = [rot[0], rot[1], rot[2]];
             p.offset = [place[0], place[1], place[2] - drop];
@@ -752,12 +752,12 @@ impl Vendor {
             (p.shown, p.fade, p.alpha, p.placed) = (true, 0, 0, true);
             return;
         }
-        let text = if e.mega { record_at(records, e.item, mega_level(e.item)).map_or(0, |r| r.vendor_text) } else { record(records, e.item).map_or(0, |r| r.vendor_text) };
+        let text = if e.mega { record_at(records, e.item, mega_level(e.item)).map_or(0, |r| r.vendor_text) } else { record(game, records, e.item).map_or(0, |r| r.vendor_text) };
         self.set_ticker(&texts(text.max(0) as u32));
         let p = &mut self.preview;
         p.class = e.class;
         let row = PREVIEW.get(e.item.max(0) as usize).copied().unwrap_or(PREVIEW[0]);
-        let upgraded = record(records, e.item).is_some_and(|r| r.class != 0);
+        let upgraded = record(game, records, e.item).is_some_and(|r| r.class != 0);
         let (rot, place) = if upgraded { (row[2], row[3]) } else { (row[0], row[1]) };
         p.rot = [rot[0], rot[1], rot[2]];
         p.offset = [place[0], place[1], place[2] - drop];
@@ -782,7 +782,7 @@ impl Vendor {
     pub fn hud_ammo(&self, game: &GameState, records: &[ItemRecord]) -> Option<(u16, i32, i32)> {
         if self.kind != Kind::Weapons { return None; }
         let e = self.current().filter(|e| e.ammo)?;
-        let r = record(records, e.item)?;
+        let r = record(game, records, e.item)?;
         Some((r.icon, Self::ammo_of(game, e.item), r.max_ammo as i32))
     }
 
@@ -899,7 +899,7 @@ impl Vendor {
         if pad.pressed & button::CROSS != 0 && self.prev_pressed & button::CROSS == 0 && (self.kind != Kind::Armor || self.current().is_some_and(|e| e.price != 0)) {
             let e = self.current().unwrap_or_default();
             let refused = self.kind == Kind::Weapons && {
-                let (ammo, max, unit) = record(records, e.item).map_or((0, 0, 0), |r| (Self::ammo_of(game, e.item), r.max_ammo as i32, r.ammo_price as i32));
+                let (ammo, max, unit) = record(game, records, e.item).map_or((0, 0, 0), |r| (Self::ammo_of(game, e.item), r.max_ammo as i32, r.ammo_price as i32));
                 let bolts = game.bolts as i32;
                 (e.ammo || bolts < self.price(records)) && (!e.ammo || max <= ammo || bolts < unit)
             };
@@ -992,7 +992,7 @@ impl Vendor {
                     out.push(Out::Sound(sound::PURCHASE));
                     game.spend_platinum(e.price);
                     if mods::HELP.get(self.sel).copied() == Some(2) { out.push(Out::Help(0xa01, 0x58)); }
-                    let priced = record(records, e.item).is_some_and(|r| r.mods.get(e.slot as usize).is_some_and(|&m| m != 0));
+                    let priced = record(game, records, e.item).is_some_and(|r| r.mods.get(e.slot as usize).is_some_and(|&m| m != 0));
                     if priced {
                         let b = &mut game.mods_bought[e.item.max(0) as usize & 0x3f];
                         *b |= 1 << ((e.slot & 0xf) << 1);
@@ -1014,7 +1014,7 @@ impl Vendor {
             self.buy = 0;
             return;
         };
-        let Some(r) = record(records, e.item).copied() else {
+        let Some(r) = record(game, records, e.item).copied() else {
             self.buy = 0;
             return;
         };
@@ -1115,6 +1115,8 @@ impl Vendor {
                                 }
                             }
                             if e.item != 0x1f && e.item != 0x3d { out.push(Out::Equip(e.item)); }
+                            // `0x2f4bf8`: a Mega entry's row switch (crate::upgrades), after the hand request.
+                            if e.mega { game.buy_mega(records, e.item); }
                             game.bolts = (bolts - price).max(0) as u32;
                             let gadgetron = self.gadgetron;
                             self.entries = build_list(game, records, gadgetron, false);
@@ -1156,7 +1158,7 @@ impl Vendor {
                 self.draw_title(game, records, g, icon, texts, out);
                 self.draw_buttons(game, records, g, texts, out);
                 self.draw_question(game, records, g, icon, texts, out);
-                self.draw_strip(records, g, icon, texts, out);
+                self.draw_strip(game, records, g, icon, texts, out);
             }
             Kind::Armor => {
                 self.draw_armor_title(game, g, icon, texts, out);
@@ -1168,7 +1170,7 @@ impl Vendor {
                 self.draw_mods_title(game, records, g, icon, texts, out);
                 self.draw_mods_buttons(game, g, texts, out);
                 self.draw_mods_question(game, g, texts, out);
-                self.draw_mods_strip(records, g, icon, out);
+                self.draw_mods_strip(game, records, g, icon, out);
             }
             Kind::Ship => {}
         }
@@ -1253,7 +1255,7 @@ impl Vendor {
         if e.item != 0 {
             let mut t = texts(mods::NAMES[slot]);
             t.extend_from_slice(b" for ");
-            t.extend_from_slice(&texts(record(records, e.item).map_or(0, |r| r.name)));
+            t.extend_from_slice(&texts(record(game, records, e.item).map_or(0, |r| r.name)));
             centred(out, g, &t, 256.0, 263.0, TEXT_WHITE);
         }
         let platinum = texts(mods::PLATINUM);
@@ -1302,14 +1304,14 @@ impl Vendor {
     /// `0x377338`: the strip at y 312..382: the box at (227, 312)-(287, 379); per slot from `scroll − 0x2f` the
     /// weapon's icon 24 × 24 at (+13, 346) in its class colour, the mod's icon 0xeaa3 (frame = the slot) 30 × 30 at
     /// (+10, 315) and its frame 3 at (+10, 345), fading 0.75 a pixel from x 256.
-    fn draw_mods_strip(&self, records: &[ItemRecord], g: &[Glyph; 256], icon: &dyn Fn(u16, u16) -> Option<(Tex, [f32; 2])>, out: &mut Vec<Quad>) {
+    fn draw_mods_strip(&self, game: &GameState, records: &[ItemRecord], g: &[Glyph; 256], icon: &dyn Fn(u16, u16) -> Option<(Tex, [f32; 2])>, out: &mut Vec<Quad>) {
         let _ = g;
         self.draw_box(0xe3, 0x138, 0x11f, 0x17b, out);
         let fade = |x: f32| (0x80 - ((256.0 - x).abs() * STRIP_FADE) as i32).max(0);
         for k in -5..7i32 {
             let Some(e) = usize::try_from(self.sel as i32 + k).ok().and_then(|i| self.entries.get(i)) else { continue };
             let x = (self.scroll - 0x2f + STRIP_PITCH * (k + 5)) as f32;
-            let Some(r) = record(records, e.item) else { continue };
+            let Some(r) = record(game, records, e.item) else { continue };
             let class = if SPECIALS.contains(&e.item) && r.class == 1 { 2 } else { r.class as usize };
             let rgb = ICON_COLOURS.get(class).copied().unwrap_or(0) & 0xff_ffff;
             let al = (fade(x + 2.0) + fade(x + STRIP_ICON)) / 2;
@@ -1336,7 +1338,7 @@ impl Vendor {
         let Some(e) = self.current() else { return };
         let bolts = game.bolts as i32;
         let (name, price, room) = if e.ammo {
-            let r = record(records, e.item);
+            let r = record(game, records, e.item);
             let mut name = texts(r.map_or(0, |r| r.name));
             name.push(b'-');
             name.extend_from_slice(&texts(text::AMMO));
@@ -1345,7 +1347,7 @@ impl Vendor {
         } else if e.mega {
             (texts(record_at(records, e.item, mega_level(e.item)).map_or(0, |r| r.name)), self.price(records), true)
         } else {
-            (texts(record(records, e.item).map_or(0, |r| r.name)), self.price(records), true)
+            (texts(record(game, records, e.item).map_or(0, |r| r.name)), self.price(records), true)
         };
         centred(out, g, &name, 256.0, 274.0, TEXT_WHITE);
         let colour = if bolts < price { TEXT_RED } else { TEXT_WHITE };
@@ -1364,7 +1366,7 @@ impl Vendor {
         let Some(e) = self.current() else { return false };
         let bolts = game.bolts as i32;
         if !e.ammo { return self.price(records) <= bolts; }
-        record(records, e.item).is_some_and(|r| Self::ammo_of(game, e.item) < r.max_ammo as i32 && r.ammo_price as i32 <= bolts)
+        record(game, records, e.item).is_some_and(|r| Self::ammo_of(game, e.item) < r.max_ammo as i32 && r.ammo_price as i32 <= bolts)
     }
 
     /// `0x379000`: the buttons at y 164: "✕ Buy" at 80 (when affordable) and "△ Exit" at 420; in a buy "△ Back",
@@ -1378,7 +1380,7 @@ impl Vendor {
         }
         let Some(e) = self.current() else { return };
         let bolts = game.bolts as i32;
-        let (ammo, max, unit) = record(records, e.item).map_or((0, 0, 0), |r| (Self::ammo_of(game, e.item), r.max_ammo as i32, r.ammo_price as i32));
+        let (ammo, max, unit) = record(game, records, e.item).map_or((0, 0, 0), |r| (Self::ammo_of(game, e.item), r.max_ammo as i32, r.ammo_price as i32));
         if e.ammo {
             if max <= ammo || bolts < unit {
                 centred(out, g, &texts(text::BACK), rightx, y, TEXT_WHITE);
@@ -1403,7 +1405,7 @@ impl Vendor {
         let mut b = TextBox { top: 0x78, bottom: 200, left: 0xa0, right: 0x160, x: 0x100, y: 160, width: 0xb8, height: 72, line: 0x10, flags: text_box::CENTRE | text_box::MIDDLE };
         let white = TEXT_WHITE.to_le_bytes();
         if e.ammo {
-            let unit = record(records, e.item).map_or(0, |r| r.ammo_price as i32);
+            let unit = record(game, records, e.item).map_or(0, |r| r.ammo_price as i32);
             if unit <= bolts {
                 b.flags = text_box::CENTRE;
                 b.y = 132;
@@ -1426,7 +1428,7 @@ impl Vendor {
 
     /// `0x376d40`: the strip (module docs). The offset eases 4 a frame to 0; the selection's box pulses with the
     /// frame count; seven icons either side of the selection's slot.
-    fn draw_strip(&self, records: &[ItemRecord], g: &[Glyph; 256], icon: &dyn Fn(u16, u16) -> Option<(Tex, [f32; 2])>, texts: &dyn Fn(u32) -> Vec<u8>, out: &mut Vec<Quad>) {
+    fn draw_strip(&self, game: &GameState, records: &[ItemRecord], g: &[Glyph; 256], icon: &dyn Fn(u16, u16) -> Option<(Tex, [f32; 2])>, texts: &dyn Fn(u32) -> Vec<u8>, out: &mut Vec<Quad>) {
         let pulse = ((self.ticks & 0xf) * 4 - 0x20).abs();
         let k = (pulse + 0x40) as u32;
         gui::rect(out, 325, 381, 0xe5, 0x11d, (k * 0x10202 | 0x8000_0000).to_le_bytes());
@@ -1435,7 +1437,7 @@ impl Vendor {
         for k in -5..7i32 {
             let Some(e) = usize::try_from(self.sel as i32 + k).ok().and_then(|i| self.entries.get(i)) else { continue };
             let x = (self.scroll - 0x2f + STRIP_PITCH * (k + 5)) as f32;
-            let Some(r) = record(records, e.item) else { continue };
+            let Some(r) = record(game, records, e.item) else { continue };
             let class = if e.mega { 2 } else if SPECIALS.contains(&e.item) && r.class == 1 { 2 } else { r.class as usize };
             let rgb = ICON_COLOURS.get(class).copied().unwrap_or(0) & 0xff_ffff;
             let al = (fade(x + 2.0) + fade(x + STRIP_ICON)) / 2;

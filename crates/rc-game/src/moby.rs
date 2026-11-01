@@ -553,6 +553,9 @@ pub struct MobyWorld {
     pub spiderbot: classes::spiderbot::Blast,
     /// The Chopper's trail slots (classes::chopper).
     pub chopper: classes::chopper::Pool,
+    /// The frame's additive full-screen fills (`0x2e8810` under ALPHA 0x48, GS RGBA) the draw callbacks asked for
+    /// (crate::fx::callbacks clears them; the engine draws them under the HUD): the Blitz Gun's screen flash.
+    pub screen_fills: Vec<u32>,
     /// The frame's blob shadows (`0x1be840`, crate::shadows), asked for by the updates and drawn with crate::fx's quads.
     pub shadows: crate::shadows::Shadows,
     /// The dying mobys' fades and their manager (crate::moby::classes::death_fade).
@@ -567,6 +570,8 @@ pub struct MobyWorld {
     /// The point lights (`0x1c6ec0`), owned by the explosion lights (classes::light); the engine lights the world and
     /// the mobys with them.
     pub point_lights: crate::point_lights::PointLights,
+    /// What `0x3228f8` reads of Ratchet's hand (crate::upgrades::hitter_item), kept by the item pass.
+    pub hitters: crate::upgrades::Hitters,
 }
 
 /// The instance data the static spawn reads besides the records (gameplay sections 20, 22..25).

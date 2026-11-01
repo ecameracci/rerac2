@@ -29,7 +29,9 @@ fn excluded(i: usize) -> bool { matches!(i, 0x1f | 0x2d | 0x3d | 0x4d) }
 pub(crate) fn pick(ctx: &mut Ctx) -> (Option<usize>, i32) {
     let items = &ctx.level.items;
     let g = &mut *ctx.game;
-    let max = |i: usize| items.get(i).map_or(0, |r| r.max_ammo as i32);
+    // Each item's current row (`0x139568`, crate::upgrades).
+    let rows: Vec<Option<u16>> = (0..0x38).map(|i| g.record(items, i).map(|r| r.max_ammo)).collect();
+    let max = |i: usize| rows.get(i).copied().flatten().map_or(0, |m| m as i32);
     let has = |g: &crate::game::GameState, i: usize| g.items.get(i).is_some_and(|&b| b != 0);
     let ammo = |g: &crate::game::GameState, i: usize| g.ammo.get(i).copied().unwrap_or(0);
     let all: Vec<usize> = (0..0x38).filter(|&i| has(g, i) && max(i) != 0 && !excluded(i)).collect();
@@ -67,7 +69,7 @@ pub fn spawn(w: &mut MobyWorld, ctx: &mut Ctx, pos: V3, item: usize, amount: Opt
     let gravity = rng.randf(10.0, 15.0);
     let hero = ctx.hero_moby;
     let id = shards::spawn_shard(w, ctx, CLASS, hero, pos, [0.0, 0.0, yaw], None, spin, gravity, 0, vel, 0xff)?;
-    let give = amount.unwrap_or_else(|| ctx.level.items.get(item).map_or(0, |r| r.pickup_ammo as i32));
+    let give = amount.unwrap_or_else(|| ctx.game.record(&ctx.level.items, item as i32).map_or(0, |r| r.pickup_ammo as i32));
     let light = hero.and_then(|h| w.mobys.get(h)).map(|h| (h.light, h.ambient));
     let m = &mut w.mobys[id];
     m.state = 1;
@@ -133,7 +135,7 @@ fn rest_or_take(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> bool {
         if near(m.pos, hero) { m.set_pv_i(0x7c, 3); }
     }
     let item = m.pv_i(0x68).max(0) as usize;
-    let max = ctx.level.items.get(item).map_or(0, |r| r.max_ammo as i32);
+    let max = ctx.game.record(&ctx.level.items, item as i32).map_or(0, |r| r.max_ammo as i32);
     if max <= ctx.game.ammo.get(item).copied().unwrap_or(0) { take = false; }
     if m.pos[2] < m.pv_f(0x78) - 2.0 { take = true; }
     if ctx.hero.hp == 0 { take = false; }
@@ -145,7 +147,7 @@ fn rest_or_take(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> bool {
     if let Some(a) = ctx.game.ammo.get_mut(item) { *a = (*a + give).min(if max == 0 { i32::MAX } else { max }); }
     let added = ctx.game.ammo.get(item).copied().unwrap_or(0) - before;
     if 0 < added {
-        let t = ctx.level.items.get(item).map_or(0, |r| r.pickup_text[if added == 1 { 0 } else { 1 }] as i32);
+        let t = ctx.game.record(&ctx.level.items, item as i32).map_or(0, |r| r.pickup_text[if added == 1 { 0 } else { 1 }] as i32);
         ctx.game.messages.push(crate::msgbox::Request::Formatted { text: t, n: added, ticks: None });
     }
     m.set_state(2, -1);

@@ -698,6 +698,9 @@ pub(crate) fn damage_of(w: &mut MobyWorld, id: usize, hit: Option<&super::hits::
     }
     let Some(hit) = hit else { return 0.0 };
     let mut dmg = hit.tmpl.damage;
+    // `0x3228f8`: the hitter's item (crate::upgrades::hitter_item; the wrench's own hits name it too).
+    let item = hit.tmpl.source.map(|s| if wrench { 10 } else { crate::upgrades::hitter_item(w, s) });
+    let m = &mut w.mobys[id];
     if let Some(src) = hit.tmpl.source {
         if link(m, h + 0x18) == Some(src) {
             let ticks = m.pv_s(h + 0x1c);
@@ -709,8 +712,7 @@ pub(crate) fn damage_of(w: &mut MobyWorld, id: usize, hit: Option<&super::hits::
             }
         } else {
             set_link(m, h + 0x18, Some(src));
-            // `0x3228f8`: the hitter's item (the wrench: 10; the classes with their own kinds are not on Aranos).
-            m.set_pv_b(h + 0x17, if wrench { 10 } else { 0xff });
+            m.set_pv_b(h + 0x17, item.unwrap_or(0xff));
             m.set_pv_s(h + 0x1c, 1);
         }
     }

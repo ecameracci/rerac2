@@ -46,10 +46,14 @@ pub const SWINGSHOT_CLASS: i16 = crate::moby::classes::swingshot::HAND_CLASS;
 /// The Chopper: item 0x16, class 0x879 (L00 row `0x263840`; crate::moby::classes::chopper).
 pub const CHOPPER: i32 = 0x16;
 pub const CHOPPER_CLASS: i16 = crate::moby::classes::chopper::HAND_CLASS;
+/// The Blitz Gun: item 0x1a, class 0x5d1 (L00 row `0x263bc0`; crate::moby::classes::blitz).
+pub const BLITZ: i32 = 0x1a;
+pub const BLITZ_CLASS: i16 = crate::moby::classes::blitz::HAND_CLASS;
 
-/// An item record (`0x262500 + 0xe0·row`, row `0x139568[item]` = the item): the fields the port reads.
+/// An item record (`0x262500 + 0xe0·row`, row `0x139568[item]`: crate::upgrades): the fields the port reads.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ItemRow {
+    /// The record's row (a base row's is its item's id; the upgrades' rows follow 0x37, [`UPGRADE_ROWS`]).
     pub item: i32,
     /// `+0x00`: Ratchet's attachment it sits at; `+0x04` its moby class.
     pub attach: usize,
@@ -74,8 +78,9 @@ pub struct ItemRow {
 }
 
 /// The rows the port has (L00 `0x262dc0`, `0x263f40`, `0x2649c0`; the Dynamo's from Oozla's live table; the
-/// Electrolyzer's and the Spiderbot Glove's from L02's; the Swingshot's from L03's; the Chopper's L00 `0x263840`).
-pub const ROWS: [ItemRow; 9] = [
+/// Electrolyzer's and the Spiderbot Glove's from L02's; the Swingshot's from L03's; the Chopper's L00 `0x263840`; the
+/// Blitz Gun's L00 `0x263bc0`).
+pub const ROWS: [ItemRow; 10] = [
     ItemRow { item: WRENCH, attach: 0, class: WRENCH_CLASS, stance: 0, icon: 0, use_seq: 0, keep: false, fire_seq: [0, 0], speed: 0.0, rate: 0.0, damage: 1.0, ammo: false, max_ammo: 0, start_ammo: 0 },
     ItemRow { item: LANCER, attach: 0, class: LANCER_CLASS, stance: 1, icon: 0xea64, use_seq: 0x38, keep: true, fire_seq: [-1, 0x3e], speed: 60.0, rate: 7.0, damage: 0.5, ammo: true, max_ammo: 200, start_ammo: 200 },
     ItemRow { item: DYNAMO, attach: 1, class: DYNAMO_CLASS, stance: 1, icon: 0xea7f, use_seq: 0x8d, keep: false, fire_seq: [0x8e, 0x8d], speed: 0.0, rate: 0.0, damage: 0.0, ammo: false, max_ammo: 0, start_ammo: 0 },
@@ -85,10 +90,35 @@ pub const ROWS: [ItemRow; 9] = [
     ItemRow { item: SPIDERBOT, attach: 6, class: SPIDERBOT_CLASS, stance: 0, icon: 0xea6e, use_seq: 0x2c, keep: false, fire_seq: [0x42, 0x2c], speed: 0.0, rate: 0.0, damage: 12.0, ammo: true, max_ammo: 8, start_ammo: 8 },
     ItemRow { item: SWINGSHOT, attach: 1, class: SWINGSHOT_CLASS, stance: 1, icon: 0xea8b, use_seq: 0, keep: false, fire_seq: [0, 0], speed: 0.0, rate: 0.0, damage: 0.0, ammo: false, max_ammo: 0, start_ammo: 0 },
     ItemRow { item: CHOPPER, attach: 6, class: CHOPPER_CLASS, stance: 0, icon: 0xea66, use_seq: 0x8f, keep: false, fire_seq: [0x8f, 0x8f], speed: 30.0, rate: 1.8, damage: 1.0, ammo: true, max_ammo: 35, start_ammo: 35 },
+    ItemRow { item: BLITZ, attach: 0, class: BLITZ_CLASS, stance: 2, icon: 0xea67, use_seq: 0x89, keep: false, fire_seq: [0x8a, -1], speed: 0.0, rate: 2.0, damage: 3.0, ammo: true, max_ammo: 40, start_ammo: 40 },
 ];
 
-/// Item `item`'s row.
-pub fn row(item: i32) -> Option<&'static ItemRow> { ROWS.iter().find(|r| r.item == item) }
+/// The upgraded rows the port has (L00 `0x262500 + 0xe0·row`; their item in brackets): the Heavy Lancer 0x3c and the
+/// Mega rows 0x4f / 0x50 (0x1e), the Mini-Nuke 0x47, 0x51, 0x52 (0x2a), the Spiderbot Glove's 0x4e, 0x69, 0x6a (0x20),
+/// the Mega Chopper 0x41, 0x53, 0x54 (0x16). Each names its own hand class (`+0x04`).
+pub const UPGRADE_ROWS: [ItemRow; 12] = [
+    ItemRow { item: 0x3c, attach: 0, class: 0xc05, stance: 2, icon: 0xea64, use_seq: 0x33, keep: true, fire_seq: [-1, -1], speed: 80.0, rate: 10.0, damage: 0.67, ammo: true, max_ammo: 300, start_ammo: 300 },
+    ItemRow { item: 0x4f, attach: 0, class: 0xc05, stance: 2, icon: 0xea64, use_seq: 0x33, keep: true, fire_seq: [-1, -1], speed: 80.0, rate: 10.0, damage: 4.0, ammo: true, max_ammo: 400, start_ammo: 300 },
+    ItemRow { item: 0x50, attach: 0, class: 0xc05, stance: 2, icon: 0xea64, use_seq: 0x33, keep: true, fire_seq: [-1, -1], speed: 80.0, rate: 10.0, damage: 8.0, ammo: true, max_ammo: 500, start_ammo: 300 },
+    ItemRow { item: 0x47, attach: 0, class: 0xa5a, stance: 2, icon: 0xea65, use_seq: 0x36, keep: false, fire_seq: [-1, 0x46], speed: 7.0, rate: 0.5, damage: 0.0, ammo: true, max_ammo: 8, start_ammo: 8 },
+    ItemRow { item: 0x51, attach: 0, class: 0xa5a, stance: 2, icon: 0xea65, use_seq: 0x36, keep: false, fire_seq: [-1, 0x46], speed: 7.0, rate: 0.5, damage: 0.0, ammo: true, max_ammo: 20, start_ammo: 8 },
+    ItemRow { item: 0x52, attach: 0, class: 0xa5a, stance: 2, icon: 0xea65, use_seq: 0x36, keep: false, fire_seq: [-1, 0x46], speed: 7.0, rate: 0.5, damage: 0.0, ammo: true, max_ammo: 30, start_ammo: 8 },
+    ItemRow { item: 0x4e, attach: 6, class: 0xe7a, stance: 0, icon: 0xea6e, use_seq: 0x2c, keep: false, fire_seq: [0x42, 0x2c], speed: 0.0, rate: 0.0, damage: 18.0, ammo: true, max_ammo: 8, start_ammo: 8 },
+    ItemRow { item: 0x69, attach: 6, class: 0xe7a, stance: 0, icon: 0xea6e, use_seq: 0x2c, keep: false, fire_seq: [0x42, 0x2c], speed: 0.0, rate: 0.0, damage: 30.0, ammo: true, max_ammo: 16, start_ammo: 8 },
+    ItemRow { item: 0x6a, attach: 6, class: 0xe7a, stance: 0, icon: 0xea6e, use_seq: 0x2c, keep: false, fire_seq: [0x42, 0x2c], speed: 0.0, rate: 0.0, damage: 100.0, ammo: true, max_ammo: 24, start_ammo: 8 },
+    ItemRow { item: 0x41, attach: 6, class: 0xaf6, stance: 0, icon: 0xea66, use_seq: 0x8f, keep: false, fire_seq: [0x8f, 0x8f], speed: 30.0, rate: 1.8, damage: 2.0, ammo: true, max_ammo: 35, start_ammo: 35 },
+    ItemRow { item: 0x53, attach: 6, class: 0xaf6, stance: 0, icon: 0xea66, use_seq: 0x8f, keep: false, fire_seq: [0x8f, 0x8f], speed: 30.0, rate: 1.8, damage: 5.0, ammo: true, max_ammo: 50, start_ammo: 35 },
+    ItemRow { item: 0x54, attach: 6, class: 0xaf6, stance: 0, icon: 0xea66, use_seq: 0x8f, keep: false, fire_seq: [0x8f, 0x8f], speed: 30.0, rate: 1.8, damage: 8.0, ammo: true, max_ammo: 70, start_ammo: 35 },
+];
+
+/// Row `row` of the records ([`ROWS`], [`UPGRADE_ROWS`]).
+pub fn row_at(row: usize) -> Option<&'static ItemRow> { ROWS.iter().chain(UPGRADE_ROWS.iter()).find(|r| r.item as usize == row) }
+
+/// Item `item`'s record: its current row (`0x139568[item]`, crate::upgrades).
+pub fn row(game: &crate::game::GameState, item: i32) -> Option<&'static ItemRow> {
+    if item < 0 { return None; }
+    row_at(game.item_row(item))
+}
 
 /// The head item's moby class (slot 2, `0x18b0e0`: item 0x2f, the pilot's helmet; `0x2d5138` names it).
 pub const HEAD_CLASS: i16 = 0x50a;
@@ -143,8 +173,10 @@ pub struct ItemBlock {
     /// `0x18b040`: the hand item's moby; its class.
     pub hand: Option<usize>,
     pub hand_class: i16,
-    /// `0x18b068`: the item (10 = the wrench).
+    /// `0x18b068`: the item (10 = the wrench); `0x139568[item]`: its row as the last item pass saw it (the hero's
+    /// tick has no game state, [`ItemBlock::held_row`]).
     pub item: i32,
+    pub row: usize,
     /// `0x18b0e0`: the head item's moby ([`head_pass`]).
     pub head: Option<usize>,
     /// `0x18b090` / `0x18b094`: the worn feet's mobys ([`feet_pass`]).
@@ -185,6 +217,10 @@ pub struct ItemBlock {
     /// The Chopper's trigger with no blades left: its class sound 0 at Ratchet (`0x360698(0, 0, Ratchet, class)`),
     /// played by the item pass.
     pub empty_click: bool,
+    /// `0x18a01c` (s16) / `0x18c314`: the swap face's ticks and its kind (`0x2b1380`: the Blitz Gun and the items 0xe /
+    /// 0x1b / 0x2b / 0x2c drawn give 0x46 ticks of kind 3; crate::hero::layers plays it; counted down by `0x2c3330`).
+    pub swap_face: i16,
+    pub swap_kind: u8,
     /// `0x18c0db`: the held item's stance type (its row's `+0x0c`: 1 one hand, 2 both; crate::hero::layers).
     pub stance: u8,
     /// `0x18c0df`: the hand item tucked away (some states' entries; every change clears it).
@@ -228,6 +264,9 @@ pub struct ItemBlock {
 }
 
 impl ItemBlock {
+    /// The held item's record (its row `0x139568[0x18b068]`, [`ItemBlock::row`]).
+    pub fn held_row(&self) -> Option<&'static ItemRow> { if self.item <= 0 { None } else { row_at(self.row) } }
+
     /// `0x2b05a0`'s record: the attachment's rows into the ring.
     pub fn ring_push(&mut self, rows: [V3; 3]) {
         self.ring[self.ring_at] = rows;
@@ -271,7 +310,7 @@ impl ItemBlock {
         if item == held {
             self.request = 0;
             true
-        } else if item == 0x77 || row(item).is_some() {
+        } else if item == 0x77 || row_at(item.max(0) as usize).is_some() {
             self.request = item;
             true
         } else {
@@ -281,12 +320,12 @@ impl ItemBlock {
 
     /// `0x2d43e0(-1)`: the held item's ammo is not out (an item without ammo always can).
     pub fn has_ammo(&self, game: &crate::game::GameState) -> bool {
-        match row(self.item) { Some(r) if r.ammo => game.ammo.get(self.item.max(0) as usize).is_some_and(|&a| a != 0), _ => true }
+        match row(game, self.item) { Some(r) if r.ammo => game.ammo.get(self.item.max(0) as usize).is_some_and(|&a| a != 0), _ => true }
     }
 
     /// `0x2d42d0(-1, n)`: take `n` of the held item's ammo; false when there is too little.
     pub fn take_ammo(&self, game: &mut crate::game::GameState, n: i32) -> bool {
-        if !row(self.item).is_some_and(|r| r.ammo) { return true; }
+        if !row(game, self.item).is_some_and(|r| r.ammo) { return true; }
         let Some(a) = game.ammo.get_mut(self.item.max(0) as usize) else { return false };
         if n <= *a { *a -= n; true } else { false }
     }
@@ -298,7 +337,7 @@ impl ItemBlock {
     /// (crate::hero::layers). The idle look starts over (`0x2ab458`).
     pub fn use_start(&mut self, group: i32) {
         if self.ready != 2 { return; }
-        let Some(r) = row(self.item) else { return };
+        let Some(r) = self.held_row() else { return };
         self.using = true;
         self.keep = r.keep;
         let blend = if r.stance == 0 {
@@ -327,7 +366,7 @@ impl ItemBlock {
     pub fn use_stance(&mut self, state: i32, seq_b: u8, blending: bool, idle: u8) {
         if !self.using || blending || !self.keep || self.raised { return; }
         if self.ready == 2 && self.item == self.use_item {
-            let s = row(self.item).map_or(0, |r| r.use_seq);
+            let s = self.held_row().map_or(0, |r| r.use_seq);
             if seq_b as i32 != s {
                 if self.fire[0].is_some() { self.fire_leave = 1; }
                 self.use_seq = s;
@@ -400,6 +439,23 @@ fn hand_pass(world: &mut MobyWorld, ctx: &mut Ctx) {
     feet_pass(world, ctx);
     look_kind(world, ctx);
     create_hand(world, ctx);
+    {
+        // The held item's row (`0x139568[0x18b068]`) for the hero's tick, and what `0x3228f8` reads of the hand
+        // (crate::upgrades::hitter_item).
+        let it = &mut ctx.hero.items;
+        it.row = ctx.game.item_row(it.item);
+        // Port: the row changed under the hand outside the upgrade screen (the vendor's Mega purchase, a dev switch):
+        // the old class goes and the new row's comes with the next creation, as the screen's swap does (`0x3805e0`).
+        if let (Some(id), Some(r)) = (it.hand, it.held_row()) {
+            if it.ready == 2 && r.class != it.hand_class {
+                world.delete(id);
+                it.hand = None;
+                it.ready = 0;
+                it.next_create = ctx.game.frame;
+            }
+        }
+        world.hitters.refresh(ctx.game, it.hand, it.item);
+    }
     let Some(id) = ctx.hero.items.hand else {
         switch(world, ctx);
         return;
@@ -419,9 +475,9 @@ fn hand_pass(world: &mut MobyWorld, ctx: &mut Ctx) {
     // `0x313420`: the hand item is out of the moby loop; its placement `0x2b09e0` advances its animation.
     ctx.host.advance(&world.mobys[id]);
     if it.thrown == 0 {
-        let attach = row(it.item).map_or(0, |r| r.attach);
+        let attach = it.held_row().map_or(0, |r| r.attach);
         if let Some((rows, mut pos)) = ctx.host.hero_attach(attach) {
-            let stance = row(it.item).is_some_and(|r| r.stance != 0);
+            let stance = it.held_row().is_some_and(|r| r.stance != 0);
             // `0x2b05a0`: the attachment's rows into the ring; an item of a stance turns as their recent average.
             it.ring_push(rows);
             let mut out = if stance { it.smoothed(ctx.hero.state == 2).unwrap_or(world.mobys[id].rows) } else { rows };
@@ -490,30 +546,82 @@ fn hand_pass(world: &mut MobyWorld, ctx: &mut Ctx) {
     let it = &mut ctx.hero.items;
     it.ammo_left = it.has_ammo(ctx.game);
     if std::mem::take(&mut it.empty_click) {
-        if let (Some(h), Some(r)) = (ctx.hero_moby, row(it.item)) { ctx.host.play_sound_of(&world.mobys[h], r.class, 0, 0); }
+        if let (Some(h), Some(r)) = (ctx.hero_moby, it.held_row()) { ctx.host.play_sound_of(&world.mobys[h], r.class, 0, 0); }
     }
 }
 
-/// `0x2a7ed8`: the hand item's glow, once it has been in the hand 0x17 ticks (not while hidden or in state 0x61). By
-/// item: the Lancer (0x1e) eases its glow word (`+0x78`, its glow vertices' colour) 0.15 a tick toward a colour that
-/// pulses with its phase (0.0407 a tick, `sin`) between 0xff0028c8 and 0xff10b4b4 — in use 0.22 toward 0xff0040ff ..
-/// 0xff10bebe, the phase 0.116 a tick — and sheds a glow sprite of that colour on it (`0x33f550`: type 0x59, 50400,
-/// at (0.195, −0.317, 0) in its rows, pulled 0.15 toward the camera, 2 ticks), its alpha the ticks in the hand − 15
-/// (at most 0x38; in use 0x32). Not ported: the other items' cases and the upgraded Lancer's (row `+0x04`).
+/// `0x2a7ed8`: the hand item's glow, once it has been in the hand 0x17 ticks (not while hidden or in state 0x61): its
+/// phase (`0x18b06c`) steps, its glow word (`+0x78`, its glow vertices' colour) pulses between two colours by `sin`,
+/// and some items shed glow sprites of it (`0x33f550`: type 0x59, at an offset in their rows, pulled toward the
+/// camera, 2 ticks), the alpha capped by the ticks in the hand − 15 ([`GLOWS`]). By item and its row's level
+/// (`0x2624f4 + 0xe0·0x139568[item]`, crate::upgrades): the Lancer (0x1e) eases its word 0.15 a tick toward the
+/// pulse — in use 0.22 and faster — and on the Heavy Lancer's rows it is the pulse of `0xff0020ff` .. `0xff104080`
+/// after the ease; the Chopper (0x16) and the Spiderbot Glove (0x20) only pulse; the Gravity Bomb (0x2a) pulses and
+/// sheds one sprite, its upgrade two.
+///
+/// The Blitz Gun (0x1a) only pulses.
+///
+/// Not ported: the other items' cases (0xe, 0x10, 0x12, 0x17..0x19, 0x1b..0x1d, 0x29, 0x2b, 0x2c: their weapons are
+/// not ported).
 fn hand_glow(world: &mut MobyWorld, ctx: &mut Ctx, id: usize) {
     let it = &mut ctx.hero.items;
     if ctx.hero.state == 0x61 || world.mobys[id].mode & 1 != 0 || it.item_ticks < 0x17 { return; }
     let ramp = ((it.item_ticks - 0xf).clamp(0, 0x40) as u32) << 24 | 0xff_ffff;
-    if it.item != LANCER { return; }
+    let cap = |c: u32| if (ramp as i32) < c as i32 { ramp } else { c };
     let lerp = crate::hud::lerp_rgba;
-    let (step, keys, ease, cap) = if it.using { (0.116_352_08, [0xff00_40ff, 0xff10_bebe], 0.22, 0x32ff_ffffu32) } else { (0.040_712_8, [0xff00_28c8, 0xff10_b4b4], 0.15, 0x38ff_ffff) };
-    it.glow_phase = crate::hero::physics::add_rot(it.glow_phase, step);
-    let target = lerp(it.glow_phase.sin() * 0.5 + 0.5, keys[0], keys[1]);
-    let m = &mut world.mobys[id];
-    m.glow = lerp(ease, m.glow, target);
-    let colour = m.glow & if (ramp as i32) < cap as i32 { ramp } else { cap };
+    let up = ctx.game.upgrade_level(it.item) != 0;
+    let using = it.using;
+    let pulse = |phase: &mut f32, step: f32, keys: [u32; 2]| {
+        *phase = crate::hero::physics::add_rot(*phase, step);
+        lerp(phase.sin() * 0.5 + 0.5, keys[0], keys[1])
+    };
+    // The sprites: (size, pull, offset, colour).
+    let mut sprites: Vec<(f32, f32, V3, u32)> = Vec::new();
+    match it.item {
+        LANCER if !up => {
+            let (step, keys, ease, c) = if using { (0.116_355_3, [0xff00_40ff, 0xff10_bebe], 0.22, 0x32ff_ffffu32) } else { (0.040_724_356, [0xff00_28c8, 0xff10_b4b4], 0.15, 0x38ff_ffff) };
+            let target = pulse(&mut it.glow_phase, step, keys);
+            let m = &mut world.mobys[id];
+            m.glow = lerp(ease, m.glow, target);
+            sprites.push((50_400.0, 0.15, [0.195, -0.317, 0.0], m.glow & cap(c)));
+        }
+        LANCER => {
+            let (step, keys) = if using { (0.203_621_77, [0xff00_40ff, 0xff10_4080]) } else { (0.040_724_356, [0xff00_40aa, 0xff10_4046]) };
+            let target = pulse(&mut it.glow_phase, step, keys);
+            let m = &mut world.mobys[id];
+            m.glow = lerp(0.15, m.glow, target);
+            m.glow = lerp(it.glow_phase.sin() * 0.5 + 0.5, 0xff00_20ff, 0xff10_4080);
+            sprites.push((77_700.0, 0.2, [-0.059, -0.516, 0.0], m.glow & cap(0x40ff_ffff)));
+        }
+        CHOPPER => {
+            let (step, keys) = if up { (0.040_724_356, [0xffff_20bf, 0xffff_2070]) } else { (0.058_177_65, [0xffff_20ff, 0xffff_2090]) };
+            world.mobys[id].glow = pulse(&mut it.glow_phase, step, keys);
+        }
+        SPIDERBOT => {
+            let step = if up { 0.040_724_356 } else { 0.049_451_005 };
+            world.mobys[id].glow = pulse(&mut it.glow_phase, step, [0xff50_5050, 0xffef_efef]);
+        }
+        GRAVITY_BOMB if !up => {
+            let g = pulse(&mut it.glow_phase, 0.052_359_887, [0xff00_ffff, 0xff10_4080]);
+            world.mobys[id].glow = g;
+            sprites.push((73_500.0, 0.15, [0.333, -0.05, 0.0], g & 0x35ff_ffff));
+        }
+        GRAVITY_BOMB => {
+            let g = pulse(&mut it.glow_phase, 0.040_724_356, [0xff20_4090, 0xff80_4040]);
+            world.mobys[id].glow = g;
+            for z in [0.1263, -0.1263] { sprites.push((57_750.0, 0.15, [0.423, -0.0555, z], g & 0x40ff_ffff)); }
+        }
+        // The Blitz Gun (case 0x1a): only pulses.
+        BLITZ => {
+            let step = if up { 0.043_633_237 } else { 0.058_177_65 };
+            world.mobys[id].glow = pulse(&mut it.glow_phase, step, [0xffdf_dfdf, 0xff20_205f]);
+        }
+        _ => return,
+    }
+    let m = &world.mobys[id];
     let (pos, draw_dist) = (m.pos, m.draw_dist);
-    if let Some(sys) = ctx.parts.as_deref_mut() { crate::particles::glow(sys, &mut ctx.game.rng, 50_400.0, 0.15, [0.195, -0.317, 0.0], id, pos, draw_dist, false, colour, 2); }
+    let Some(sys) = ctx.parts.as_deref_mut() else { return };
+    for (size, pull, at, colour) in sprites { crate::particles::glow(sys, &mut ctx.game.rng, size, pull, at, id, pos, draw_dist, false, colour, 2); }
 }
 
 /// `0x2aeb90`'s read of the enemy the head looks at (`0x18c2b0`): its health block's look kind (`+0x2c`).
@@ -531,7 +639,7 @@ fn create_hand(world: &mut MobyWorld, ctx: &mut Ctx) {
     if it.hand.is_some() || ctx.game.frame <= it.next_create { return; }
     let mut item = it.selected;
     if item == 0 { item = if ctx.game.wrench_out || ctx.game.held == 0 { WRENCH } else { ctx.game.held }; }
-    let Some(r) = row(item) else { return };
+    let Some(r) = row(ctx.game, item) else { return };
     if world.class(r.class).is_none() {
         if it.next_create != i32::MAX { eprintln!("rc_game::hero::items: item {item:#x}'s class {:#x} is not loaded: no hand item", r.class); }
         it.next_create = i32::MAX;
@@ -546,6 +654,7 @@ fn create_hand(world: &mut MobyWorld, ctx: &mut Ctx) {
     it.hand = Some(id);
     it.hand_class = r.class;
     it.item = item;
+    it.row = ctx.game.item_row(item);
     it.ready = 2;
     it.empty = if r.ammo && ctx.game.ammo.get(item as usize).is_some_and(|&a| a == 0) { 0xff } else { 0 };
     it.ammo_left = it.empty == 0;
@@ -598,6 +707,11 @@ fn switch(world: &mut MobyWorld, ctx: &mut Ctx) {
     if !changed { return; }
     it.request = 0;
     it.item_ticks = 3;
+    // `0x2b1380(item)`: the swap face for the items that have one.
+    if matches!(it.selected, 0xe | BLITZ | 0x1b | 0x2b | 0x2c) {
+        it.swap_face = 0x46;
+        it.swap_kind = 3;
+    }
     it.use_end(h.state, ctx.hero_view.seq_b, idle);
     ctx.game.wrench_out = it.selected == WRENCH;
     if it.selected != WRENCH { ctx.game.held = it.selected; }
@@ -606,7 +720,7 @@ fn switch(world: &mut MobyWorld, ctx: &mut Ctx) {
     if let Some(id) = it.hand { ctx.host.set_anim(&world.mobys[id], 2, 0, 2); }
     it.ready = 3;
     // A new stance type (`0x18c0db` against the new item's row `+0x0c`): the holding layers go for good (`+0x34`).
-    if row(it.selected).map_or(0, |r| r.stance) != it.stance {
+    if row(ctx.game, it.selected).map_or(0, |r| r.stance) != it.stance {
         for l in h.layers.hold.iter_mut().flatten() { l.kill = true; }
     }
 }
@@ -791,7 +905,8 @@ fn view_model(world: &mut MobyWorld, ctx: &mut Ctx) {
         world.rebuild(id, &*ctx.host);
         return;
     }
-    let Some(rec) = ctx.level.items.get(item.max(0) as usize).copied() else { return };
+    // `0x2f4b88(item)`: the place of the item's current row (`0x139568`).
+    let Some(rec) = ctx.game.record(&ctx.level.items, item).copied() else { return };
     let w = rec.first_person.map(f32::from_bits);
     let (cam, cam_rows) = (ctx.host.camera_pos(), ctx.host.camera_rows());
     let mirror = ctx.game.cheat(crate::cheats::cheat::MIRROR);

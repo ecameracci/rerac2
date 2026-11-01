@@ -20,13 +20,14 @@
 //! * 0x0f (`0x1a7a77`): Oozla's store's breakables all broken (0x12dc, L01 `0x379e6c`, crate::moby::classes::smash);
 //! * 0x13 (`0x1a7a7b`): the arena boss 0x0a44 beaten without Ratchet hurt (L02 `0x3da250`);
 //! * 0x19 (`0x1a7a81`): a slot machine's jackpot (0x0a9c, L02 `0x3e8f04`, crate::moby::classes::maktar);
+//! * 0x1a (`0x1a7a82`): every weapon at its top level (`0x2d6258`'s tail every 128th frame, L01 `0x2cb9c8`, L02
+//!   `0x2d97a8`, L03 `0x2d6e28`: crate::upgrades, GameState::all_upgraded);
 //! * 0x1c (`0x1a7a84`): Endako's sentry 0x0ffd's death (`0x4201b8`, crate::moby::classes::endako_c::crane_kill) —
 //!   the remote crane that makes the state 0x31 it counts in is not ported yet, so it does not come.
 //!
 //! Not ported (no class or system for them yet): the play frame's checks (`0x2a67f8`, every level's copy: L01
 //! `0x2a8770`, L02 `0x2a9b78`, L03 `0x2ad068`): 0x1d (`0x1a7a85`) once the ship's upgrades `0x1a7af8 & 0xbb50` are
-//! all had, 0x17 (`0x1a7a7f`) at the health limit 80; the weapons' levels (`0x2d6258`'s tail, L01 `0x2cb9c8`, L02
-//! `0x2d97a8`, L03 `0x2d6e28`): 0x1a (`0x1a7a82`) every 128th frame once every weapon had is at its top level; item
+//! all had, 0x17 (`0x1a7a7f`) at the health limit 80; item
 //! 0x10's weapon (two hand classes, in every overlay: L00 `0x3c76e0` / `0x406cf8`, L01 `0x3c6f40` / `0x4085f0`, L02
 //! `0x3e0a18` / `0x432288`, L03 `0x3d74a0` / `0x412de8`): 0x16 (`0x1a7a7e`) its 16th class-0xfb4 target on level 0xc
 //! (`$gp+0x1de0`); level 0x10's count (L02 `0x38b3c0`, L03 `0x385200`, no class placed on these levels): 0xb

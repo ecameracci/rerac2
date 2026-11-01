@@ -48,7 +48,7 @@ fn normalize(v: V3) -> V3 {
 /// `0x3e3600(range, at, owner, target)`: a shot from `at`.
 pub fn spawn(w: &mut MobyWorld, ctx: &mut Ctx, range: f32, at: V3, owner: usize, target: Option<usize>) {
     if w.class(SHOT_CLASS).is_none() { return; }
-    let Some(r) = row(LANCER) else { return };
+    let Some(r) = row(ctx.game, LANCER) else { return };
     let speed = r.speed / 60.0;
     let vel = match target {
         Some(t) if w.mobys.get(t).is_some() => scale(normalize(sub(aim::aim_point(w, t), at)), speed),
@@ -130,7 +130,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 m.rot = [crate::hero::physics::add_rot(m.rot[0], s[0]), crate::hero::physics::add_rot(m.rot[1], s[1]), crate::hero::physics::add_rot(m.rot[2], s[2])];
             }
             spin(w, id);
-            let damage = row(LANCER).map_or(0.0, |r| r.damage);
+            let damage = row(ctx.game, LANCER).map_or(0.0, |r| r.damage);
             let d = normalize(vel);
             let mut t = HitTemplate::new(damage, Some(id), 0x10000, [d[0], d[1], d[2], crate::moby::classes::lancer::NO_KNOCK_LIMIT]);
             t.kind = (w.mobys[id].o_class as u16 as u32) << 16 | 0x101;

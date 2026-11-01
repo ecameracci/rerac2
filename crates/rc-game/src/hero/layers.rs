@@ -19,7 +19,8 @@
 //! **Face** (`0x18acc0`, list 0x18): with a reason, a node playing his own sequence (`0x3122c8(.., 8, 1)` on a change,
 //! else its own advance) at a weight eased 0.05 a tick to 1 (0.7 / 0.8 for some); without, eased out and freed. The
 //! reasons, the last winning: the enemy his head looks at (its health block's `+0x2c`: 1 → 0x72, 2 → 0x70, 3 → 0x6e,
-//! else 0x72; 0.7 in the look stance), one health left (0x74 at 0.8, not in the sequences 0x51 / 0x7b / 0x57 when not
+//! else 0x72; 0.7 in the look stance), a newly drawn weapon's swap face (`0x18a01c` running: its kind's glare,
+//! crate::hero::items::ItemBlock::swap_face, at that weight), one health left (0x74 at 0.8, not in the sequences 0x51 / 0x7b / 0x57 when not
 //! blending), the Lancer (items 0x1e / 0x1c / 0x1d) in use (0x6f at 0.8).
 //!
 //! **The firing arm** (`0x18acb8` / `0x18acbc`, kept in crate::hero::items::ItemBlock and copied here for the draw):
@@ -30,8 +31,7 @@
 //! leaves) — or, leaving (`0x18acc4`), fades 0.07 a tick (0.25 with 2) and goes. While it is out and not leaving the
 //! holding layers fade 0.15 a tick to 0.
 //!
-//! Not ported: the swap face
-//! (`0x18a01c`, the items 0xe / 0x1a / 0x1b / 0x2b / 0x2c), the tuck in two of the transitions' falls (`0x2cb650`).
+//! Not ported: the tuck in two of the transitions' falls (`0x2cb650`).
 
 use super::physics::approach;
 use super::Hero;
@@ -114,7 +114,7 @@ pub fn fire_update(h: &mut Hero, anim: &dyn AnimCtl) {
         let Some(mut l) = h.items.fire[i] else { continue };
         let it = &mut h.items;
         if it.ready == 2 && it.item == it.use_item {
-            let seq = super::items::row(it.item).map_or(-1, |r| r.fire_seq[(h.group == 0xc) as usize]);
+            let seq = it.held_row().map_or(-1, |r| r.fire_seq[(h.group == 0xc) as usize]);
             if seq != -1 && l.seq_b as i32 != seq {
                 it.use_seq = seq;
                 l.start(anim, seq as u8, 0, 8, true);
@@ -259,6 +259,8 @@ pub fn face_update(h: &mut Hero, anim: &dyn AnimCtl) {
         };
         want = Some((seq, w));
     }
+    // `0x18a01c`: the swap face (kind `0x18c314`), at the weight so far.
+    if h.items.swap_face != 0 { want = Some((glare(h.items.swap_kind), want.map_or(1.0, |(_, w)| w))); }
     if h.hp == 1 {
         let keep_off = matches!(v.seq_b, 0x51 | 0x7b | 0x57) && !v.blending();
         want = if keep_off { None } else { Some((0x74, 0.8)) };

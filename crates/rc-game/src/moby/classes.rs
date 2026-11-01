@@ -4,6 +4,7 @@
 pub mod arena;
 pub mod area_switch;
 pub mod beast;
+pub mod blitz;
 pub mod bolt;
 pub mod bosses;
 pub mod carriers;
@@ -60,6 +61,7 @@ pub mod endako_c;
 pub mod endako_crane;
 pub mod endako_d;
 pub mod endako_boss;
+pub mod mod_vendor;
 pub mod hacker_panel;
 
 use super::UpdateFn;
@@ -72,19 +74,28 @@ use super::UpdateFn;
 /// The Spiderbot 0x0b58 is listed for the levels whose class list lacks it (`0x315530` creates it without a model, hidden).
 /// Endako's boss's shots (crate::moby::classes::endako_boss: the laser 0x09df, the tracer 0x0a72, the rocket 0x0b1b;
 /// L03's update table `0x2a9604` holds them) are listed so too, for when the level's class list lacks their models.
-pub const CREATED_LOGIC: &[i16] = &[crate::ship::LASER_CLASS, teleport::CLASS, explosion::CLASS, spiderbot::BOT_CLASS, endako_boss::BEAM, endako_boss::TRACER, endako_boss::ROCKET];
+/// The Blitz Gun's tracer 0x0d5e (L00 `lvl.vtbl` `0x2a360c`) has no model. The Mini-Nuke's bomb 0x0c07 and blast 0x0c06
+/// (L00 `0x2a3450` / `0x2a3444`) are listed for the levels whose class list lacks them.
+pub const CREATED_LOGIC: &[i16] = &[crate::ship::LASER_CLASS, teleport::CLASS, explosion::CLASS, spiderbot::BOT_CLASS, endako_boss::BEAM, endako_boss::TRACER, endako_boss::ROCKET, blitz::TRACER, gravity_bomb::MINI_BOMB, gravity_bomb::MINI_BLAST];
 
 pub fn update_for(o_class: i16) -> Option<UpdateFn> {
     match o_class {
         0x47 => Some(wrench::update),
         0x5d2 => Some(lancer::update),
+        // The Heavy Lancer's hand (`0x3e5dc8` calls the Lancer's `0x3a8060`; crate::upgrades).
+        lancer::HEAVY_CLASS => Some(lancer::update),
+        gravity_bomb::MINI_HAND => Some(gravity_bomb::update),
+        gravity_bomb::MINI_BOMB => Some(gravity_bomb::update_bomb),
+        gravity_bomb::MINI_BLAST => Some(gravity_bomb::update_mini_blast),
         gravity_bomb::HAND_CLASS => Some(gravity_bomb::update),
         gravity_bomb::BOMB_CLASS => Some(gravity_bomb::update_bomb),
         gravity_bomb::BLAST_CLASS => Some(gravity_bomb::update_blast),
         spiderbot::HAND_CLASS => Some(spiderbot::update_hand),
         spiderbot::BOT_CLASS => Some(spiderbot::update_bot),
-        chopper::HAND_CLASS => Some(chopper::update),
+        chopper::HAND_CLASS | chopper::MEGA_CLASS => Some(chopper::update),
         chopper::BLADE => Some(chopper::update_blade),
+        blitz::HAND_CLASS => Some(blitz::update),
+        blitz::TRACER => Some(blitz::update_tracer),
         swingshot::HAND_CLASS => Some(swingshot::update),
         swingshot::HOOK_CLASS => Some(swingshot::update_hook),
         0xbfe => Some(shot::update),
@@ -279,6 +290,8 @@ pub fn update_for(o_class: i16) -> Option<UpdateFn> {
         0x11e7 => Some(endako_b::update_11e7),
         0x11c4 => Some(endako_b::update_11c4),
         0x12ea => Some(endako_b::update_12ea),
+        mod_vendor::CLASS => Some(mod_vendor::update),
+        mod_vendor::MACHINE => Some(mod_vendor::update_machine),
         // Endako (endakoC).
         endako_c::SENTRY => Some(endako_c::update_0ffd),
         endako_c::FLAMER => Some(endako_c::update_0ffc),

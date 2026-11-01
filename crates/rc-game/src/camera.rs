@@ -26,7 +26,9 @@
 //!
 //! The camera-tweak requests (`0x2d7468` / `0x2d7508` / `0x2d7568`: 32 slots objects and regions fill, the highest
 //! priority applied each tick through the camera's setters) are [`CamTweaks`]; the hero-state tweaks `0x4239d0`
-//! follow the hero's groups (water, glide, Clank, the bounce, the Charge Boots, strafing).
+//! follow the hero's groups (water, glide, Clank, the bounce, the Charge Boots, strafing). Mobys that turn the view
+//! by writing the follow record's yaw script directly (Endako's boss, its mod vendor 0x0ddc) go through [`CamTurn`]
+//! ([`CamTweaks::turn_toward`]).
 //!
 //! **Not ported**: the body cameras (Giant Clank's branch of `0x4239d0`: the hero is never Giant Clank yet), the focus
 //! mobys `0x1b8e84` / `0x18b270` (nothing sets them on Aranos), the stick auto-centre (`$gp+0x2540` is 0 on the disc),
@@ -233,6 +235,18 @@ impl Default for CamTweak {
     }
 }
 
+/// A moby's turn of the follow camera for one tick: what its update writes straight into the follow record (the
+/// current camera `0x1b8d90` (L03 `0x1b99d0`) `+0x70` → D+; L03 `0x3f7b28`, `0x40a8a8`): the script bits D+0x1d0 or'd
+/// in (1 the stick's yaw off, 2 its pitch), the scripted yaw D+0x1dc and the yaw rate D+0x1d4. The camera's next
+/// update takes it before its own steps, as the original's moby loop runs before the camera; its spring back
+/// (`0x423768`) clears the fields after the tick.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct CamTurn {
+    pub script: u32,
+    pub yaw: f32,
+    pub rate: f32,
+}
+
 /// The 32 request slots and the last applied one (`$gp + 0x2814`).
 #[derive(Clone, Debug)]
 pub struct CamTweaks {
@@ -240,13 +254,29 @@ pub struct CamTweaks {
     pub last: i32,
     /// The field of view the camera blends to (`0x2d7a60`, `0x1b8fd4`; 1.1243 the default).
     pub fov: f32,
+    /// A moby's turn this tick ([`CamTurn`]; none: the camera as it is).
+    pub turn: Option<CamTurn>,
+    /// The follow camera's offset from its pivot (D+0x160) as its last update left it: what the turners read.
+    pub off: V3,
 }
 
 impl Default for CamTweaks {
-    fn default() -> Self { CamTweaks { slots: [CamTweak::default(); 32], last: -1, fov: 1.124_3 } }
+    fn default() -> Self { CamTweaks { slots: [CamTweak::default(); 32], last: -1, fov: 1.124_3, turn: None, off: [0.0; 3] } }
 }
 
 impl CamTweaks {
+    /// The turners' common code (L03 `0x3f7b28`, `0x40a8a8`): the gap between the yaw `to` and the yaw of the camera's
+    /// offset (D+0x160's x, y: `0x2f04d0`) plus `behind` (0 or π) eased to 0 by `0x3206d8(0, accel, accel, max, &gap,
+    /// v, 0)` (crate::hero::physics::turn_ease, its speed `v` the moby's), then the scripted yaw 1 at the rate −v and
+    /// the script bits `script` ([`CamTurn`]).
+    pub fn turn_toward(&mut self, to: f32, behind: f32, accel: f32, max: f32, v: &mut f32, script: u32) {
+        let mut gap = sub_rot(to, add_rot(crate::hero::physics::atan2(self.off[0], self.off[1]), behind));
+        crate::hero::physics::turn_ease(0.0, accel, accel, max, &mut gap, v, 0);
+        let t = self.turn.get_or_insert_with(CamTurn::default);
+        t.script |= script;
+        (t.yaw, t.rate) = (1.0, -*v);
+    }
+
     /// `0x2d7468(priority)`: a free slot, reset; `None` when all 32 are in use.
     pub fn request(&mut self, priority: u8) -> Option<usize> {
         let i = self.slots.iter().position(|s| !s.active)?;
@@ -631,7 +661,18 @@ impl FollowCamera {
 
     /// One camera update (`0x2d9f38` with the follow camera current): the flags, the motion pre-step, the type-0
     /// update `0x4278c8`.
+    /// A moby's turn ([`CamTurn`]) is taken first; the offset is left for the turners after.
     pub fn update(&mut self, inp: &CamInput, tweaks: &mut CamTweaks) {
+        if let Some(t) = tweaks.turn.take() {
+            self.script |= t.script;
+            (self.script_yaw, self.yaw_rate) = (t.yaw, t.rate);
+        }
+        self.step(inp, tweaks);
+        tweaks.off = self.off;
+    }
+
+    /// `0x2d9f38`'s steps with the follow camera current (see [`FollowCamera::update`]).
+    fn step(&mut self, inp: &CamInput, tweaks: &mut CamTweaks) {
         self.ticks += 1;
         self.pre_flags(inp);
         self.pre_motion(inp);

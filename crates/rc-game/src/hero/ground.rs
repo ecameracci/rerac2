@@ -70,7 +70,7 @@ impl Hero {
             self.items.use_end(self.state, anim.view().seq_b, idle);
             return false;
         }
-        let Some(r) = super::items::row(it.item) else { return false };
+        let Some(r) = it.held_row() else { return false };
         if !self.set_state(anim, env, 0, false) { return false; }
         if 0.025 < len(self.momentum) { self.momentum = set_len(self.momentum, 0.025); }
         self.speed = self.speed.min(0.025);

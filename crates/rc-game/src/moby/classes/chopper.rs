@@ -69,8 +69,10 @@
 //! Not ported: the weapon mods' effects on a hit (`0x3f9f70`), the gravity frames' bends (`0x380e08`, `0x37f538` /
 //! `0x37f618`, the velocity flattened along the up), the lock a cheat or the Lock-On mod holds (`0x18b270`), the
 //! after-images' one-ghost setting (`0x1adb0c`: two here), the trail slot's other users (the Lava Gun's class
-//! `0x41b198`: their eviction frees this slot's after-images, [`Pool::slot`]). The Mega Chopper (row 0x41, class 0x0af6,
-//! the same updates) waits for the weapons' upgrade system: [`level`] reads 0.
+//! `0x41b198`: their eviction frees this slot's after-images, [`Pool::slot`]). 
+//!
+//! The Mega Chopper (row 0x41, its hand class 0x0af6 with the same update `0x3b7038`; crate::upgrades): [`level`] is
+//! its row's level, the blade's damage and speed its row's.
 
 use crate::collision::QueryFlags;
 use crate::hero::items::{row, ItemRow, CHOPPER};
@@ -81,6 +83,8 @@ use crate::moby::{aim, countdown, mode, Ctx, MobyWorld};
 
 /// The hand's class (item 0x16's row `+0x04`) and the blade's (`+0x50`).
 pub const HAND_CLASS: i16 = 0x879;
+/// The Mega Chopper's hand (row 0x41 and the Mega rows 0x53 / 0x54, crate::upgrades): the same update.
+pub const MEGA_CLASS: i16 = 0xaf6;
 pub const BLADE: i16 = 0x87a;
 /// The trails a slot holds.
 pub const TRAILS: usize = 25;
@@ -138,12 +142,12 @@ impl Pool {
     pub fn holds(&self, class: i16, slot: usize) -> bool { self.owner.get(slot) == Some(&class) }
 }
 
-/// The Chopper's row as `0x139568[0x16]` gives it (the port has the base row only).
-fn cur_row() -> Option<&'static ItemRow> { row(CHOPPER) }
+/// The Chopper's row as `0x139568[0x16]` gives it (crate::upgrades).
+fn cur_row(game: &crate::game::GameState) -> Option<&'static ItemRow> { row(game, CHOPPER) }
 
-/// The upgrade level of the Chopper's row (`0x2624f4 + 0xe0·0x139568[0x16]`: 0 the Chopper, 1 the Mega Chopper). The
-/// port keeps no upgrade rows yet.
-pub fn level(_game: &crate::game::GameState) -> u8 { 0 }
+/// The upgrade level of the Chopper's row (`0x2624f4 + 0xe0·0x139568[0x16]`: 0 the Chopper, 1 the Mega Chopper, 2 and
+/// 3 the challenge mode's rows).
+pub fn level(game: &crate::game::GameState) -> u8 { game.upgrade_level(CHOPPER) }
 
 /// `0x321c00(a, out, v, axis)`: `v` turned by `a` about `axis` (made unit; under 1e-5 none).
 fn turn(v: V3, axis: V3, a: f32) -> V3 {
@@ -164,7 +168,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         let red = 0.0 < w.mobys[id].pv_f(0xc) && ammo(ctx);
         crate::hud::marker(&mut ctx.game.markers, 1.0, id, if red { 0x6000_00ff } else { 0x600f_ff0f }, None, RETICLE);
     }
-    let Some(r) = cur_row().copied() else { return };
+    let Some(r) = cur_row(ctx.game).copied() else { return };
     match w.mobys[id].state {
         0 => {
             let class = w.mobys[id].o_class;
@@ -290,7 +294,7 @@ fn aim(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 #[allow(clippy::too_many_arguments)]
 pub fn spawn(w: &mut MobyWorld, ctx: &mut Ctx, hand: usize, at: V3, look: bool, slot: usize, lock: Option<usize>, first: bool) -> Option<usize> {
     if w.class(BLADE).is_none() { return None; }
-    let r = *cur_row()?;
+    let r = *cur_row(ctx.game)?;
     let hand_class = w.mobys.get(hand)?.o_class;
     let id = w.create(BLADE);
     let lv = level(ctx.game);
@@ -515,7 +519,7 @@ pub fn update_blade(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         w.delete(id);
         return;
     }
-    let Some(r) = cur_row().copied() else { return };
+    let Some(r) = cur_row(ctx.game).copied() else { return };
     let lv = level(ctx.game);
     let start = w.mobys[id].pos;
     let up = ctx.hero.gravity.up_at(start);

@@ -13,6 +13,8 @@
 //! | `0x3efd68` | the Gravity Bomb in the hand 0xce3 | where its throw lands ([`crate::moby::classes::gravity_bomb::draw_marker`]) |
 //! | `0x3f0e80` | the Gravity Bomb's blast 0xce5 | its shockwave and flares ([`crate::moby::classes::gravity_bomb::draw_blast`]) |
 //! | `0x41f9a8` | the Chopper's blade 0x087a with a trail | its trail and the Mega's lightning ([`crate::moby::classes::chopper::draw`]) |
+//! | `0x3a7968` | the Blitz Gun in the hand 0x05d1 after a shot | its muzzle's starburst and flash, the screen flash ([`crate::moby::classes::blitz::draw`]) |
+//! | `0x3fd908` | the Blitz Gun's tracer 0x0d5e | its beam ([`crate::moby::classes::blitz::draw_tracer`]) |
 //! | `0x3c6eb8` (L02) | the Spiderbot Glove in the hand 0x0907 | where its throw lands ([`crate::moby::classes::spiderbot::draw_marker`]) |
 //! | `0x3cac30` | Oozla's conveyor 0x0a7b out | its belt of light ([`crate::moby::classes::oozla::draw_0a7b`]) |
 //! | `0x3d2ea8` | Oozla's hatch 0x0a9d open | its light ([`crate::moby::classes::oozla::draw_0a9d`]) |
@@ -279,6 +281,7 @@ pub struct Lists {
 pub fn callbacks(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut crate::game::GameState, hero_state: i32, view: &crate::particles::BSphereView, cam: V3) -> Lists {
     let mut first = Vec::new();
     let mut frame = Vec::new();
+    w.screen_fills.clear();
     // The ship's shadow (`0x361af8`, a first-list callback; crate::travel).
     crate::travel::draw_ship_shadow(game, view, &mut first);
     for id in w.draws_first.clone() { one(w, host, game, hero_state, view, cam, id, true, &mut first, &mut frame); }
@@ -304,6 +307,8 @@ fn one(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut crate::ga
         crate::moby::classes::gravity_bomb::HAND_CLASS => crate::moby::classes::gravity_bomb::draw_marker(w, id, hero_state, game.frame, out),
         crate::moby::classes::gravity_bomb::BLAST_CLASS => crate::moby::classes::gravity_bomb::draw_blast(w, id, view, cam, out),
         crate::moby::classes::chopper::BLADE => crate::moby::classes::chopper::draw(w, id, game, cam, out),
+        crate::moby::classes::blitz::HAND_CLASS => crate::moby::classes::blitz::draw(w, id, cam, out),
+        crate::moby::classes::blitz::TRACER => crate::moby::classes::blitz::draw_tracer(w, id, cam, out),
         crate::moby::classes::spiderbot::HAND_CLASS => crate::moby::classes::spiderbot::draw_marker(w, id, hero_state, game.scenes.mode, game.frame, out),
         0x0a7b => crate::moby::classes::oozla::draw_0a7b(w, id, out),
         0x0a9d => crate::moby::classes::oozla::draw_0a9d(w, id, out),

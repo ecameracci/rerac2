@@ -13,7 +13,7 @@
 //!
 //! Environment: `RC_PLAY=0` (no tick), `RC_PLAY_FLY=1` (start on the fly camera; Tab switches), `RC_PLAY_TRACE=1`
 //! (one line per tick: state, position, velocity, air ticks, sequence), `RC_SCENES=0` (the scenes count as seen),
-//! `RC_HERO_AT=x,y,z,yaw` (Ratchet's start), `RC_GRAVITY_AT=x,y,z` (the gravity frames pinned on about a centre), `RC_GIVE_ITEMS=a,b,…` (the items had, the last in the hand), `RC_CHEATS=a,b,…` (those cheat bytes on).
+//! `RC_HERO_AT=x,y,z,yaw` (Ratchet's start), `RC_GRAVITY_AT=x,y,z` (the gravity frames pinned on about a centre), `RC_GIVE_ITEMS=a,b,…` (the items had, the last in the hand), `RC_CHEATS=a,b,…` (those cheat bytes on), `RC_ITEM_ROWS=item:row,…` / `RC_WEAPON_XP=item:points,…` (weapons' rows and experience, rc_game::upgrades).
 
 use crate::game_camera::CameraSource;
 use crate::input_map::{self, PadFrame, Script};
@@ -151,7 +151,7 @@ fn quick_select_frame(qs: &mut rc_game::quick_select::QuickSelect, paused: &mut 
         match o {
             rc_game::quick_select::Out::Equip(item) => {
                 // Its ammo cut to the most.
-                if let Some(r) = rc_game::hero::items::row(item).filter(|r| r.ammo) {
+                if let Some(r) = rc_game::hero::items::row(game, item).filter(|r| r.ammo) {
                     if let Some(a) = game.ammo.get_mut(item as usize) { *a = (*a).min(r.max_ammo); }
                 }
                 equip(game.held, hero, item);
@@ -250,6 +250,9 @@ pub(crate) struct Play {
     qs_paused: bool,
     /// The vendor's menu (game mode 5, rc_game::vendor through crate::vendor_play).
     pub(crate) vendor: crate::vendor_play::VendorPlay,
+    /// The upgrade screen (game mode 8, rc_game::menus::upgrade) and its full-screen fills of the frame.
+    upgrade: Option<rc_game::menus::upgrade::Screen>,
+    upgrade_fills: Vec<[u8; 4]>,
     /// A ship scene (rc_game::travel: the take-off or the landing from `SPACE.WAD`) for the next scene start, in
     /// place of the level's scene of the id asked for.
     space_scene: Option<std::sync::Arc<rc_formats::scene::Scene>>,
@@ -449,13 +452,16 @@ fn tick(
         if let Some(v) = std::env::var("RC_CHEATS").ok().filter(|_| dev) {
             for b in v.split(',').filter_map(|x| x.trim().parse::<usize>().ok()) { p.game.set_cheat(b, true); }
         }
+        // `RC_ITEM_ROWS=item:row,…` / `RC_WEAPON_XP=item:points,…` (rc_game::upgrades::dev_switches): weapons' rows and
+        // experience, before the items given take their rows' ammo.
+        if dev { rc_game::upgrades::dev_switches(&mut p.game); }
         // `RC_GIVE_ITEMS=a,b,…` (crate::debug_hud's repro line): the items had, their ammo full, the last in the hand.
         if let Some(v) = std::env::var("RC_GIVE_ITEMS").ok().filter(|_| dev) {
             let items: Vec<i32> = v.split(',').filter_map(|x| x.trim().parse().ok()).collect();
             for &i in &items {
                 let Some(b) = p.game.items.get_mut(i as usize) else { continue };
                 *b = 1;
-                if let Some(r) = rc_game::hero::items::row(i).filter(|r| r.ammo) {
+                if let Some(r) = rc_game::hero::items::row(&p.game, i).filter(|r| r.ammo) {
                     if let Some(a) = p.game.ammo.get_mut(i as usize) { *a = r.max_ammo; }
                 }
             }
@@ -652,6 +658,15 @@ fn tick(
             p.ticks += 1;
             return;
         }
+        // The upgrade screen (`0x380c50`, rc_game::menus::upgrade): its frame alone, its camera the view.
+        rc_game::menus::upgrade::MODE => {
+            let view = upgrade_frame(p, &level.0, occl.as_deref_mut(), anim.as_deref_mut(), parts.as_deref_mut().map(|s| &mut s.sys));
+            let (eye, rows, tan) = view.unwrap_or((p.camera.pos, p.camera.rows, play_camera::GAME_TAN_HALF_FOV));
+            let v = if view.is_some() { scene_view(&rc_game::scene_camera::SceneCamera { eye, rows, tan_half_fov: tan, cut: false }) } else { camera_view(&p.camera, eye, rows) };
+            commands.insert_resource(PlayView { view: v, tan_half_fov: tan, far: p.game.view_far * 1024.0 });
+            p.ticks += 1;
+            return;
+        }
         _ => {}
     }
     // The ship mode (rc_game::travel): △ at the hatch of the last tick starts the take-off (`0x3706f0`'s `0x1b1a60`
@@ -749,6 +764,9 @@ fn tick(
     p.game.health_tick(&mut p.hero.hp);
     let class = &lv.mobys.anim[p.class];
     let mobys = p.mobys.as_mut().expect("mobys");
+    // `0x2d6258`'s weapons: their upgrades (rc_game::upgrades; the hand item's through the upgrade screen, mode 8).
+    rc_game::upgrades::dev_tick(&mut p.game);
+    p.game.upgrade_tick(&mobys.level.items, p.hero.items.item, p.hero.grounded_ticks != 0, p.hero.hp);
     let hero_view = rc_game::hero::anim::AnimCtl::view(&p.anim.ctl(class));
     // `+0x31` (MobyProc writes it each frame): a placed moby drawn last frame (shown, not hidden), as R&C1's
     // `write_visible`; the moby loop's activity and the weapons' aim read it. Created mobys keep their own (their
@@ -1125,7 +1143,7 @@ fn tick(
     let (sb, sh) = (p.game.show_bolts.take(), p.game.show_health.take());
     // `0x2fa770`: the held item when it has ammo (not with the items off, `0x18c0d4`).
     let it = &p.hero.items;
-    let weapon = rc_game::hero::items::row(it.item).filter(|r| r.ammo && it.ready == 2 && p.hero.mode == 0).map(|r| (r.icon, p.game.ammo.get(it.item.max(0) as usize).copied().unwrap_or(0), r.max_ammo));
+    let weapon = rc_game::hero::items::row(&p.game, it.item).filter(|r| r.ammo && it.ready == 2 && p.hero.mode == 0).map(|r| (r.icon, p.game.ammo.get(it.item.max(0) as usize).copied().unwrap_or(0), r.max_ammo));
     p.hud.tick(p.hero.hp, p.game.max_health, sb, sh, weapon);
     // The boss bar's own update (`0x2f2458`): its ticks left counted down, gone at 0.
     p.game.boss_bar = p.game.boss_bar.and_then(|(f, t)| (1 < t).then_some((f, t - 1)));
@@ -1330,6 +1348,55 @@ fn puzzle_frame(p: &mut Play, lv: &crate::level_load::LoadedLevel, occl: Option<
     }
     // The help panel (`0x2f9608` runs in modes 0 and 7).
     p.help.tick(&mut p.game, p.pad.pressed & rc_game::pad::button::TRIANGLE != 0, &p.texts);
+}
+
+/// The upgrade screen's frame (game mode 8, rc_game::menus::upgrade; `0x380c50`): the world stands — no hero, moby or
+/// camera update — the particles run (`0x331150`, its glows), the screen opens on the mode's arguments (the item and
+/// its next row, `0x37fb50`); the moby it shows is drawn as the puzzle frame's. Its view while the camera is off.
+fn upgrade_frame(p: &mut Play, lv: &crate::level_load::LoadedLevel, occl: Option<&mut MobyOcclusion>, mut anim: Option<&mut MobyAnim>, mut parts: Option<&mut rc_game::particles::Particles>) -> Option<([f32; 3], [[f32; 3]; 3], f32)> {
+    let coll = lv.collision.as_ref()?;
+    let class = &lv.mobys.anim[p.class];
+    let hero_view = rc_game::hero::anim::AnimCtl::view(&p.anim.ctl(class));
+    let mobys = p.mobys.as_mut()?;
+    (p.fx_quads_first, p.fx_quads, p.frame_quads) = (Vec::new(), Vec::new(), Vec::new());
+    p.game.markers.clear();
+    if let Some(s) = parts.as_deref_mut() {
+        let aux = rc_game::particles::PartAux { cam_yaw: p.camera.yaw(), water_z: p.hero.surf.water_z, coll: Some(coll), rain: mobys.world.weather.aux(&mobys.level, &p.game) };
+        rc_game::particles::update_parts(s, &mobys.world, rc_game::menus::upgrade::EYE, p.hero.pos, &mut p.game.rng, &aux);
+    }
+    let mut host = crate::mobys::Host { lv: &lv.mobys, occl: occl.as_deref(), anim: anim.as_deref_mut(), created: &mut mobys.created, hero: None, hero_chains: &[], chains: Some(&mobys.chains), camera: p.camera.pos, camera_rows: p.camera.rows, sound: None };
+    let scene = crate::mobys::scene_of(&mobys.snap, &mobys.coll, &mobys.cache);
+    let mut ctx = rc_game::moby::Ctx { host: &mut host, hero: &mut p.hero, game: &mut p.game, coll: Some(coll), scene: scene.as_ref(), hero_moby: mobys.hero_moby, hero_view, level: &mobys.level, parts: parts.as_deref_mut(), view: None };
+    if p.upgrade.is_none() {
+        let (item, next) = ctx.game.scenes.arg;
+        println!("play: upgrade screen: item {item:#x} to row {next:#x}");
+        p.upgrade = Some(rc_game::menus::upgrade::Screen::open(&mut mobys.world, &mut ctx, item, next));
+    }
+    let screen = p.upgrade.as_mut()?;
+    let done = screen.frame(&mut mobys.world, &mut ctx);
+    let view = screen.view;
+    p.upgrade_fills = screen.fills.clone();
+    drop(ctx);
+    drop(host);
+    if done { p.upgrade = None; }
+    if mobys.world.changed {
+        let host = crate::mobys::Host { lv: &lv.mobys, occl: occl.as_deref(), anim: anim.as_deref_mut(), created: &mut mobys.created, hero: None, hero_chains: &[], chains: Some(&mobys.chains), camera: p.camera.pos, camera_rows: p.camera.rows, sound: None };
+        mobys.snap = Some(crate::mobys::take_snapshot(&mobys.world, &mobys.coll, &host));
+        mobys.world.changed = false;
+    }
+    if let Some(o) = occl {
+        for m in &mobys.world.mobys {
+            let Some(ii) = m.instance else { continue };
+            let hidden = m.state >= 0x80 || m.mode & 0x81 != 0 || m.piece.is_some();
+            if m.update.is_some() || m.drive {
+                o.drive(ii, m.pos, m.rows, m.scale, crate::mobys::moby_lights(&lv.mobys, m.rows, m.light, m.ambient).as_ref(), hidden);
+            } else {
+                o.set_hidden(ii, hidden);
+            }
+        }
+        o.drive(p.instance, p.hero.pos, p.hero.rows, p.scale, None, true);
+    }
+    view
 }
 
 /// `0x32c858`'s changes (rc_game::scene): a scene's end and start, a movie's start.
@@ -2556,6 +2623,8 @@ fn draw_hud(
     }
     // Under water the screen's tint (`0x2e6658`'s last pass: `0x1ad8a0..a3`, rc_game::fog), before the scene fade.
     if p.game.underwater && !movie { rc_game::gui::fill(&mut quads, rc_game::fog::UnderwaterLook::default().tint); }
+    // The upgrade screen's flash and fades (rc_game::menus::upgrade: `0x380a58`, `0x380770`).
+    for &f in &p.upgrade_fills { rc_game::gui::fill(&mut quads, f); }
     // The screen's fades to black and to white (`0x2e9b68`: each past 1 held at 1, drawn at `ftoi(fade · 128)`).
     for (f, rgb) in [(&mut p.game.fade_black, 0u8), (&mut p.game.fade_white, 0xff)] {
         if 0.0 < *f {
@@ -2567,6 +2636,12 @@ fn draw_hud(
     let fade = if movie { 0.0 } else { p.game.scenes.fade.clamp(0.0, 1.0) };
     if 0.0 < fade { rc_game::gui::fill(&mut quads, [0, 0, 0, (fade * 128.0) as u8]); }
     let mut d = crate::hud_render::Hud2d::default();
+    // The draw callbacks' additive full-screen fills (rc_game::moby::MobyWorld::screen_fills: the Blitz Gun's flash),
+    // drawn with the world's callbacks in the game, so first here, under the HUD.
+    if let Some(m) = p.mobys.as_ref().filter(|_| !movie) {
+        let (w, h) = (rc_game::gui::SCREEN_W, rc_game::gui::SCREEN_H);
+        for &c in &m.world.screen_fills { d.screen_prim(crate::hud_render::Tex::None, [[0.0, 0.0], [w, 0.0], [0.0, h], [w, h]], [[0.0; 2]; 4], c, true); }
+    }
     for q in quads {
         let (tex, nearest) = match q.tex {
             rc_game::gui::Tex::Slot(i) => (crate::hud_render::Tex::Frame(i), false),
@@ -2848,7 +2923,7 @@ fn start(lv: &crate::level_load::LoadedLevel) -> Option<Play> {
     Some(Play {
         anim: RatchetAnim { curves: &rc_game::hero::CURVES, ..RatchetAnim::new(&m.anim[class]) },
         hero, class, instance, scale, pad: PadState::default(), camera, ship: None, chain: false, mobys: None, game: Default::default(), hud: rc_game::hud::Hud::new(rc_game::game::GameState::default().max_health), ticks: 0, loaded: false,
-        fx_quads: Vec::new(), fx_quads_first: Vec::new(), frame_quads: Vec::new(), exhaust: Default::default(), scene_wad: None, shared_scenes: None, scene_slots: Vec::new(), movie: None, movie_picture: None, leaving: None, scene_listener: None, movie_started: false, hero_loops: [-1; 9], pause: None, pause_opened: false, death_fade: None, qs: Default::default(), qs_paused: false, vendor: Default::default(), space_scene: None, flight: None, flight_cam: None, flight_quads: Vec::new(), body: None,
+        fx_quads: Vec::new(), fx_quads_first: Vec::new(), frame_quads: Vec::new(), exhaust: Default::default(), scene_wad: None, shared_scenes: None, scene_slots: Vec::new(), movie: None, movie_picture: None, leaving: None, scene_listener: None, movie_started: false, hero_loops: [-1; 9], pause: None, pause_opened: false, death_fade: None, qs: Default::default(), qs_paused: false, vendor: Default::default(), upgrade: None, upgrade_fills: Vec::new(), space_scene: None, flight: None, flight_cam: None, flight_quads: Vec::new(), body: None,
         help: Default::default(), boxes: Default::default(), glyphs: None, texts: rc_formats::strings::parse_strings(&lv.gameplay, rc_formats::strings::lang::ENGLISH).map_err(|e| eprintln!("play: no help texts ({e:#})")).unwrap_or_default(),
         trace: std::env::var("RC_PLAY_TRACE").is_ok_and(|v| v.trim() == "1"),
     })

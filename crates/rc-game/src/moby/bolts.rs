@@ -7,8 +7,10 @@
 //! Every bolt, placed (its state 0) or made here, gets the same look ([`dress`]): half its class's size, the metal
 //! pass from 20 units (`+0x63` 0x14, the gold sheen), light set 0xd and the bolt ambient, its rows kept (mode 0x100).
 //!
-//! Not ported: the XP of the drop (`+0xb6`, `0x18d198`/`0x18d208` rate scaling), the challenge mode multiplier
-//! (`0x1a7a10`).
+//! The drop's experience (`+0xb6`) comes first: crate::upgrades (GameState::kill_xp), to Ratchet and to the weapon that
+//! hit the moby last (its health block's `+0x17`).
+//!
+//! Not ported: the challenge mode's bolt multiplier (`0x1a7a3a` for a moby of class type 5, `0x31ac48`).
 
 use super::{Ctx, Moby, MobyWorld};
 use crate::hero::physics::{add, cross, scale, set_len, sub, V3};
@@ -47,17 +49,18 @@ pub fn drop(w: &mut MobyWorld, id: usize, flags: u32, limit: i32, ctx: &mut Ctx)
     let m = &w.mobys[id];
     if m.uid < 0 || m.sub_index & 0x80 != 0 { return; }
     let (uid, base) = (m.uid, m.bolts);
+    let weapon = (m.mode & super::ai::AI != 0).then(|| super::ai::health_of(m)).flatten().map(|h| m.pv_b(h + 0x17));
+    let xp = m.xp;
     w.mobys[id].drops = w.mobys[id].drops.wrapping_add(1);
     let g = &mut *ctx.game;
+    // The experience (`0x31adc0`'s first part), before the uid's count goes up.
+    g.kill_xp(uid, xp, weapon, ctx.hero.mode);
     // A fiftieth of the bank (rounded up) joins the drop unless flag 0x1000.
     let mut bank = 0;
     if flags & 0x1000 == 0 {
         bank = (g.bolt_bank + 0x31) / 0x32;
         g.bolt_bank -= bank;
     }
-    // The XP part (`+0xb6`): the health and XP widget shows for 720 ticks (`0x30d9f8(0x2d0)`; the XP itself is not
-    // ported).
-    if w.mobys[id].xp != 0 { g.show_health = Some(0x2d0); }
     let table = &BOLT_PERCENT[g.uid_flag(uid) as usize];
     let mut value = table[g.uid_count(uid) as usize] as i32 * base as i32 / 100;
     // In an arena challenge (`0x1aa1b0` ≠ −1): the arena's count, `0x1a8a38` on Maktar (6) else `0x1a8a36` (25),
@@ -67,6 +70,8 @@ pub fn drop(w: &mut MobyWorld, id: usize, flags: u32, limit: i32, ctx: &mut Ctx)
         let boss = matches!(w.mobys[id].o_class, crate::moby::classes::bosses::C9F8 | crate::moby::classes::bosses::CA44);
         value = if boss { each * 10 } else { each };
     }
+    // `0x188610[k]`: the arena's kill counted.
+    g.arena_kill();
     g.bump_uid(uid);
     let mission = w.mobys[id].mission;
     g.uid_gone(uid, mission);
