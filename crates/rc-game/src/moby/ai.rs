@@ -805,7 +805,7 @@ fn knock_aim(w: &MobyWorld, id: usize, ctx: &Ctx, range: f32, cone: f32, dir: V3
 /// block's fallback with the speeds scaled), dying (kind 4) or spinning (5) without collision and out of the target
 /// list; the knock along `dir` (at least 1 across and 1 up) at the reaction's speeds, facing the hit; the flight's
 /// gravities and keys. Returns whether it reacts (not for a graze).
-fn react_start(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, dir: [f32; 4], kind: i32) -> bool {
+pub(crate) fn react_start(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, dir: [f32; 4], kind: i32) -> bool {
     let r = react(&w.mobys[id]);
     let m = &w.mobys[id];
     let mut x = Reaction { kind: 0, brake: m.pv_f(r + 0x2c), across: m.pv_f(r + 0x1c), up: m.pv_f(r + 0x20), g_up: m.pv_f(r + 0x24), g_down: m.pv_f(r + 0x28), key_a: 0.0, key_b: 0.0 };

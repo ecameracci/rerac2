@@ -45,6 +45,7 @@ pub mod telepad;
 pub mod maktar;
 pub mod maktar_hints;
 pub mod maktar_pads;
+pub mod swamp_monster;
 pub mod tractor;
 pub mod vendor;
 pub mod weather;
@@ -160,6 +161,10 @@ pub fn update_for(o_class: i16) -> Option<UpdateFn> {
         0x09a2 => Some(leaper::update),
         0x0b2b => Some(spitter::update),
         0x0a49 => Some(flyer::update),
+        swamp_monster::CLASS => Some(swamp_monster::update),
+        swamp_monster::TRANSPORTER => Some(swamp_monster::update_0e38),
+        swamp_monster::BALL => Some(swamp_monster::update_ball),
+        swamp_monster::REWARD => Some(swamp_monster::update_reward),
         0x09fc => Some(beast::update),
         0x0a53 => Some(oozla::update_0a53),
         0x0a56 => Some(oozla::update_0a56),

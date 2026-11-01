@@ -518,6 +518,15 @@ fn tick(
         p.ticks += 1;
         return;
     }
+    // An object's blocking fade (`0x2dd378(n)`, rc_game::game::GameState::blocking_fade): its frames with the game
+    // stopped (the first one is the frame drawn after the tick that asked); after the last the game goes on at once.
+    if let Some((k, n)) = p.game.held_fade {
+        p.game.held_fade = (k + 1 < n).then_some((k + 1, n));
+        if p.game.held_fade.is_some() {
+            p.ticks += 1;
+            return;
+        }
+    }
     // The death (`0x2b31f0`): `0x2e7c90(16)` fades to black over 16 frames with the game stopped, then the level
     // restarts from the checkpoint ([`death_reset`]).
     if let Some(k) = p.death_fade {
@@ -2380,6 +2389,10 @@ fn draw_hud(
     // The death's fade (`0x2e7c90(16)`: frame i of 16 drawn black at alpha `0x80 − (15 − i)·0x80/16`).
     if let Some(k) = p.death_fade {
         rc_game::gui::fill(&mut quads, [0, 0, 0, (0x80 - (DEATH_FADE - 1 - k) * 0x80 / DEATH_FADE) as u8]);
+    }
+    // An object's blocking fade (`0x2dd378(n)`: the same law over its `n` frames).
+    if let Some((k, n)) = p.game.held_fade {
+        rc_game::gui::fill(&mut quads, [0, 0, 0, (0x80 - (n - 1 - k) * 0x80 / n) as u8]);
     }
     // Under water the screen's tint (`0x2e6658`'s last pass: `0x1ad8a0..a3`, rc_game::fog), before the scene fade.
     if p.game.underwater && !movie { rc_game::gui::fill(&mut quads, rc_game::fog::UnderwaterLook::default().tint); }

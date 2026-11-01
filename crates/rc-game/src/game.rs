@@ -249,6 +249,8 @@ pub struct GameState {
     pub fade_white: f32,
     /// `0x311b10`: the HUD's screen callback (crate::hud::ScreenCallback; the engine runs it in the HUD's draw).
     pub screen_callback: Option<crate::hud::ScreenCallback>,
+    /// The blocking fade under way ([`GameState::blocking_fade`]): the frame `k` of `n`.
+    pub held_fade: Option<(u32, u32)>,
 }
 
 /// The flag bytes `0x1395b8..0x139685` ([`GameState::flags`]): the save's global chunk 5 (0xcd bytes).
@@ -269,7 +271,7 @@ impl Default for GameState {
             clank: false, thruster: false, boots: false, charge_boots: false, grind_boots: false, nanotech: [false; 10], level_xp: [0; 2], death_z: None, boss_bar: None, boss_icon: 0, shadow: Default::default(), water_base: 0.0, water_z: 0.0, water_scroll: [[0.0; 2]; 2], water_cam: [0.0; 3], missions: vec![0; 0x200], mission_area: 0, cam_tweaks: Default::default(), shakes: Default::default(), uid_pending: vec![0; 0x800], uid_dead: vec![0; 0x800], mission_table: vec![0; 0x100],
             mission_xp: vec![0; 0x30], mission_bolts: vec![0; 0x30], checkpoint: None, checkpoint_bits: Vec::new(), last_checkpoint: None, messages: Vec::new(), help_state: 0, help_req: None, help_counts: vec![0; 0x100], help_shift: 0, help_shift_ticks: 0, help_aux: vec![0; 0x100], help_last: vec![0; 0x100], help_levels: vec![0; 0x100], help_queue: Vec::new(), hint_flags: [0; 5], no_item_area: false, variant: 0, chunk_request: None, items: vec![0; 0x40], quick_select: vec![0; 28], planets: vec![0; 0x1c], travel: Default::default(), ring: [0; 8], ammo: vec![0; 0x50], held: 0, wrench_out: false, trail_phase: 0.0, view_far: 1024.0, sky: Default::default(), markers: Vec::new(), scenes_seen: vec![false; 0x100], scenes: Default::default(), cameras: Default::default(), ship_parts: Vec::new(), underwater: false, fog: Default::default(), fog_flash: Default::default(), area_ask: Vec::new(), area_hero: Vec::new(), next_level: None, next_level_save: false, bolt_help_done: false, space_bolts: 0, space_bolts_shown: 0, rider_hits: 0, store_left: 0, skill_points: [0; crate::skill_points::LEN], cheats: [0; crate::cheats::LEN], play_time: 0, visited: vec![0; 0x1c], puzzle: Default::default(),
             stock: [0xff; crate::vendor::STOCK_SLOTS], challenge: false, rac1_weapons: 0, vendor_open: None, vendor_virtual: None, vendor_phase: [0.0; 3], vendor_beam: [0.0; 2], prompt: Default::default(),
-            armor: 0, armor_offer: 0, mods_available: [0; 0x38], mods_bought: [0; 0x38], platinum_spent: 0, platinum_found: 0, platinum: vec![0; 0x70], flags: vec![0; FLAGS_LEN], arena_menu: None, arena_hud: None, arena_wipe: None, arena_results: None, arena_on: false, fade_black: 0.0, fade_white: 0.0, screen_callback: None,
+            armor: 0, armor_offer: 0, mods_available: [0; 0x38], mods_bought: [0; 0x38], platinum_spent: 0, platinum_found: 0, platinum: vec![0; 0x70], flags: vec![0; FLAGS_LEN], arena_menu: None, arena_hud: None, arena_wipe: None, arena_results: None, arena_on: false, fade_black: 0.0, fade_white: 0.0, screen_callback: None, held_fade: None,
         }
     }
 }
@@ -430,6 +432,15 @@ impl GameState {
         if self.variant == k { return; }
         self.variant = k;
         self.chunk_request = Some(k);
+    }
+
+    /// `0x2dd378(n)` (L01; L00 `0x2e7c90`): the blocking fade — `n` frames drawn with the game stopped, frame `i`
+    /// covered in black at alpha `0x80 − (n − 1 − i)·0x80 / n` (full on the last); the game then goes on with no fade.
+    /// The original runs the frames inside the caller's tick and the caller goes on after them; here the frames run
+    /// before the next tick (the engine, from the frame drawn after this one), so a caller does the rest of its work
+    /// on its next tick. Its callers: Oozla's transporter 0x0e38 and boss 0x0a54 (crate::moby::classes::swamp_monster).
+    pub fn blocking_fade(&mut self, n: i32) {
+        if 0 < n { self.held_fade = Some((0, n as u32)); }
     }
 
     /// `0x3132a8(mission)`: the level's mission done (bit 7).

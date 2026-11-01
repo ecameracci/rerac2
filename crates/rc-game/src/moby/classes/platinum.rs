@@ -94,8 +94,8 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     }
 }
 
-/// `0x398500`: the show's start.
-fn show(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+/// `0x398500`: the show's start (also the swamp boss's reward 0x1250's, crate::moby::classes::swamp_monster).
+pub(super) fn show(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     use crate::script_camera::MODE_SNAP;
     let m = &w.mobys[id];
     let (home, yaw) = (m.pv_v(0x10), m.pv_f(0x1c));
@@ -146,7 +146,7 @@ fn held(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 }
 
 /// `0x399088`: the camera's targets by the share `t` of the bolt's sequence played (its frame / 170; 1 once over).
-fn camera(w: &MobyWorld, id: usize, ctx: &mut Ctx, playing: bool) {
+pub(super) fn camera(w: &MobyWorld, id: usize, ctx: &mut Ctx, playing: bool) {
     let m = &w.mobys[id];
     let t = if playing { ctx.host.frame_time(m) } else { 170.0 } * 0.005_882_353;
     let places = (ctx.level.cuboid_place(m.pv_i(4)), ctx.level.cuboid_place(m.pv_i(8)));

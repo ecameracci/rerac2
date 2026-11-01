@@ -944,7 +944,7 @@ pub fn update_0b07(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 }
 
 /// 0x0b21 (`0x3dad40`, 59 placed): the lily pads of the swamp's low basin, kept about its creature (Swamp Monster II, 0x0a54, its
-/// moby `+0x68`[0xc0]; `[0xc8]` + 1 once known) — not ported, so its pushes do not come. The water `0x3bc3b8`.
+/// moby `+0x68`[0xc0]; `[0xc8]` + 1 once known; crate::moby::classes::swamp_monster). The water `0x3bc3b8`.
 /// * Any state but 0: nothing while its home (`[0xb0]`) is over 5 under the water; with the creature in its
 ///   sub-state above 6 or its `[0x20]` at 0 it goes back home (its height at least home − 0.2), `[0xc4]` 0, state 1.
 /// * **0**: once there is water: no creature (−1) deletes it; else its angles at `[0x90]`, their speeds `[0xa0]` 0,
