@@ -407,8 +407,9 @@ pub fn update_bot(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         w.mobys[id].set_pv_i(pv::WARPS, warps);
         end(w, false, 0);
     }
-    // Its down: the gravity's (`0x3864f0` / `0x32aa88`: up (0, 0, 1)), or on surface 2 the surface's (`0x1b4284`).
-    let mut down = [0.0, 0.0, -1.0];
+    // Its down: the gravity's (`0x3864f0` / `0x32aa88`, crate::gravity::Gravity::up_at), or on surface 2 the
+    // surface's (`0x1b4284`).
+    let mut down = scale(ctx.hero.gravity.up_at(w.mobys[id].pos), -1.0);
     {
         let (p, up) = (w.mobys[id].pos, w.mobys[id].rows[2]);
         let hit = w.coll_line(ctx, add(p, scale(up, HALF)), sub(p, up), 2, Some(id));
