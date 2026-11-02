@@ -56,7 +56,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 }
 
 /// `0x391b98(index, pvars, inside)`: one moby's update, draw and collision by the flags.
-fn switch(w: &mut MobyWorld, i: usize, flags: [i8; 3], inside: bool) {
+pub fn switch(w: &mut MobyWorld, i: usize, flags: [i8; 3], inside: bool) {
     let Some(m) = w.mobys.get(i) else { return };
     let class = w.class(m.o_class);
     let kind_12 = class.is_some_and(|c| c.kind == 0x12);
