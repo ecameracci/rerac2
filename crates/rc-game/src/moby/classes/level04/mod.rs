@@ -5,9 +5,12 @@
 use crate::hero::physics::V3;
 use crate::moby::MobyWorld;
 
+pub mod rider;
+
 /// This level's class updates.
 pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
     match o_class {
+        rider::CLASS => Some(rider::update),
         _ => None,
     }
 }
