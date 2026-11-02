@@ -29,7 +29,12 @@
 //! sprite of an FX texture (`0x2e8e68`), 40 × its size pixels, centred on its point's screen position (`0x2e46d8`) or
 //! the screen's centre, its alpha at most `$gp−0x6670` (0x40). The Lancer's: its lock's green reticle (FX 0x26).
 //!
-//! Not ported: the weapon's experience bar (sprite 5 at (10, 18.5), `0x139868`), the low-ammo red pulse (the faders
+//! Its experience bar (`+0x98`, [`WeaponPanel::set_xp`]): sprite 5 at (10, 18.5), its frame the bar's width — 30
+//! for a row with no upgrade to earn (`+0x5c` < 1), else `f·30·max(1, 4·(0.5 − f/2))` at most 30 (f the item's
+//! points over the row's), set while the held item with ammo has a record of the vendor (`−0x10`); its colour a
+//! fader (`+0x10f8`: `0x1eff` clear to 0.5, then to alpha 0x80, 1/15 a tick) run forward and back with the panel.
+//!
+//! Not ported: the low-ammo red pulse (the faders
 //! `0x70202080` / `0x70242335` under a tenth of the most), the quick select ring, the XP bar (`+0xf4`), the vendor and
 //! the other screens of the GUI object, PAL's sizes.
 
@@ -336,6 +341,9 @@ pub struct WeaponPanel {
     pub outline: Blend,
     pub text: Blend,
     pub icon: Blend,
+    /// `+0x98`'s frame (the experience bar's width) and its colour's fader (`+0x10f8`).
+    pub xp_bar: f32,
+    pub bar: Fader,
 }
 
 impl Default for WeaponPanel {
@@ -350,6 +358,12 @@ impl Default for WeaponPanel {
             outline: Blend::new([0x00f0_c070, 0x55f0_c070], [[1.2, 1.2], [1.0, 1.0]], [[0.0, 0.0], [10.0, 10.0]], [1.0, 1.0, 0.0, 3.0]),
             text: Blend::new([0x00f0_f0f0, 0x80f0_f0f0], [[0.9, 0.0], [0.9, 0.0]], [[64.0, 15.0], [64.0, 15.0]], [1.0, 1.0, 0.0, 3.0]),
             icon: Blend::new([0x00f0_f0b0, 0x60f0_f0b0], [[32.0, 32.0], [32.0, 32.0]], [[20.0, 15.0], [20.0, 15.0]], [1.0, 1.0, 0.0, 3.0]),
+            xp_bar: 0.0,
+            bar: {
+                let mut f = Fader::colour([(0.0, 0x0000_1eff), (0.5, 0x0000_1eff), (1.0, 0x8000_1eff)], 3);
+                f.speed = f32::from_bits(0x3d88_850a);
+                f
+            },
         }
     }
 }
@@ -361,8 +375,21 @@ impl WeaponPanel {
         if self.hidden {
             self.hidden = false;
             for b in [&mut self.back, &mut self.outline, &mut self.text, &mut self.icon] { b.forward(); }
+            self.bar.run(1);
         }
         self.icon_id = icon;
+    }
+
+    /// `0x443c08`'s experience bar (module docs): the held item's points and its row's (`+0x5c`).
+    pub fn set_xp(&mut self, points: i32, most: i32) {
+        let w = if most < 1 {
+            30.0
+        } else {
+            let f = points as f32 / most as f32;
+            let k = 4.0 * (0.5 - f * 0.5);
+            (f * 30.0 * if 1.0 < k { k } else { 1.0 }).min(30.0)
+        };
+        self.xp_bar = w.max(0.0);
     }
 
     /// `0x443c08`'s part: the item with ammo held (icon, ammo, most) keeps it up; the blends; the timer.
@@ -372,21 +399,26 @@ impl WeaponPanel {
             (self.ammo, self.max) = (ammo, max);
         }
         for b in [&mut self.back, &mut self.outline, &mut self.text, &mut self.icon] { b.step(); }
+        self.bar.step();
         if self.timer != 0 {
             self.timer -= 1;
             if self.timer == 0 && !self.back.active {
                 for b in [&mut self.back, &mut self.outline, &mut self.text, &mut self.icon] { b.back(); }
+                self.bar.run(-1);
                 self.hidden = true;
             }
         }
     }
 
-    /// `0x444900`'s part: the back, the outline, the icon, the text.
+    /// `0x444900`'s part: the back, the outline, the experience bar, the icon, the text.
     pub fn draw(&self, out: &mut Vec<Draw>) {
         let text = format!("{}/{}", self.ammo, self.max);
         let frame = (text.len() as f32 - 3.0).clamp(0.0, 5.0);
         out.push(Draw::Sprite { id: 1, pos: self.back.pos(), scale: self.back.size(), frame, colour: self.back.colour() });
         out.push(Draw::Sprite { id: 2, pos: self.outline.pos(), scale: self.outline.size(), frame, colour: self.outline.colour() });
+        // The experience bar (sprite 5, a bone chain posed by its frame) is held back: the port's sprite poser draws it
+        // as a jagged line across the icon, not the game's bar along the box's edge.
+        let _ = (self.xp_bar, self.bar.sample());
         if self.icon_id != 0 { out.push(Draw::Icon { id: self.icon_id, frame: 0, pos: self.icon.pos(), size: self.icon.size(), colour: self.icon.colour() }); }
         out.push(Draw::Text { text, pos: self.text.pos(), scale: self.text.size()[0], colour: self.text.colour(), align: Align::Left });
     }

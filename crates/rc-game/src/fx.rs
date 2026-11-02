@@ -15,6 +15,10 @@
 //! | `0x41f9a8` | the Chopper's blade 0x087a with a trail | its trail and the Mega's lightning ([`crate::moby::classes::chopper::draw`]) |
 //! | `0x3a7968` | the Blitz Gun in the hand 0x05d1 after a shot | its muzzle's starburst and flash, the screen flash ([`crate::moby::classes::blitz::draw`]) |
 //! | `0x3fd908` | the Blitz Gun's tracer 0x0d5e | its beam ([`crate::moby::classes::blitz::draw_tracer`]) |
+//! | `0x3feba0` | the beam 0x0dc1 (the upgrade screen's lightning) | its bolt ([`crate::moby::classes::beam::draw`]) |
+//! | `0x3d4320` / `0x3fe250` | the upgraded Blitz Gun 0x0af1 after a shot / its tracer 0x0d9c | its arcs, ring and glare ([`crate::moby::classes::blitz_mega::draw`]); the beam |
+//! | `0x3a9a48` | the Pulse Rifle's shot 0x05d6 with smoke or a beam | its slot's smoke and beams ([`crate::moby::classes::pulse_rifle::draw`]) |
+//! | `0x2a7ac8` (first list) | Ratchet | the hand item's glows ([`HeroGlow`]; its other glows are not ported) |
 //! | `0x3c6eb8` (L02) | the Spiderbot Glove in the hand 0x0907 | where its throw lands ([`crate::moby::classes::spiderbot::draw_marker`]) |
 //! | `0x3cac30` | Oozla's conveyor 0x0a7b out | its belt of light ([`crate::moby::classes::oozla::draw_0a7b`]) |
 //! | `0x3d2ea8` | Oozla's hatch 0x0a9d open | its light ([`crate::moby::classes::oozla::draw_0a9d`]) |
@@ -30,6 +34,8 @@
 //! | `0x3d20e8` (L03) | the Endako boss's laser 0x09df | its glows and strips ([`sprite`], crate::moby::classes::endako_boss::draw_beam) |
 //! | `0x426410` (L02) | the big explosion 0x0d4e | its discs and glare ([`crate::moby::classes::explosion::draw`]); its shimmer ([`FrameQuad`]) |
 //! | `0x3fac68` (L02) | the Spiderbot 0x0b58 | its blast's sphere ([`FrameQuad`], [`crate::moby::classes::spiderbot::draw_blast`]) |
+//! | `0x4034c8` | the upgraded Spiderbot 0x0e79 | its blast's sphere and its charge's marker ([`crate::moby::classes::spiderbot_plus::draw_marker`]) |
+//! | `0x405658` / `0x406038` | its shot 0x0eaa / shell 0x0eab | sprites and streaks ([`crate::moby::classes::spiderbot_plus::draw_shot`], [`crate::moby::classes::spiderbot_plus::draw_lob`]) |
 //!
 //! **The frame's own image** (`0x2ea6c8(n)` for n < 0: a texture of a GS buffer instead of an FX texture): −1 queues a
 //! GS copy of the frame as it stands (the draw buffer `0x1a72dc` scaled by the sprites `0x138ad0` into a 256×256 CT16
@@ -61,6 +67,17 @@ pub struct FxQuad {
     pub corners: [V3; 4],
     pub st: [[f32; 2]; 4],
     pub rgba: [u32; 4],
+}
+
+/// One of the hand item's glows (`0x2a7e60(size, push, point, rgba)` into the queue `0x18bea0`, eight at most, emptied by
+/// the hero update `0x2a6dd0`): `0x2a7ac8` draws each by `0x326d60` — FX 0xb, additive, a ±1 square × `size` facing the
+/// camera, `push` toward it ([`sprite`] without a roll).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct HeroGlow {
+    pub size: f32,
+    pub push: f32,
+    pub point: V3,
+    pub rgba: u32,
 }
 
 /// The frame image a [`FrameQuad`] samples (module docs).
@@ -284,6 +301,8 @@ pub fn callbacks(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut
     w.screen_fills.clear();
     // The ship's shadow (`0x361af8`, a first-list callback; crate::travel).
     crate::travel::draw_ship_shadow(game, view, &mut first);
+    // Ratchet's hand-item glows (`0x2a7ac8`, a first-list callback of his).
+    for g in &w.hero_glows { sprite(&mut first, g.size, g.push, 0.0, g.point, cam, 0xb, g.rgba, true); }
     for id in w.draws_first.clone() { one(w, host, game, hero_state, view, cam, id, true, &mut first, &mut frame); }
     let mut out = Vec::new();
     // The blob shadows first (`0x2e7ab0` runs before the callbacks' list, `0x2e7970`).
@@ -299,6 +318,12 @@ fn one(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut crate::ga
     if w.mobys.get(id).is_none_or(|m| 0x80 <= m.state) { return; }
     match w.mobys[id].o_class {
         crate::moby::classes::spiderbot::BOT_CLASS => crate::moby::classes::spiderbot::draw_blast(w, id, cam, host.camera_rows(), frame),
+        crate::moby::classes::spiderbot::PLUS_BOT => {
+            crate::moby::classes::spiderbot::draw_blast(w, id, cam, host.camera_rows(), frame);
+            crate::moby::classes::spiderbot_plus::draw_marker(w, id, hero_state, game.scenes.mode, game.frame, out);
+        }
+        crate::moby::classes::spiderbot_plus::SHOT => crate::moby::classes::spiderbot_plus::draw_shot(w, id, &mut game.rng, cam, out),
+        crate::moby::classes::spiderbot_plus::LOB => crate::moby::classes::spiderbot_plus::draw_lob(w, id, &mut game.rng, cam, out),
         0x0ce9 => tie_lights::draw(w, id, view, cam, out),
         0x0b0a => draw_0b0a(w, id, &mut game.rng, cam, out),
         0x0b0b | 0x0b22 => draw_0b0b(w, host, id, &mut game.rng, cam, out),
@@ -308,8 +333,11 @@ fn one(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut crate::ga
         crate::moby::classes::gravity_bomb::BLAST_CLASS => crate::moby::classes::gravity_bomb::draw_blast(w, id, view, cam, out),
         crate::moby::classes::chopper::BLADE => crate::moby::classes::chopper::draw(w, id, game, cam, out),
         crate::moby::classes::blitz::HAND_CLASS => crate::moby::classes::blitz::draw(w, id, cam, out),
-        crate::moby::classes::blitz::TRACER => crate::moby::classes::blitz::draw_tracer(w, id, cam, out),
-        crate::moby::classes::spiderbot::HAND_CLASS => crate::moby::classes::spiderbot::draw_marker(w, id, hero_state, game.scenes.mode, game.frame, out),
+        crate::moby::classes::blitz::TRACER | crate::moby::classes::blitz::MEGA_TRACER => crate::moby::classes::blitz::draw_tracer(w, id, cam, out),
+        crate::moby::classes::blitz_mega::HAND_CLASS => crate::moby::classes::blitz_mega::draw(w, id, &mut game.rng, cam, out),
+        crate::moby::classes::beam::CLASS => crate::moby::classes::beam::draw(w, id, cam, out),
+        crate::moby::classes::pulse_rifle::SHOT => crate::moby::classes::pulse_rifle::draw(w, id, hero_state, cam, out),
+        crate::moby::classes::spiderbot::HAND_CLASS | crate::moby::classes::spiderbot::PLUS_HAND => crate::moby::classes::spiderbot::draw_marker(w, id, hero_state, game.scenes.mode, game.frame, out),
         0x0a7b => crate::moby::classes::oozla::draw_0a7b(w, id, out),
         0x0a9d => crate::moby::classes::oozla::draw_0a9d(w, id, out),
         0x0a17 => crate::moby::classes::oozla::draw_0a17(w, id, game, cam, host.camera_rows(), out),

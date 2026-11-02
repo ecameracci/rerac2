@@ -27,8 +27,12 @@
 //!   (`0x3227d8`), **7**;
 //! * **7**: black fading out over 20 ticks, then game mode 0 (`0x32c5f0(0, 2, ..)`).
 //!
-//! Not ported: the lightning about the moby in states 1..6 (`0x380ac0`: six bolts a tick from 9 ahead of the camera
-//! to around the moby, `0x3fe9d8`; the port has no lightning system yet), the wait for the dialogue's stream in state
+//! **The lightning** ([`Screen::lightning`], `0x380ac0`, at the end of each placing, states 1..6): six beams a tick
+//! (crate::moby::classes::beam) from 9 ahead of the camera to 3 ahead turned by a random 0.1..3 (8..12 ticks; widths
+//! `gp−0x14b0..`: 1.25, 0.4, 0.3, 0.8; `0x808080` / `0x808080` / `0xff1010`, the glow `0xff1010` → `0xff1010`). The
+//! frame (`0x380c50`) runs the beams' updates before its state, and their draws are the frame's only callbacks.
+//!
+//! Not ported: the wait for the dialogue's stream in state
 //! 0 (`0x1a641a`, up to 0xb5 ticks), the other mobys the frame animates (0xdc1's update, 0xcb2 / 0xb02 / 0x259 / 0xa5c /
 //! 0x1192: none on the screen), the items 0x3d / 0x49 / 0x4d / 0x5d / 0x5e / 0x6b / 0x6c's swap to the hidden preview
 //! (`0x37fe70`: their weapons are not ported).
@@ -120,6 +124,14 @@ impl Screen {
     /// `0x37fec8` (module docs). True when the screen is over (game mode 0 asked for).
     pub fn frame(&mut self, w: &mut MobyWorld, ctx: &mut Ctx) -> bool {
         self.fills.clear();
+        // `0x380c50`: the beams' updates (the frame's draw lists start empty: they are its only callbacks).
+        w.draws.clear();
+        w.draws_first.clear();
+        for id in 0..w.mobys.len() {
+            let m = &w.mobys[id];
+            if m.o_class != crate::moby::classes::beam::CLASS || 0x80 <= m.state { continue; }
+            if let Some(f) = m.update { f(w, id, ctx); }
+        }
         let shown = |s: &Screen| Some((EYE, ROWS, tan())).filter(|_| !s.camera_on);
         match self.state {
             0 => {
@@ -239,6 +251,19 @@ impl Screen {
         m.pos = pos;
         m.rows = rows;
         w.rebuild(id, &*ctx.host);
+        self.lightning(w, ctx);
+    }
+
+    /// `0x380ac0` (module docs, "The lightning").
+    fn lightning(&mut self, w: &mut MobyWorld, ctx: &mut Ctx) {
+        const WIDTHS: [f32; 4] = [1.25, 0.4, 0.3, 0.8];
+        for _ in 0..6 {
+            let from = add(EYE, scale(ROWS[0], 9.0));
+            let r = ctx.game.rng.rand_vec(0.1, 3.0);
+            let to = add(add(EYE, scale(ROWS[0], 3.0)), r);
+            let life = ctx.game.rng.rand_range(8, 0xc);
+            crate::moby::classes::beam::spawn(w, WIDTHS, from, to, life, [0x80_8080, 0x80_8080, 0xff_1010, 0xff_1010, 0xff_1010]);
+        }
     }
 
     /// `0x3807f0`: the glows of a tick (module docs).

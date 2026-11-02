@@ -816,10 +816,10 @@ fn tick(
             for m in mobys.world.mobys.iter().filter(|m| m.state < 0x80 && classes.contains(&m.o_class)) {
                 let d = rc_game::hero::physics::dist2(m.pos, p.hero.pos);
                 // `RC_MOBY_PV=240,258`: those pvar words too (hex offsets).
-                let a = m.instance.and_then(|ii| occl.as_ref()?.anim_index(ii)).and_then(|k| anim.as_ref()?.instances.get(k)).map(|i| i.state);
+                let a = m.instance.and_then(|ii| occl.as_ref()?.anim_index(ii)).and_then(|k| anim.as_ref()?.instances.get(k)).map(|i| i.state).or_else(|| mobys.created.get(&m.index).map(|c| c.state));
                 let a = a.map_or(String::new(), |s| format!(" seq {}/{} f {}/{} t {:.2} speed {:.2} rate {:.3} flags {}", s.seq_a, s.seq_b, s.frame_a, s.frame_b, s.t, s.speed, s.rate, s.flags));
                 let pv: Vec<String> = std::env::var("RC_MOBY_PV").unwrap_or_default().split(',').filter_map(|x| usize::from_str_radix(x.trim(), 16).ok()).map(|o| format!("+{o:#x}={}", m.pv_i(o))).collect();
-                println!("moby trace tick {}: #{} class {:#06x} state {} sub {} mode {:#x} upd {} drawn {} group {} pvars #{} pos ({:.1}, {:.1}, {:.1}) hero at {:.1}{a} {}", p.ticks, m.index, m.o_class, m.state, m.sub_state, m.mode, m.update_dist, m.drawn, m.group, m.pvar_index, m.pos[0], m.pos[1], m.pos[2], d, pv.join(" "));
+                println!("moby trace tick {}: #{} class {:#06x} state {} sub {} mode {:#x} upd {} drawn {} group {} pvars #{} serial {} pos ({:.1}, {:.1}, {:.1}) hero at {:.1}{a} {}", p.ticks, m.index, m.o_class, m.state, m.sub_state, m.mode, m.update_dist, m.drawn, m.group, m.pvar_index, m.serial, m.pos[0], m.pos[1], m.pos[2], d, pv.join(" "));
             }
         }
     }
@@ -1006,7 +1006,7 @@ fn tick(
                 o.game_look(ii, m.alpha, m.mode, m.glow, m.draw_dist, m.shine);
                 // A placed moby's modifiers pose it (rc_game::moby::Moby::manips, `joint_scales`, `joint_moves`: Endako's
                 // boss's rotor and turrets, its crane's arm). Without any, its slot is left alone.
-                if !(m.manips.is_empty() && m.joint_scales.is_empty() && m.joint_moves.is_empty()) {
+                if !(m.manips.is_empty() && m.joint_scales.is_empty() && m.joint_moves.is_empty() && m.joint_nodes.is_empty()) {
                     if let (Some(a), Some(k)) = (anim.as_deref_mut(), o.anim_index(ii)) {
                         if let Some(slot) = a.mods.get_mut(k) { *slot = crate::mobys::moby_mods(&mobys.chains.targets, m); }
                     }
@@ -1056,6 +1056,8 @@ fn tick(
         let g = &mut p.game;
         g.cameras.tick(&p.hero, &mobys.level, (p.camera.pos, p.camera.rows), &mut g.scenes.fade, &mut g.scenes.fade_in, &fp)
     };
+    // `0x2d9f38`'s tail `0x2d7b70`: the field of view's blend (rc_game::camera::FovBlend: the Pulse Rifle's zoom).
+    p.game.cam_tweaks.fov_step();
     // The first-person camera's view lock (`0x18c0d5`: Ratchet hides and faces the view, rc_game::hero).
     if cam.view_lock && p.hero.view_lock == 0 { p.hero.view_lock = 1; }
     // The ship's camera (class 0x19, rc_game::ship): its update flies the ship and is the view.
@@ -1144,6 +1146,10 @@ fn tick(
     // `0x2fa770`: the held item when it has ammo (not with the items off, `0x18c0d4`).
     let it = &p.hero.items;
     let weapon = rc_game::hero::items::row(&p.game, it.item).filter(|r| r.ammo && it.ready == 2 && p.hero.mode == 0).map(|r| (r.icon, p.game.ammo.get(it.item.max(0) as usize).copied().unwrap_or(0), r.max_ammo));
+    // `0x443c08`'s experience bar: the held item with ammo, its record a vendor's (`−0x10`).
+    if weapon.is_some() {
+        if let Some(r) = mobys.level.items.get(p.game.item_row(it.item)).filter(|r| r.mega) { p.hud.weapon.set_xp(p.game.weapon_xp(it.item), r.xp_max); }
+    }
     p.hud.tick(p.hero.hp, p.game.max_health, sb, sh, weapon);
     // The boss bar's own update (`0x2f2458`): its ticks left counted down, gone at 0.
     p.game.boss_bar = p.game.boss_bar.and_then(|(f, t)| (1 < t).then_some((f, t - 1)));
@@ -1206,17 +1212,19 @@ fn tick(
     let far = p.game.view_far * 1024.0;
     crate::moby_lod::set_draw_cap(p.game.moby_draw_cap());
     // `0x2d9f38`'s shakes on the frame's eye and rows (rc_game::camera::Shakes; the cameras keep their own).
+    // The play's tangent: a field-of-view blend's once one ran this level (`0x1bd2f0`, rc_game::camera::FovBlend).
+    let play_tan = p.game.cam_tweaks.blend.tan.unwrap_or(play_camera::GAME_TAN_HALF_FOV);
     let (view, fwd) = match cam.view {
         Some((mut pos, mut rows)) => {
             p.game.shakes.apply(&mut pos, &mut rows);
             // The fly-by's FOV is its own (`0x1bd2f0`); the script camera keeps the play's.
-            let tan = if p.game.cameras.current_class() == rc_game::cameras::CLASS_FLYBY { p.game.cameras.tan } else { p.game.puzzle.tan.unwrap_or(play_camera::GAME_TAN_HALF_FOV) };
+            let tan = if p.game.cameras.current_class() == rc_game::cameras::CLASS_FLYBY { p.game.cameras.tan } else { p.game.puzzle.tan.unwrap_or(play_tan) };
             (PlayView { view: scene_view(&rc_game::scene_camera::SceneCamera { eye: pos, rows, tan_half_fov: tan, cut: false }), tan_half_fov: tan, far }, rows[0])
         }
         None => {
             let (mut pos, mut rows) = (p.camera.pos, p.camera.rows);
             p.game.shakes.apply(&mut pos, &mut rows);
-            (PlayView { view: camera_view(&p.camera, pos, rows), tan_half_fov: play_camera::GAME_TAN_HALF_FOV, far }, rows[0])
+            (PlayView { view: camera_view(&p.camera, pos, rows), tan_half_fov: play_tan, far }, rows[0])
         }
     };
     commands.insert_resource(view);
@@ -1377,6 +1385,13 @@ fn upgrade_frame(p: &mut Play, lv: &crate::level_load::LoadedLevel, occl: Option
     let view = screen.view;
     p.upgrade_fills = screen.fills.clone();
     drop(ctx);
+    // The frame's draw callbacks — the lightning's beams (rc_game::moby::classes::beam) — seen from its view.
+    if let Some((eye, rows, _)) = view {
+        let (tx, ty) = crate::game_camera::projection_tans(None);
+        let bview = rc_game::particles::BSphereView::from_camera(eye, rows[0], rows[1], rows[2], tx, ty);
+        let lists = rc_game::fx::callbacks(&mut mobys.world, &host, &mut p.game, p.hero.state, &bview, eye);
+        (p.fx_quads_first, p.fx_quads, p.frame_quads) = (lists.first, lists.second, lists.frame);
+    }
     drop(host);
     if done { p.upgrade = None; }
     if mobys.world.changed {
@@ -2337,10 +2352,12 @@ fn draw_hud(
             }
             Err(e) => eprintln!("play: no HUD icons ({e:#})"),
         }
-        // The markers' FX textures (the Lancer's reticle), the space fights' HUD's (rc_game::ship), font 3 (FX
-        // texture 3: the arena's counters, rc_game::moby::classes::arena::draw_hud) and the arena wipe's edge.
+        // The markers' FX textures (the Lancer's reticle, the Pulse Rifle's crosshair 0x27 and lock 0x20, the Blitz Guns'
+        // crosshair 0x21), the space
+        // fights' HUD's (rc_game::ship), font 3 (FX texture 3: the arena's counters,
+        // rc_game::moby::classes::arena::draw_hud) and the arena wipe's edge.
         let mut fx = std::collections::HashMap::new();
-        for id in [0x26u16, rc_game::moby::classes::arena::FONT_3, rc_game::moby::classes::arena::WIPE_FX].into_iter().chain(rc_game::ship::HUD_FX) {
+        for id in [0x26u16, 0x20, 0x21, 0x27, rc_game::moby::classes::arena::FONT_3, rc_game::moby::classes::arena::WIPE_FX].into_iter().chain(rc_game::ship::HUD_FX) {
             if let Some(t) = level.0.particles.textures.as_ref().and_then(|t| t.fx_textures.get(id as usize)).and_then(Option::as_ref) {
                 fx.insert(id, (textures.len(), [t.width as f32, t.height as f32]));
                 // The HUD's atlas holds the GS's bytes (0x80 = 1.0); the FX textures' alpha is decoded to 0..0xff (their

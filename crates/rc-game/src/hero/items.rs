@@ -49,6 +49,9 @@ pub const CHOPPER_CLASS: i16 = crate::moby::classes::chopper::HAND_CLASS;
 /// The Blitz Gun: item 0x1a, class 0x5d1 (L00 row `0x263bc0`; crate::moby::classes::blitz).
 pub const BLITZ: i32 = 0x1a;
 pub const BLITZ_CLASS: i16 = crate::moby::classes::blitz::HAND_CLASS;
+/// The Pulse Rifle: item 0x17, class 0x5cb (L00 row `0x263920`; crate::moby::classes::pulse_rifle).
+pub const PULSE: i32 = 0x17;
+pub const PULSE_CLASS: i16 = crate::moby::classes::pulse_rifle::HAND_CLASS;
 
 /// An item record (`0x262500 + 0xe0·row`, row `0x139568[item]`: crate::upgrades): the fields the port reads.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -79,8 +82,8 @@ pub struct ItemRow {
 
 /// The rows the port has (L00 `0x262dc0`, `0x263f40`, `0x2649c0`; the Dynamo's from Oozla's live table; the
 /// Electrolyzer's and the Spiderbot Glove's from L02's; the Swingshot's from L03's; the Chopper's L00 `0x263840`; the
-/// Blitz Gun's L00 `0x263bc0`).
-pub const ROWS: [ItemRow; 10] = [
+/// Blitz Gun's L00 `0x263bc0`; the Pulse Rifle's L00 `0x263920`).
+pub const ROWS: [ItemRow; 11] = [
     ItemRow { item: WRENCH, attach: 0, class: WRENCH_CLASS, stance: 0, icon: 0, use_seq: 0, keep: false, fire_seq: [0, 0], speed: 0.0, rate: 0.0, damage: 1.0, ammo: false, max_ammo: 0, start_ammo: 0 },
     ItemRow { item: LANCER, attach: 0, class: LANCER_CLASS, stance: 1, icon: 0xea64, use_seq: 0x38, keep: true, fire_seq: [-1, 0x3e], speed: 60.0, rate: 7.0, damage: 0.5, ammo: true, max_ammo: 200, start_ammo: 200 },
     ItemRow { item: DYNAMO, attach: 1, class: DYNAMO_CLASS, stance: 1, icon: 0xea7f, use_seq: 0x8d, keep: false, fire_seq: [0x8e, 0x8d], speed: 0.0, rate: 0.0, damage: 0.0, ammo: false, max_ammo: 0, start_ammo: 0 },
@@ -91,12 +94,14 @@ pub const ROWS: [ItemRow; 10] = [
     ItemRow { item: SWINGSHOT, attach: 1, class: SWINGSHOT_CLASS, stance: 1, icon: 0xea8b, use_seq: 0, keep: false, fire_seq: [0, 0], speed: 0.0, rate: 0.0, damage: 0.0, ammo: false, max_ammo: 0, start_ammo: 0 },
     ItemRow { item: CHOPPER, attach: 6, class: CHOPPER_CLASS, stance: 0, icon: 0xea66, use_seq: 0x8f, keep: false, fire_seq: [0x8f, 0x8f], speed: 30.0, rate: 1.8, damage: 1.0, ammo: true, max_ammo: 35, start_ammo: 35 },
     ItemRow { item: BLITZ, attach: 0, class: BLITZ_CLASS, stance: 2, icon: 0xea67, use_seq: 0x89, keep: false, fire_seq: [0x8a, -1], speed: 0.0, rate: 2.0, damage: 3.0, ammo: true, max_ammo: 40, start_ammo: 40 },
+    ItemRow { item: PULSE, attach: 0, class: PULSE_CLASS, stance: 2, icon: 0xea68, use_seq: 0x36, keep: false, fire_seq: [-1, 0x46], speed: 400.0, rate: 1.0, damage: 10.0, ammo: true, max_ammo: 8, start_ammo: 8 },
 ];
 
 /// The upgraded rows the port has (L00 `0x262500 + 0xe0·row`; their item in brackets): the Heavy Lancer 0x3c and the
 /// Mega rows 0x4f / 0x50 (0x1e), the Mini-Nuke 0x47, 0x51, 0x52 (0x2a), the Spiderbot Glove's 0x4e, 0x69, 0x6a (0x20),
-/// the Mega Chopper 0x41, 0x53, 0x54 (0x16). Each names its own hand class (`+0x04`).
-pub const UPGRADE_ROWS: [ItemRow; 12] = [
+/// the Mega Chopper 0x41, 0x53, 0x54 (0x16), the upgraded Blitz Gun 0x44, 0x5b, 0x5c (0x1a). Each names its own hand
+/// class (`+0x04`).
+pub const UPGRADE_ROWS: [ItemRow; 15] = [
     ItemRow { item: 0x3c, attach: 0, class: 0xc05, stance: 2, icon: 0xea64, use_seq: 0x33, keep: true, fire_seq: [-1, -1], speed: 80.0, rate: 10.0, damage: 0.67, ammo: true, max_ammo: 300, start_ammo: 300 },
     ItemRow { item: 0x4f, attach: 0, class: 0xc05, stance: 2, icon: 0xea64, use_seq: 0x33, keep: true, fire_seq: [-1, -1], speed: 80.0, rate: 10.0, damage: 4.0, ammo: true, max_ammo: 400, start_ammo: 300 },
     ItemRow { item: 0x50, attach: 0, class: 0xc05, stance: 2, icon: 0xea64, use_seq: 0x33, keep: true, fire_seq: [-1, -1], speed: 80.0, rate: 10.0, damage: 8.0, ammo: true, max_ammo: 500, start_ammo: 300 },
@@ -109,6 +114,9 @@ pub const UPGRADE_ROWS: [ItemRow; 12] = [
     ItemRow { item: 0x41, attach: 6, class: 0xaf6, stance: 0, icon: 0xea66, use_seq: 0x8f, keep: false, fire_seq: [0x8f, 0x8f], speed: 30.0, rate: 1.8, damage: 2.0, ammo: true, max_ammo: 35, start_ammo: 35 },
     ItemRow { item: 0x53, attach: 6, class: 0xaf6, stance: 0, icon: 0xea66, use_seq: 0x8f, keep: false, fire_seq: [0x8f, 0x8f], speed: 30.0, rate: 1.8, damage: 5.0, ammo: true, max_ammo: 50, start_ammo: 35 },
     ItemRow { item: 0x54, attach: 6, class: 0xaf6, stance: 0, icon: 0xea66, use_seq: 0x8f, keep: false, fire_seq: [0x8f, 0x8f], speed: 30.0, rate: 1.8, damage: 8.0, ammo: true, max_ammo: 70, start_ammo: 35 },
+    ItemRow { item: 0x44, attach: 0, class: 0xaf1, stance: 2, icon: 0xea67, use_seq: 0x89, keep: false, fire_seq: [0x8a, -1], speed: 0.0, rate: 2.6, damage: 6.0, ammo: true, max_ammo: 40, start_ammo: 40 },
+    ItemRow { item: 0x5b, attach: 0, class: 0xaf1, stance: 2, icon: 0xea67, use_seq: 0x89, keep: false, fire_seq: [0x8a, -1], speed: 0.0, rate: 2.6, damage: 20.0, ammo: true, max_ammo: 50, start_ammo: 40 },
+    ItemRow { item: 0x5c, attach: 0, class: 0xaf1, stance: 2, icon: 0xea67, use_seq: 0x89, keep: false, fire_seq: [0x8a, -1], speed: 0.0, rate: 2.6, damage: 40.0, ammo: true, max_ammo: 60, start_ammo: 40 },
 ];
 
 /// Row `row` of the records ([`ROWS`], [`UPGRADE_ROWS`]).
@@ -395,6 +403,8 @@ impl ItemBlock {
 /// lock `0x18c0d5` — his items hidden (`0x2d3208`: the hand, head and feet; the wrench in flight stays), and the
 /// first-person weapon (`0x2d54f8`, [`first_person_weapon`]).
 pub fn item_pass(world: &mut MobyWorld, ctx: &mut Ctx) {
+    // `0x2a6dd0`'s head: the hand item's glow queue emptied (crate::fx::HeroGlow).
+    world.hero_glows.clear();
     hand_pass(world, ctx);
     if ctx.hero.view_lock != 0 {
         let it = &ctx.hero.items;
@@ -444,16 +454,6 @@ fn hand_pass(world: &mut MobyWorld, ctx: &mut Ctx) {
         // (crate::upgrades::hitter_item).
         let it = &mut ctx.hero.items;
         it.row = ctx.game.item_row(it.item);
-        // Port: the row changed under the hand outside the upgrade screen (the vendor's Mega purchase, a dev switch):
-        // the old class goes and the new row's comes with the next creation, as the screen's swap does (`0x3805e0`).
-        if let (Some(id), Some(r)) = (it.hand, it.held_row()) {
-            if it.ready == 2 && r.class != it.hand_class {
-                world.delete(id);
-                it.hand = None;
-                it.ready = 0;
-                it.next_create = ctx.game.frame;
-            }
-        }
         world.hitters.refresh(ctx.game, it.hand, it.item);
     }
     let Some(id) = ctx.hero.items.hand else {
@@ -527,6 +527,27 @@ fn hand_pass(world: &mut MobyWorld, ctx: &mut Ctx) {
         2 => {
             ctx.hero.items.item_ticks += 1;
             switch(world, ctx);
+            // Port: the row changed under the hand outside the upgrade screen (the vendor's Mega purchase, a dev
+            // switch): the hand goes out as a change sends it (its sequence 2, ready 3: its update sees the put-away
+            // this tick, the next pass deletes it) and the new row's class comes with the next creation.
+            let it = &mut ctx.hero.items;
+            if let (2, Some(id), Some(r)) = (it.ready, it.hand, it.held_row()) {
+                if r.class != it.hand_class {
+                    let idle = ctx.hero.idle_seq();
+                    let it = &mut ctx.hero.items;
+                    it.use_end(ctx.hero.state, ctx.hero_view.seq_b, idle);
+                    ctx.host.set_anim(&world.mobys[id], 2, 0, 2);
+                    ctx.hero.items.ready = 3;
+                }
+            }
+            // Its sequence 0 (the draw-out: the Spiderbot Gloves' unfolding) run out, a class of more sequences goes
+            // to its sequence 1 (`0x31b5f0(item, 1, 0, 2)`), so the draw-out plays once.
+            if let Some(&id) = ctx.hero.items.hand.as_ref() {
+                let m = &world.mobys[id];
+                if ctx.host.anim(m).is_some_and(|a| a.flags & 2 != 0 && a.seq_b == 0) && ctx.host.seq_frames(m, 1).is_some() {
+                    ctx.host.set_anim(&world.mobys[id], 1, 0, 2);
+                }
+            }
         }
         3 => {
             let it = &mut ctx.hero.items;
@@ -559,10 +580,10 @@ fn hand_pass(world: &mut MobyWorld, ctx: &mut Ctx) {
 /// after the ease; the Chopper (0x16) and the Spiderbot Glove (0x20) only pulse; the Gravity Bomb (0x2a) pulses and
 /// sheds one sprite, its upgrade two.
 ///
-/// The Blitz Gun (0x1a) only pulses.
+/// The Blitz Gun (0x1a) only pulses. The Pulse Rifle (0x17) queues two glows at its joints 2 and 3 (crate::fx::HeroGlow).
 ///
-/// Not ported: the other items' cases (0xe, 0x10, 0x12, 0x17..0x19, 0x1b..0x1d, 0x29, 0x2b, 0x2c: their weapons are
-/// not ported).
+/// Not ported: the other items' cases (0xe, 0x10, 0x12, 0x18, 0x19, 0x1b..0x1d, 0x29, 0x2b, 0x2c: their weapons are
+/// not ported), the upgraded Pulse Rifle's (its joint 1, `0x7f1010ff`, and a sprite: its hand is not ported).
 fn hand_glow(world: &mut MobyWorld, ctx: &mut Ctx, id: usize) {
     let it = &mut ctx.hero.items;
     if ctx.hero.state == 0x61 || world.mobys[id].mode & 1 != 0 || it.item_ticks < 0x17 { return; }
@@ -615,6 +636,14 @@ fn hand_glow(world: &mut MobyWorld, ctx: &mut Ctx, id: usize) {
         BLITZ => {
             let step = if up { 0.043_633_237 } else { 0.058_177_65 };
             world.mobys[id].glow = pulse(&mut it.glow_phase, step, [0xffdf_dfdf, 0xff20_205f]);
+        }
+        // The Pulse Rifle (case 0x17): two green glows at its joints 2 and 3 (`0x2a7e60(0.1, 0.03, joint, 0x3500ff10)`),
+        // no word.
+        PULSE if !up => {
+            for j in [2, 3] {
+                if let Some(point) = ctx.host.joint(&world.mobys[id], j) { world.hero_glows.push(crate::fx::HeroGlow { size: 0.1, push: 0.03, point, rgba: 0x3500_ff10 }); }
+            }
+            return;
         }
         _ => return,
     }

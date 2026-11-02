@@ -258,13 +258,82 @@ pub struct CamTweaks {
     pub turn: Option<CamTurn>,
     /// The follow camera's offset from its pivot (D+0x160) as its last update left it: what the turners read.
     pub off: V3,
+    /// The field of view's blend toward [`CamTweaks::fov`] ([`FovBlend`]).
+    pub blend: FovBlend,
 }
 
 impl Default for CamTweaks {
-    fn default() -> Self { CamTweaks { slots: [CamTweak::default(); 32], last: -1, fov: 1.124_3, turn: None, off: [0.0; 3] } }
+    fn default() -> Self { CamTweaks { slots: [CamTweak::default(); 32], last: -1, fov: 1.124_3, turn: None, off: [0.0; 3], blend: FovBlend::default() } }
+}
+
+/// `0x3f8fea69`: the play's field of view (the level start's `0x32c858` and the weapons put away blend back to it).
+pub const PLAY_FOV: f32 = 1.124_341_1;
+
+/// The field of view's blend (`0x1b8fd0..0x1b8ff0`): `0x2d7a60` starts it ([`CamTweaks::set_fov`]), the camera
+/// update's tail `0x2d7b70` runs it ([`CamTweaks::fov_step`]) and sets the view's tangent `0x1bd2f0` from it. Its first
+/// user is the Pulse Rifle's zoom (crate::moby::classes::pulse_rifle). Port: the tangent is the engine's view only once
+/// a blend has run this level ([`FovBlend::tan`]); until then the play's own (`0x32c858`'s blend to [`PLAY_FOV`] at the
+/// level start ends on the same view).
+///
+/// Not ported: the modes 1 / 2 (over a count of ticks, linear and cosine: no user found).
+#[derive(Clone, Copy, Debug)]
+pub struct FovBlend {
+    /// `0x1b8fd8`: the field of view now; `0x1b8fd0` its speed.
+    pub cur: f32,
+    pub v: f32,
+    /// `0x1b8fdc` / `0x1b8fe0` / `0x1b8fe4`: mode 3's spring (`0x2d7f80`: its pull, its damping, the most a tick).
+    pub k: f32,
+    pub d: f32,
+    pub max: f32,
+    /// `0x1b8fe8`: 0 at once, 3 the spring; `0x1b8fe9`: running.
+    pub mode: u8,
+    pub on: bool,
+    /// `0x1bd2f0` as the blend last set it (None: no blend ran this level).
+    pub tan: Option<f32>,
+}
+
+impl Default for FovBlend {
+    fn default() -> Self { FovBlend { cur: PLAY_FOV, v: 0.0, k: 0.0, d: 0.0, max: 0.0, mode: 0, on: false, tan: None } }
 }
 
 impl CamTweaks {
+    /// `0x2d7a60(fov, k, d, max, ticks, mode)`: blend the field of view to `fov` — mode 0 at once, 3 by the spring
+    /// (`k`, `d`, `max`); the other modes are not ported (module docs of [`FovBlend`]).
+    pub fn set_fov(&mut self, fov: f32, k: f32, d: f32, max: f32, mode: u8) {
+        let b = &mut self.blend;
+        match mode {
+            0 => b.mode = 0,
+            3 => (b.k, b.d, b.max, b.mode) = (k, d, max, 3),
+            _ => return,
+        }
+        self.fov = fov;
+        b.on = true;
+    }
+
+    /// `0x2d7b70` (the camera update `0x2d9f38`'s tail): a running blend steps — mode 0 takes the field of view at once
+    /// and stops, mode 3 springs toward it (`0x2d7f80`) and stops once its speed is under 0.0001 — and the view's tangent
+    /// is `tan(fov / 2)`.
+    pub fn fov_step(&mut self) {
+        let b = &mut self.blend;
+        if !b.on { return; }
+        match b.mode {
+            0 => {
+                b.on = false;
+                b.cur = self.fov;
+            }
+            3 => {
+                b.cur = ang_interp(b.cur, self.fov, b.k, b.d, b.max, &mut b.v);
+                if b.v.abs() < 0.0001 { b.on = false; }
+            }
+            _ => {}
+        }
+        let half = b.cur * 0.5;
+        b.tan = Some(half.sin() / half.cos());
+    }
+
+    /// `0x1bd2f0`: the view's tangent (the play's own, `tan(PLAY_FOV / 2)`, until a blend has run).
+    pub fn view_tan(&self) -> f32 { self.blend.tan.unwrap_or_else(|| (PLAY_FOV * 0.5).tan()) }
+
     /// The turners' common code (L03 `0x3f7b28`, `0x40a8a8`): the gap between the yaw `to` and the yaw of the camera's
     /// offset (D+0x160's x, y: `0x2f04d0`) plus `behind` (0 or π) eased to 0 by `0x3206d8(0, accel, accel, max, &gap,
     /// v, 0)` (crate::hero::physics::turn_ease, its speed `v` the moby's), then the scripted yaw 1 at the rate −v and

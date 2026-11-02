@@ -221,7 +221,7 @@ impl Host<'_> {
         })
     }
 
-    fn has_mods(&self, m: &Moby) -> bool { !(m.manips.is_empty() && m.joint_scales.is_empty() && m.joint_moves.is_empty()) }
+    fn has_mods(&self, m: &Moby) -> bool { !(m.manips.is_empty() && m.joint_scales.is_empty() && m.joint_moves.is_empty() && m.joint_nodes.is_empty()) }
 
     /// The moby's modifiers on its lists' targets ([`moby_mods`]).
     fn mods_of(&self, m: &Moby) -> Vec<moby_anim::JointModifier> { self.chains.map(|c| moby_mods(&c.targets, m)).unwrap_or_default() }
@@ -766,7 +766,8 @@ fn tie_spheres(lv: &crate::level_load::LoadedLevel) -> Vec<[f32; 4]> {
 }
 
 /// A moby's runtime joint modifiers on its lists' target joints (`targets`, [`Mobys::targets`]): its manipulators
-/// (rc_game::moby::Moby::manips), scale nodes (`joint_scales`) and translations (`joint_moves`), in that order.
+/// (rc_game::moby::Moby::manips), scale nodes (`joint_scales`), translations (`joint_moves`) and whole nodes
+/// (`joint_nodes`), in that order.
 pub fn moby_mods(targets: &HashMap<i16, Vec<u8>>, m: &Moby) -> Vec<moby_anim::JointModifier> {
     let target = |l: u8| targets.get(&m.o_class)?.get(l as usize).filter(|&&j| j != 0xff).copied();
     m.manips
@@ -774,6 +775,7 @@ pub fn moby_mods(targets: &HashMap<i16, Vec<u8>>, m: &Moby) -> Vec<moby_anim::Jo
         .filter_map(|&(l, quat)| Some(moby_anim::JointModifier { quat, ..moby_anim::JointModifier::compose(target(l)?) }))
         .chain(m.joint_scales.iter().filter_map(|&(l, s)| Some(moby_anim::JointModifier { scale: [s; 3], ..moby_anim::JointModifier::compose(target(l)?) })))
         .chain(m.joint_moves.iter().filter_map(|&(l, t)| Some(moby_anim::JointModifier { trans: t, ..moby_anim::JointModifier::compose(target(l)?) })))
+        .chain(m.joint_nodes.iter().filter_map(|&(l, n)| Some(moby_anim::JointModifier { joint: target(l)?, ..n })))
         .collect()
 }
 

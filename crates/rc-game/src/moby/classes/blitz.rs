@@ -10,9 +10,9 @@
 //! already running (the bigger kick), `+0x4c` the rumble's handle; `+0x50` the up at the muzzle, the port's, for the
 //! draw). Every tick: state **0** clears the starburst and goes to **1**; **6** waits out the pump (0x1c ticks), then
 //! its class sound 2 and **1**; its sequence run out, back to 1 (blend 2); Ratchet in the look stance 1 is sent to its
-//! twin 0x1d; the cooldown runs down. In the twin it queues the crosshair (`0x2db498(1.3, 0, 90, …, FX 0x21, −1, 4)`:
-//! red `0x600000ff` while the cooldown runs with shells left, else green `0x600fff0f`) — in the marker draw's mode 4,
-//! which `0x2dab20` does not draw: the Blitz shows no crosshair. Outside the twin `0x18c354` is set to 0x28, in it
+//! twin 0x1d; the cooldown runs down. In the twin it queues the crosshair at the screen's centre ([`crosshair`],
+//! `0x2db498(1.3, 0, 90, …, FX 0x21, −1, 4)`: its mode from the −1, so FX 0x21 draws as a sprite, mode 2; red
+//! `0x600000ff` while the cooldown runs with shells left, else green `0x600fff0f`). Outside the twin `0x18c354` is set to 0x28, in it
 //! counted down (the first shot from the look stance waits it out). There is no aim of its own (`0x18aa18` is only
 //! the lock cheat's, `0x18b270`).
 //!
@@ -58,7 +58,8 @@
 //! (`0x18b270`), the gravity frames' bends of the tracer (`0x380e08`), the glare quad the screen flash draws 0.1 in
 //! front of the camera toward the muzzle (FX 0xb under ALPHA 0x49, `Cd·As + Cd`: the engine's effect pass has no such
 //! blend). The muzzle burst's carry in the air (`auStack_d0`, only set on the ground: the stack's leftovers) is 0. The
-//! upgraded Blitz's rows (0x44 and the Mega rows on, `+0x3a`) are not in crate::hero::items::UPGRADE_ROWS yet.
+//! upgraded Blitz (rows 0x44, 0x5b, 0x5c: the hand 0x0af1 and its tracer 0x0d9c) is crate::moby::classes::blitz_mega;
+//! its pellets' lines are [`pellet`]'s, its tracer this module's with its own look ([`TracerLook`]).
 
 use crate::collision::QueryFlags;
 use crate::hero::items::{row, ItemRow, BLITZ};
@@ -66,9 +67,10 @@ use crate::hero::physics::{add, add_rot, atan2, cross, dist, scale, set_len, sub
 use crate::moby::hits::HitTemplate;
 use crate::moby::{countdown, Ctx, MobyWorld};
 
-/// The hand's class (item 0x1a's row `+0x04`) and the tracer's.
+/// The hand's class (item 0x1a's row `+0x04`) and the tracer's; the upgraded Blitz's tracer (`0x3fdee0`).
 pub const HAND_CLASS: i16 = 0x5d1;
 pub const TRACER: i16 = 0xd5e;
+pub const MEGA_TRACER: i16 = 0xd9c;
 /// `t[3]` of the hits' template (`0x45afdf66`).
 const NO_KNOCK_LIMIT: f32 = 5627.987;
 /// `$gp+0x640` / `+0x644`: the shot's delay in a running use / from a standing start; `+0x648` / `+0x64c` /
@@ -89,7 +91,7 @@ const PELLET_LEN: f32 = 32.0;
 fn cur_row(game: &crate::game::GameState) -> Option<&'static ItemRow> { row(game, BLITZ) }
 
 /// `0x321b28(out, v, 0x31fe98(a, axis))`: `v` turned by the quaternion of `a` about `axis` (`q·v·q*`).
-fn qturn(v: V3, axis: V3, a: f32) -> V3 {
+pub(crate) fn qturn(v: V3, axis: V3, a: f32) -> V3 {
     use crate::quat::{axis_angle, mul};
     let q = axis_angle(a, axis);
     let t = mul(mul(q, [v[0], v[1], v[2], 0.0]), [-q[0], -q[1], -q[2], q[3]]);
@@ -97,16 +99,24 @@ fn qturn(v: V3, axis: V3, a: f32) -> V3 {
 }
 
 /// `0x2eef88(out, a, b)` = b × a.
-fn cross_ba(a: V3, b: V3) -> V3 { cross(b, a) }
+pub(crate) fn cross_ba(a: V3, b: V3) -> V3 { cross(b, a) }
+
+/// `0x2db498(1.3, 0, 90, hand, colour, 0, 0x21, −1, 4)` in the twin 0x1d (the upgraded Blitz's the same): the
+/// crosshair at the screen's centre, red while the cooldown (`+0x00`) runs with shells left, else green
+/// (crate::hud::marker).
+pub(crate) fn crosshair(w: &MobyWorld, id: usize, ctx: &mut Ctx) {
+    let red = 0.0 < w.mobys[id].pv_f(0) && ctx.hero.items.has_ammo(ctx.game);
+    crate::hud::marker(&mut ctx.game.markers, 1.3, id, if red { 0x6000_00ff } else { 0x600f_ff0f }, None, 0x21);
+}
 
 /// `0x2eeb40(+0x00)`: the cooldown down a frame (1/60 s).
-fn cooldown(w: &mut MobyWorld, id: usize) {
+pub(crate) fn cooldown(w: &mut MobyWorld, id: usize) {
     let c = w.mobys[id].pv_f(0);
     w.mobys[id].set_pv_f(0, if 1.0 / 60.0 < c { c - 1.0 / 60.0 } else { 0.0 });
 }
 
 /// `0x2eeae0` on the s16 at `off`: true when it was 0 or just reached it.
-fn count_s(w: &mut MobyWorld, id: usize, off: usize) -> bool {
+pub(crate) fn count_s(w: &mut MobyWorld, id: usize, off: usize) -> bool {
     let mut n = w.mobys[id].pv_s(off) as i32;
     let done = countdown(&mut n);
     w.mobys[id].set_pv_s(off, n as i16);
@@ -134,7 +144,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let hero_state = ctx.hero.state;
     if hero_state == 1 { ctx.hero.request_state(0x1d, true); }
     cooldown(w, id);
-    // The crosshair `0x2db498` queues in the twin 0x1d is of mode 4, which the marker draw does not draw (module docs).
+    if hero_state == 0x1d { crosshair(w, id, ctx); }
     let ok = if hero_state == 0x1d { countdown(&mut ctx.hero.items.look_wait) } else { ctx.hero.items.look_wait = 0x28; true };
     let Some(r) = cur_row(ctx.game).copied() else { return };
     let it = ctx.hero.items;
@@ -252,22 +262,22 @@ fn pellets(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, t: &mut HitTemplate, fwd
         dir = scale(dir, PELLET_LEN);
         let start = add(muzzle, o);
         let end = add(start, dir);
-        if let Some(m) = pellet(w, ctx, t, start, end, damage, &hit) { hit.push(m); }
+        if let Some(m) = pellet(w, ctx, t, start, end, damage, &hit, false) { hit.push(m); }
     }
 }
 
 /// `0x3a71f0(hand, start, end, tmpl)`: one pellet's line (flags 0x10, Ratchet and `skip` left out), its tracer and its
-/// hit; the moby hit.
+/// hit; the moby hit. The upgraded Blitz's `0x3d3e50` (`mega`) is the same with its own tracer.
 #[allow(clippy::too_many_arguments)]
-fn pellet(w: &mut MobyWorld, ctx: &mut Ctx, t: &mut HitTemplate, start: V3, end: V3, damage: f32, skip: &[usize]) -> Option<usize> {
+pub(crate) fn pellet(w: &mut MobyWorld, ctx: &mut Ctx, t: &mut HitTemplate, start: V3, end: V3, damage: f32, skip: &[usize], mega: bool) -> Option<usize> {
     let d = set_len(sub(end, start), 1.5);
     t.dir = [d[0], d[1], d[2], NO_KNOCK_LIMIT];
     let met = ctx.coll.and_then(|c| crate::collision::coll_line_live(c, ctx.scene, start, end, QueryFlags(0x10), ctx.hero_moby, &|m| !skip.contains(&m)));
     let Some(o) = met else {
-        spawn_tracer(w, ctx, start, sub(end, start), end, false);
+        spawn_tracer(w, ctx, start, sub(end, start), end, false, mega);
         return None;
     };
-    spawn_tracer(w, ctx, start, sub(o.point, start), o.point, true);
+    spawn_tracer(w, ctx, start, sub(o.point, start), o.point, true, mega);
     let m = o.moby?;
     let r = dist(o.point, start);
     t.damage = if r < 10.0 {
@@ -284,10 +294,14 @@ fn pellet(w: &mut MobyWorld, ctx: &mut Ctx, t: &mut HitTemplate, start: V3, end:
 }
 
 /// `0x3fd5a8(start, d, at, met)`: the tracer at `at`, its tail stepping 0.133 a tick along `d` from 1.5 behind
-/// `start`, for 20 ticks; the puff at `at` (`0x3fdcc0`, [`impact`]).
-fn spawn_tracer(w: &mut MobyWorld, ctx: &mut Ctx, start: V3, d: V3, at: V3, met: bool) {
-    let id = w.create(TRACER);
-    let step = set_len(d, 0.133_333_34);
+/// `start`, for 20 ticks; the puff at `at` (`0x3fdcc0`, [`impact`]). The upgraded Blitz's (`0x3fdee0`, `mega`):
+/// the tracer 0x0d9c, a third of a unit a tick from a quarter behind, for 12 ticks (`gp+0x1b74`); its puff
+/// [`mega_impact`] (`0x3fe618`).
+fn spawn_tracer(w: &mut MobyWorld, ctx: &mut Ctx, start: V3, d: V3, at: V3, met: bool, mega: bool) {
+    let (class, speed, back, life) = if mega { (MEGA_TRACER, 1.0 / 3.0, -0.25, 12) } else { (TRACER, 0.133_333_34, -1.5, 0x14) };
+    if w.class(class).is_none() { return; }
+    let id = w.create(class);
+    let step = set_len(d, speed);
     {
         let m = &mut w.mobys[id];
         m.state = 0;
@@ -297,12 +311,48 @@ fn spawn_tracer(w: &mut MobyWorld, ctx: &mut Ctx, start: V3, d: V3, at: V3, met:
         m.mode |= 0x41;
         m.set_pv_v(0x20, step);
         m.pos = at;
-        m.set_pv_v(0x50, add(start, set_len(step, -1.5)));
-        m.set_pv_i(0x38, 0x14);
+        m.set_pv_v(0x50, add(start, set_len(step, back)));
+        m.set_pv_i(0x38, life);
         m.set_pv_i(0x34, met as i32);
-        m.set_pv_f(0x3c, 1.0 / 20.0);
+        m.set_pv_f(0x3c, 1.0 / life as f32);
     }
-    impact(ctx, at);
+    if mega { mega_impact(ctx, at) } else { impact(ctx, at) }
+}
+
+/// `0x3fe618(at)`: fifteen grey sparks (`0x339848`: 0.1..0.3 × 210000, growing 500 a tick, 0x1e ticks, alpha 0x7f,
+/// `0x7f7f7f`) jittered 0.2 about `at`, flying 0.5..1.25 a second up to 80° up and 80° either side of the way to the
+/// camera; then five pairs of twinkles (`0x33a6a0`: 0.25..0.75 · 0.1 growing to it, red `0x7fff1010`, and half that
+/// in white `0x7f7f7f7f`, 60 ticks, falling 0.003 a tick, turning one way and the other) jittered 0.15, drifting 1..4
+/// a second a random way.
+fn mega_impact(ctx: &mut Ctx, at: V3) {
+    let Some(sys) = ctx.parts.as_deref_mut() else { return };
+    let g = &mut ctx.game.rng;
+    let c = sub(ctx.host.camera_pos(), at);
+    let yaw0 = atan2(c[0], c[1]);
+    for _ in 0..15 {
+        let f = g.randf(0.5, 1.25);
+        let spin = g.randf_signed(1.0, 2.0) as i32;
+        let pitch = g.randf(0.0, 1.396_263_6);
+        let yaw = add_rot(yaw0, g.randf_signed(0.0, 1.396_263_6));
+        let vel = crate::moby::classes::shot::polar(f * (1.0 / 60.0), yaw, pitch);
+        let p: V3 = std::array::from_fn(|k| at[k] + g.randf_signed(0.0, 0.2));
+        let size = g.randf(0.1, 0.3) * 210_000.0;
+        crate::particles::spark(sys, g, size, 500.0, 1.0, 0.0, 0.0, p, vel, 0x1e, 0x7f, 0x7f_7f7f, spin);
+    }
+    for _ in 0..5 {
+        let s = g.randf(0.25, 0.75);
+        let k = g.randi(2);
+        let k = if k != 0 { k } else { -1 };
+        let f = g.randf(1.0, 4.0) * (1.0 / 60.0);
+        let v = g.rand_vec(f, f);
+        let p: V3 = std::array::from_fn(|i| at[i] + g.randf_signed(0.0, 0.15));
+        let fall = f32::from_bits(0x3b44_9ba6);
+        for (size, end, rgba, rot, spin) in [(s * 0.1, s, 0x7fff_1010u32, 0u8, k), (s * 0.05, s * 0.5, 0x7f7f_7f7f, 1, -k)] {
+            if let Some(i) = crate::particles::twinkle(sys, g, size, end, fall, p, 0x3c, rgba, rot, spin as i8, v, 0) {
+                sys.pool.recs[i][9] = 4 + 0x70;
+            }
+        }
+    }
 }
 
 /// `0x3fdcc0(at)`: fifteen grey sparks (`0x339848`: 0.05..0.2 × 210000, growing 500 a tick, 0x1e ticks, alpha 0x7f,
@@ -375,7 +425,30 @@ fn burst(ctx: &mut Ctx, muzzle: V3, fwd: V3) {
     }
 }
 
-/// `0x3fd6c8` (module docs).
+/// A tracer's look: the base Blitz's (`0x3fd6c8` / `0x3fd908`) or the upgraded one's (`0x3fe010` / `0x3fe250`,
+/// `gp+0x1b78..0x1b98`).
+pub struct TracerLook {
+    /// Its two glows each tick: size and colour.
+    pub glow: (f32, u32),
+    /// The texture's scroll a frame (it wraps the other way for the upgraded one: down by 0.1, up 4 at 4 or less).
+    pub scroll: f32,
+    /// The beam's alpha scale; its half-widths at the end, the midpoint (and on); its colours at the end, the
+    /// midpoint and the tail.
+    pub alpha: f32,
+    pub beam: [f32; 2],
+    pub colours: [u32; 3],
+    /// The glow over it (FX 0xe): half-widths at the end and the tail; colour (its alpha 64 · life), at the tail.
+    pub over: [f32; 2],
+    pub over_colours: [u32; 2],
+}
+
+/// The tracers' looks.
+pub const LOOK: TracerLook = TracerLook { glow: (420_000.0, 0x20_2080), scroll: 0.1, alpha: 64.0, beam: [0.1, 0.1], colours: [0x10_8080, 0x10_1080, 0x10_8080], over: [0.6, 0.6], over_colours: [0x40ff, 0x40ff] };
+pub const MEGA_LOOK: TracerLook = TracerLook { glow: (630_000.0, 0x80_2020), scroll: -0.1, alpha: 128.0, beam: [0.1, 0.4], colours: [0x80_8080, 0x80_8080, 0xff_1010], over: [0.3, 0.8], over_colours: [0xff_1010, 0xff_1010] };
+
+fn look_of(o_class: i16) -> &'static TracerLook { if o_class == MEGA_TRACER { &MEGA_LOOK } else { &LOOK } }
+
+/// `0x3fd6c8` (module docs); the upgraded Blitz's `0x3fe010`, the same with its [`MEGA_LOOK`].
 pub fn update_tracer(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     w.mobys[id].pvars.resize(crate::moby::PVAR_BYTES, 0);
     if w.mobys[id].state == 0 {
@@ -396,7 +469,8 @@ pub fn update_tracer(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         if let Some(sys) = ctx.parts.as_deref_mut() {
             let def = sys.def_first(0x35);
             for s in [spin, (spin + 0x80) % 0xff] {
-                if let Some(i) = crate::particles::sprite(sys, &mut ctx.game.rng, 420_000.0, 420_000.0, 0.0, pos, [0.0; 3], 2, 0x20_2080, s as u8, 0x40, 0x10, 0) { sys.pool.recs[i][2] = def; }
+                let (size, rgb) = look_of(w.mobys[id].o_class).glow;
+                if let Some(i) = crate::particles::sprite(sys, &mut ctx.game.rng, size, size, 0.0, pos, [0.0; 3], 2, rgb, s as u8, 0x40, 0x10, 0) { sys.pool.recs[i][2] = def; }
             }
         }
         w.register_draw(id);
@@ -406,11 +480,11 @@ pub fn update_tracer(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 }
 
 /// The FX quad's corners and colours as `0x2eb998` takes them.
-fn quad(out: &mut Vec<crate::fx::FxQuad>, fx: usize, additive: bool, corners: [V3; 4], st: [[f32; 2]; 4], rgba: [u32; 4]) {
+pub(crate) fn quad(out: &mut Vec<crate::fx::FxQuad>, fx: usize, additive: bool, corners: [V3; 4], st: [[f32; 2]; 4], rgba: [u32; 4]) {
     out.push(crate::fx::FxQuad { fx, additive, corners, st, rgba });
 }
 
-const ST: [[f32; 2]; 4] = [[0.0, 0.0], [0.0, 1.0], [1.0, 0.0], [1.0, 1.0]];
+pub(crate) const ST: [[f32; 2]; 4] = [[0.0, 0.0], [0.0, 1.0], [1.0, 0.0], [1.0, 1.0]];
 
 /// `0x3a7968` (module docs): the starburst, the flash, the screen flash.
 pub fn draw(w: &mut MobyWorld, id: usize, cam: V3, out: &mut Vec<crate::fx::FxQuad>) {
@@ -457,28 +531,16 @@ pub fn draw(w: &mut MobyWorld, id: usize, cam: V3, out: &mut Vec<crate::fx::FxQu
 /// `0x3fd908`: the tracer from its end to its tail — two quads 0.1 wide across the view (FX 0x17, normal blend), the
 /// first to the midpoint `0x108080` → `0x101080`, the second on to the tail fading to none, at its life's share of 64;
 /// the texture scrolling 0.1 a frame (wrapping at 4); over them one quad 0.6 wide, additive (FX 0xe), `0x40ff` fading
-/// to none at the tail.
+/// to none at the tail (crate::moby::classes::beam::quads, the beam's shape; the upgraded Blitz's `0x3fe250` with its
+/// [`MEGA_LOOK`]).
 pub fn draw_tracer(w: &mut MobyWorld, id: usize, cam: V3, out: &mut Vec<crate::fx::FxQuad>) {
+    let look = look_of(w.mobys[id].o_class);
     let m = &mut w.mobys[id];
     let f = m.pv_i(0x38) as f32 * m.pv_f(0x3c);
-    let a = ((f * 64.0) as i32 as u32) << 24;
-    let phase = m.pv_f(0x30);
-    let st: [[f32; 2]; 4] = ST.map(|[s, t]| {
-        let s = s - phase;
-        [if s <= 7.0 { s + 7.0 } else { s }, t]
-    });
-    let p = phase + 0.1;
-    m.set_pv_f(0x30, if 4.0 <= p { p - 4.0 } else { p });
-    let pos = m.pos;
-    let half = scale(sub(m.pv_v(0x50), pos), 0.5);
-    let mid = add(pos, half);
-    let side = set_len(cross_ba(sub(pos, cam), half), 0.1);
-    let (c0, c1) = (a | 0x10_8080, a | 0x10_1080);
-    let (m0, m1) = (add(mid, side), sub(mid, side));
-    quad(out, 0x17, false, [add(pos, side), sub(pos, side), m0, m1], st, [c0, c0, c1, c1]);
-    quad(out, 0x17, false, [m0, m1, add(m0, half), add(m1, half)], st, [c1, c1, 0x10_8080, 0x10_8080]);
-    let side = set_len(side, 0.6);
-    let tail = add(mid, half);
-    let c = a | 0x40ff;
-    quad(out, 0xe, true, [add(pos, side), sub(pos, side), add(tail, side), sub(tail, side)], ST, [c, c, 0x40ff, 0x40ff]);
+    let mut phase = m.pv_f(0x30);
+    let (alpha, over) = (((f * look.alpha) as i32 as u32) << 24, ((f * 64.0) as i32 as u32) << 24);
+    let widths = [look.beam[0], look.beam[1], look.over[0], look.over[1]];
+    let colours = [look.colours[0], look.colours[1], look.colours[2], look.over_colours[0], look.over_colours[1]];
+    super::beam::quads(out, m.pos, m.pv_v(0x50), cam, &mut phase, look.scroll, alpha, over, widths, colours);
+    m.set_pv_f(0x30, phase);
 }

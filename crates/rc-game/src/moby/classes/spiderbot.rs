@@ -71,10 +71,18 @@
 //! copied as it stands (crate::fx::FrameQuad) around the bot while the blast grows, its 98 wobbles (`0x2496d0`) made
 //! in state 0 and turned by each draw; its mesh the overlay's (Aranos's `0x296760` / `0x296160`).
 //!
-//! Not ported: the upgraded glove (item 0x4e: the hand 0x0e7a `0x42e7a0`, its bot 0x0e79 `0x42b978` with its shells
-//! `0x430a10` / `0x431858`, its end `0x42e670`, which `0x2bd368` also calls: the same machine with its own globals,
-//! and its own sphere `0x403540` with the tables `0x29f8a0` / `0x29f2a0` and wobbles `0x2545d0`); the sphere's copy
-//! is the frame at full size (the game's is 256×256 CT16) and its TEST 0x5380b Z writes (ATST GEQUAL 0x80 with the
+//! **The upgraded glove** (rows 0x4e / 0x69 / 0x6a, crate::hero::items::UPGRADE_ROWS; L00's addresses): the hand
+//! **0x0e7a** (`0x403ec8`) is the hand above but for the bot it throws, **0x0e79** (`0x401ab0`), and no class sound 1
+//! at the throw; its marker (`0x4042b8`) and its screen (`0x4018f0`) are the same. The bot (`0x4010a0`) is the same
+//! machine with its own words ([`Layout`]: its timer `+0x60`, its reach `+0x64`, the stick `+0x50` / `+0x54`, its
+//! speed `+0x58`; the globals `0x1b2b70`..`0x1b2ba4`) and these differences: its flight grows it to 0.023, its line
+//! (flags 0) keeps its velocity when it lands and the tick goes on; its blast grows 10 a second and hits every tick
+//! of state 6 with flags 0x810000; its fuse plays the class sound before the explosion; while it walks (states 2 and
+//! 3) its guns run (crate::moby::classes::spiderbot_plus, `0x401c08`), and its end frees their joint nodes. Its
+//! sphere (`0x403540` with the tables `0x29f8a0` / `0x29f2a0`, wobbles `0x2545d0`) is the same code on the same
+//! tables; the port shares the base bot's mesh and wobbles.
+//!
+//! Not ported: the sphere's copy is the frame at full size (the game's is 256×256 CT16) and its TEST 0x5380b Z writes (ATST GEQUAL 0x80 with the
 //! copy's alpha) are left out (the effects write no Z here); the weapon mods
 //! on the blast's hits (`0x422630`); the gravity frames and moving frames (`0x386d68` / `0x386e48`, `0x388638` /
 //! `0x3886f0`, `0x326450`), the level-specific refusal under 462.43 (`0x1a8ff4`) and the landing on the lava level's
@@ -88,6 +96,7 @@
 use crate::cameras::Cameras;
 use crate::collision::QueryFlags;
 use crate::hero::items::{row, SPIDERBOT};
+use super::spiderbot_plus;
 use crate::hero::physics::{add, cross, dot, len, scale, set_len, sub, unit, V3};
 use crate::moby::hits::HitTemplate;
 use crate::moby::{aim, countdown, mode, Ctx, MobyWorld};
@@ -97,6 +106,9 @@ use crate::quat;
 pub const HAND_CLASS: i16 = 0x0907;
 pub const BOT_CLASS: i16 = 0x0b58;
 pub const CAMERA_CLASS: i16 = 0x1b;
+/// The upgraded glove's hand and bot (rows 0x4e / 0x69 / 0x6a, module docs).
+pub const PLUS_HAND: i16 = 0x0e7a;
+pub const PLUS_BOT: i16 = 0x0e79;
 
 /// `0x385b58`'s arguments: the least reach (with L1), the reach ahead (in the look stance 0x1d), the speed across (a
 /// tick) and the gravity (a tick²: 11 a second²).
@@ -121,26 +133,46 @@ mod hand {
     pub const REFUSED: usize = 0x2c;
 }
 
-/// The bot's pvars (the port keeps the globals `0x1b4280` / `0x1b4284` / `0x1b4288` and its hand `+0xb8` from 0x40).
-mod pv {
-    pub const VEL: usize = 0x00;
-    pub const AHEAD: usize = 0x10;
-    pub const ACROSS: usize = 0x14;
-    pub const SPEED: usize = 0x18;
-    pub const TIMER: usize = 0x20;
-    pub const REACH: usize = 0x24;
-    pub const HOLD: usize = 0x28;
-    pub const FRAME: usize = 0x2c;
-    pub const STICK: usize = 0x30;
-    pub const FACING: usize = 0x34;
-    pub const TURN: usize = 0x38;
-    pub const CLOCK: usize = 0x40;
-    pub const MAGNETIC: usize = 0x44;
-    pub const SURFACE6: usize = 0x48;
-    pub const HAND: usize = 0x4c;
+/// Where a bot keeps its words: its pvars, and the globals the port keeps past them (module docs).
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct Layout {
+    /// The pvars' length.
+    pub size: usize,
+    pub vel: usize,
+    pub ahead: usize,
+    pub across: usize,
+    pub speed: usize,
+    pub timer: usize,
+    pub reach: usize,
+    pub hold: usize,
+    /// The last animation frame its feet were tested at.
+    pub frame: usize,
+    /// The stick's size, facing it, the turn.
+    pub stick: usize,
+    pub facing: usize,
+    pub turn: usize,
+    /// Its 30 s, on a magnetic surface, on surface 6.
+    pub clock: usize,
+    pub magnetic: usize,
+    pub surface6: usize,
+    /// Its hand (`+0xb8`).
+    pub hand: usize,
     /// The port's: Ratchet's warps it has seen (crate::hero::Hero::warps).
-    pub const WARPS: usize = 0x50;
+    pub warps: usize,
 }
+
+/// The bot 0x0b58's (`0x3f8ff8`; the globals `0x1b4280` / `0x1b4284` / `0x1b4288` and its hand `+0xb8` from 0x40).
+pub(crate) const BASE: Layout = Layout { size: crate::moby::PVAR_BYTES, vel: 0x00, ahead: 0x10, across: 0x14, speed: 0x18, timer: 0x20, reach: 0x24, hold: 0x28, frame: 0x2c, stick: 0x30, facing: 0x34, turn: 0x38, clock: 0x40, magnetic: 0x44, surface6: 0x48, hand: 0x4c, warps: 0x50 };
+/// The bot 0x0e79's (`0x4010a0`; its own words to 0x80 (crate::moby::classes::spiderbot_plus), then the globals
+/// `0x1b2b9c` the stick, `0x1b2ba0` facing, `0x1b2ba4` the turn, `0x1b2b90` the clock, `0x1b2b94` / `0x1b2b98` the
+/// surfaces, `0x1b2b70` the last frame).
+pub(crate) const PLUS: Layout = Layout { size: 0xb0, vel: 0x00, ahead: 0x50, across: 0x54, speed: 0x58, timer: 0x60, reach: 0x64, hold: 0x68, frame: 0xa0, stick: 0x80, facing: 0x84, turn: 0x88, clock: 0x8c, magnetic: 0x90, surface6: 0x94, hand: 0x98, warps: 0x9c };
+
+/// The layout of bot `o_class`.
+pub(crate) fn layout(o_class: i16) -> &'static Layout { if o_class == PLUS_BOT { &PLUS } else { &BASE } }
+
+/// A bot of either glove.
+fn is_bot(o_class: i16) -> bool { o_class == BOT_CLASS || o_class == PLUS_BOT }
 
 /// `gp+0x2090` / `+0x2094`: its height to its middle and its size (the corners' reach, the shadow).
 const HALF: f32 = 0.375;
@@ -156,6 +188,11 @@ const SCALE_FROM: f32 = f32::from_bits(0x3983_126f);
 const SCALE_GROW: f32 = 0.01;
 const SCALE_MAX: f32 = 0.018_11;
 const SCALE_TO: f32 = f32::from_bits(0x3c94_5b6c);
+/// The upgraded bot's (`0x4010a0`): at most 0.023, then `0x3cbc6a7f`.
+const PLUS_SCALE_MAX: f32 = 0.023;
+const PLUS_SCALE_TO: f32 = f32::from_bits(0x3cbc_6a7f);
+/// `gp+0x1c68`: the upgraded bot's blast's growth a second.
+const PLUS_BLAST_GROWTH: f32 = 10.0;
 /// `gp+0x207c` / `+0x2080` / `+0x2088`: the blast's largest reach, its growth a second, its ticks (the hits the first
 /// 21).
 const BLAST_MAX: f32 = 8.0;
@@ -234,7 +271,7 @@ fn landing(w: &MobyWorld, ctx: &Ctx, id: usize, from: V3, vel: V3) -> Option<Lan
     None
 }
 
-/// `0x3c6ab0`.
+/// `0x3c6ab0`; the upgraded glove's `0x403ec8` (module docs).
 pub fn update_hand(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     w.mobys[id].pvars.resize(crate::moby::PVAR_BYTES, 0);
     let from = ctx.host.joint(&w.mobys[id], 0).unwrap_or(w.mobys[id].pos);
@@ -282,8 +319,13 @@ pub fn update_hand(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         2 => {
             let mut t = w.mobys[id].pv_i(hand::TIMER);
             if countdown(&mut t) {
-                if let Some(b) = make_bot(w, ctx, from, vel) { w.mobys[b].set_pv_i(pv::HAND, id as i32); }
-                ctx.host.play_sound(&w.mobys[id], 1, 0);
+                if w.mobys[id].o_class == PLUS_HAND {
+                    // `0x401ab0`, no class sound.
+                    if let Some(b) = make_plus_bot(w, ctx, from, vel) { w.mobys[b].set_pv_i(PLUS.hand, id as i32); }
+                } else {
+                    if let Some(b) = make_bot(w, ctx, from, vel) { w.mobys[b].set_pv_i(BASE.hand, id as i32); }
+                    ctx.host.play_sound(&w.mobys[id], 1, 0);
+                }
                 let idle = ctx.hero.idle_seq();
                 ctx.hero.items.use_end(hero_state, ctx.hero_view.seq_b, idle);
                 w.mobys[id].state = 3;
@@ -315,7 +357,7 @@ pub fn update_hand(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     w.register_draw(id);
 }
 
-/// `0x3c6eb8` → `0x3857f0(1, landing, normal, colours)`: the marker where the throw lands (refused: red); not in
+/// `0x3c6eb8` (the upgraded glove's `0x4042b8`, the same) → `0x3857f0(1, landing, normal, colours)`: the marker where the throw lands (refused: red); not in
 /// Ratchet's states 0x17..0x1b, 0x6f, 0x62 or in a scene.
 pub fn draw_marker(w: &MobyWorld, id: usize, hero_state: i32, mode: i32, frame: i32, out: &mut Vec<crate::fx::FxQuad>) {
     let m = &w.mobys[id];
@@ -334,7 +376,7 @@ fn clock_parts(ticks: i32) -> (i32, i32, i32) {
     (m, s, if 99 < h { 0 } else { h })
 }
 
-/// `0x3f9818`, the bot's screen callback (`0x311b10(0, 0x3f9818)` in its state 0, `(0, 0)` in its state 8;
+/// `0x3f9818` (the upgraded bot's `0x4018f0`, its clock `0x1b2b90`), the bot's screen callback (`0x311b10(0, 0x3f9818)` in its state 0, `(0, 0)` in its state 8;
 /// crate::hud::ScreenCallback): with a bot out (`gp+0x2084`) the GUI sprites 0xc1 (`0x60442d00`) and 0xc2
 /// (`0x55f0c070`) at (454, 380), half wide and mirrored (`0x389130(.., −0.5, 1, 0, ..)`), and its 30 s
 /// (`0x1b4280`) as `"%d:%02d:%02d"` (`0x1b1088`, [`clock_parts`]) at (405, 372) in font 2 (`0x2ed478`:
@@ -345,26 +387,28 @@ pub fn draw_screen(w: &MobyWorld, font: (&[rc_formats::disc::boot::Glyph; 256], 
     for (id, colour) in [(0xc1, 0x6044_2d00), (0xc2, 0x55f0_c070)] {
         draws.push(crate::hud::Draw::Sprite { id, pos: [454.0, 380.0], scale: [-0.5, 1.0], frame: 0.0, colour });
     }
-    let (m, s, h) = clock_parts(w.mobys[b].pv_i(pv::CLOCK));
+    let (m, s, h) = clock_parts(w.mobys[b].pv_i(layout(w.mobys[b].o_class).clock));
     let text = format!("{m}:{s:02}:{h:02}");
     crate::gui::text(out, font.0, font.1, text.as_bytes(), 405.0, 372.0, 1.0, 0x8080_8080u32.to_le_bytes());
     true
 }
 
-/// `0x3c6e98`: the hand may throw again (`+0x28`).
+/// `0x3c6e98` (the upgraded glove's `0x404298`, its hand `gp+0x1d68`): the hand may throw again (`+0x28`).
 fn tell_hand(w: &mut MobyWorld) {
-    if let Some(h) = w.mobys.iter().position(|m| m.o_class == HAND_CLASS && m.state < 0x80) { w.mobys[h].set_pv_i(hand::READY, 1); }
+    if let Some(h) = w.mobys.iter().position(|m| (m.o_class == HAND_CLASS || m.o_class == PLUS_HAND) && m.state < 0x80) { w.mobys[h].set_pv_i(hand::READY, 1); }
 }
 
-/// The bot out (`gp+0x2084`).
-fn live_bot(w: &MobyWorld) -> Option<usize> { w.mobys.iter().position(|m| m.o_class == BOT_CLASS && m.state < 0x80) }
+/// The bot out (`gp+0x2084`; the upgraded one's `gp+0x1c70`).
+fn live_bot(w: &MobyWorld) -> Option<usize> { w.mobys.iter().position(|m| is_bot(m.o_class) && m.state < 0x80) }
 
-/// `0x3fb028(on, n)`: a bot out goes to 5 (blows up) or 7 (goes), the hand told, its timer `n` (−1: 10).
+/// `0x3fb028(on, n)` (the upgraded bot's end the same on its own words): a bot out goes to 5 (blows up) or 7 (goes),
+/// the hand told, its timer `n` (−1: 10).
 pub fn end(w: &mut MobyWorld, on: bool, n: i32) {
     let Some(b) = live_bot(w) else { return };
+    let l = layout(w.mobys[b].o_class);
     let m = &mut w.mobys[b];
     m.state = if on { 5 } else { 7 };
-    m.set_pv_i(pv::TIMER, if n == -1 { 10 } else { n });
+    m.set_pv_i(l.timer, if n == -1 { 10 } else { n });
     tell_hand(w);
 }
 
@@ -386,8 +430,34 @@ fn make_bot(w: &mut MobyWorld, ctx: &mut Ctx, pos: V3, vel: V3) -> Option<usize>
     m.scale *= 0.25;
     m.rot = rot;
     m.rows = crate::hero::physics::euler_rows(rot);
-    m.set_pv_v(pv::VEL, vel);
-    m.set_pv_i(pv::WARPS, ctx.hero.warps as i32);
+    m.set_pv_v(BASE.vel, vel);
+    m.set_pv_i(BASE.warps, ctx.hero.warps as i32);
+    w.rebuild(id, &*ctx.host);
+    w.changed = true;
+    Some(id)
+}
+
+/// `0x401ab0(pos, vel)`: the upgraded bot (class 0x0e79) as [`make_bot`] does the base one, and its guns' words
+/// (crate::moby::classes::spiderbot_plus::init: its turret's and barrels' joint nodes, its aim, the charge's reach).
+fn make_plus_bot(w: &mut MobyWorld, ctx: &mut Ctx, pos: V3, vel: V3) -> Option<usize> {
+    w.class(PLUS_BOT)?;
+    let id = w.create(PLUS_BOT);
+    let rot = ctx.hero.rot;
+    let m = &mut w.mobys[id];
+    m.update = Some(update_bot);
+    m.mode = (m.mode & !mode::NO_UPDATE) | mode::KEEP_ROWS;
+    m.pvars.resize(PLUS.size, 0);
+    m.update_dist = 0xff;
+    m.draw_dist = 0xff;
+    m.drawn = 1;
+    m.state = 0;
+    m.pos = pos;
+    m.scale *= 0.25;
+    m.rot = rot;
+    m.rows = crate::hero::physics::euler_rows(rot);
+    m.set_pv_v(PLUS.vel, vel);
+    m.set_pv_i(PLUS.warps, ctx.hero.warps as i32);
+    spiderbot_plus::init(m);
     w.rebuild(id, &*ctx.host);
     w.changed = true;
     Some(id)
@@ -401,13 +471,15 @@ fn flight_over(ctx: &Ctx) -> bool {
 /// Ratchet no longer steering (out of 0x1c, or a scene).
 fn steer_over(ctx: &Ctx) -> bool { ctx.hero.state != 0x1c || ctx.game.scenes.mode == crate::scene::SCENE }
 
-/// `0x3f8ff8`.
+/// `0x3f8ff8`; the upgraded bot's `0x4010a0` (module docs, "The upgraded glove").
 pub fn update_bot(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
-    w.mobys[id].pvars.resize(crate::moby::PVAR_BYTES, 0);
+    let plus = w.mobys[id].o_class == PLUS_BOT;
+    let l = layout(w.mobys[id].o_class);
+    w.mobys[id].pvars.resize(l.size, 0);
     // `0x2bd368`'s `0x3fb028(0, 0)`: Ratchet warped since its last update (module docs, "The ends").
     let warps = ctx.hero.warps as i32;
-    if w.mobys[id].pv_i(pv::WARPS) != warps {
-        w.mobys[id].set_pv_i(pv::WARPS, warps);
+    if w.mobys[id].pv_i(l.warps) != warps {
+        w.mobys[id].set_pv_i(l.warps, warps);
         end(w, false, 0);
     }
     // Its down: the gravity's (`0x3864f0` / `0x32aa88`, crate::gravity::Gravity::up_at), or on surface 2 the
@@ -419,18 +491,18 @@ pub fn update_bot(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         let m = &mut w.mobys[id];
         match hit {
             None => {
-                m.set_pv_i(pv::MAGNETIC, 0);
-                m.set_pv_i(pv::SURFACE6, 0);
+                m.set_pv_i(l.magnetic, 0);
+                m.set_pv_i(l.surface6, 0);
             }
             Some(h) => {
                 let s = h.surface_id();
                 if s == 2 {
                     down = scale(unit(h.normal), -1.0);
-                    m.set_pv_i(pv::MAGNETIC, 1);
+                    m.set_pv_i(l.magnetic, 1);
                 } else {
-                    m.set_pv_i(pv::MAGNETIC, 0);
+                    m.set_pv_i(l.magnetic, 0);
                 }
-                m.set_pv_i(pv::SURFACE6, (s == 6) as i32);
+                m.set_pv_i(l.surface6, (s == 6) as i32);
             }
         }
     }
@@ -441,16 +513,17 @@ pub fn update_bot(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             if w.mobys[id].state == 0 {
                 let m = &mut w.mobys[id];
                 m.state = 1;
-                m.set_pv_i(pv::TIMER, 0);
+                // The base bot's `+0x20`, the upgraded one's speed `+0x58`.
+                m.set_pv_i(if plus { l.speed } else { l.timer }, 0);
                 m.scale = SCALE_FROM;
-                m.set_pv_i(pv::CLOCK, CLOCK);
-                // The blast sphere's 98 texture wobbles (`0x2496d0`: an angle, a turn of 720..2160° a second with
-                // a random sign, × `0x3998825c` = π/180/60 a tick; [`draw_blast`]).
+                // The blast sphere's 98 texture wobbles (`0x2496d0`, the upgraded bot's `0x2545d0`: an angle, a turn
+                // of 720..2160° a second with a random sign, × `0x3998825c` = π/180/60 a tick; [`draw_blast`]).
                 let g = &mut ctx.game.rng;
                 w.spiderbot.wobbles = (0..WOBBLES).map(|_| {
                     let a = g.rand_angle();
                     [a, g.randf_signed(720.0, 2160.0) * f32::from_bits(0x3998_825c)]
                 }).collect();
+                w.mobys[id].set_pv_i(l.clock, CLOCK);
                 // `0x311b10(0, 0x3f9818)`: its clock in the HUD's place ([`draw_screen`]).
                 ctx.game.screen_callback = Some(crate::hud::ScreenCallback::Spiderbot);
             }
@@ -458,8 +531,8 @@ pub fn update_bot(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 camera_release(&mut ctx.game.cameras);
                 w.mobys[id].state = 7;
                 tell_hand(w);
-                w.mobys[id].set_pv_i(pv::TIMER, 0);
-            } else if fly(w, id, ctx) {
+                w.mobys[id].set_pv_i(l.timer, 0);
+            } else if fly(w, id, ctx, plus) && !plus {
                 return;
             }
         }
@@ -474,12 +547,12 @@ pub fn update_bot(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             walk(w, id, ctx, down);
             pull_bolts(w, id, ctx);
             steps(w, id, ctx);
-            let mut c = w.mobys[id].pv_i(pv::CLOCK);
+            let mut c = w.mobys[id].pv_i(l.clock);
             let out = countdown(&mut c);
-            w.mobys[id].set_pv_i(pv::CLOCK, c);
+            w.mobys[id].set_pv_i(l.clock, c);
             if out || ctx.hero.items.pressed & crate::pad::button::CIRCLE != 0 {
                 w.mobys[id].state = 9;
-                w.mobys[id].set_pv_i(pv::TIMER, 10);
+                w.mobys[id].set_pv_i(l.timer, 10);
             }
             if steer_over(ctx) { give_up(w, id, ctx); }
         }
@@ -487,21 +560,24 @@ pub fn update_bot(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         5 => fuse = true,
         6 => {
             blast(w, id, ctx);
+            let growth = if plus { PLUS_BLAST_GROWTH } else { BLAST_GROWTH };
             let m = &mut w.mobys[id];
-            m.set_pv_f(pv::REACH, m.pv_f(pv::REACH) + BLAST_GROWTH * 0.016_666_668);
-            let mut t = m.pv_i(pv::TIMER);
-            if countdown(&mut t) && m.pv_i(pv::HOLD) == 0 { m.state = 8; }
-            m.set_pv_i(pv::TIMER, t);
+            m.set_pv_f(l.reach, m.pv_f(l.reach) + growth * 0.016_666_668);
+            let mut t = m.pv_i(l.timer);
+            if countdown(&mut t) && m.pv_i(l.hold) == 0 { m.state = 8; }
+            m.set_pv_i(l.timer, t);
         }
         7 => {
             let m = &mut w.mobys[id];
-            let mut t = m.pv_i(pv::TIMER);
+            let mut t = m.pv_i(l.timer);
             if countdown(&mut t) { m.state = 8; }
-            m.set_pv_i(pv::TIMER, t);
+            m.set_pv_i(l.timer, t);
         }
         8 => {
             if ctx.hero.state == 0x1c { ctx.hero.request_state(0, true); }
             if ctx.game.cameras.current_class() == CAMERA_CLASS { camera_release(&mut ctx.game.cameras); }
+            // The upgraded bot: its guns' charge sound and joint nodes let go (`0x37f110`).
+            if plus { spiderbot_plus::release(w, id, ctx); }
             // `0x311b10(0, 0)`.
             ctx.game.screen_callback = None;
             w.delete(id);
@@ -516,22 +592,27 @@ pub fn update_bot(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     }
     if fuse {
         let m = &mut w.mobys[id];
-        let mut t = m.pv_i(pv::TIMER);
+        let mut t = m.pv_i(l.timer);
         let lit = countdown(&mut t);
-        m.set_pv_i(pv::TIMER, t);
+        m.set_pv_i(l.timer, t);
         if lit {
+            // The upgraded bot plays its class sound first.
+            if plus { ctx.host.play_sound(&w.mobys[id], 1, 0); }
+            let m = &w.mobys[id];
             let (p, dir) = (m.pos, unit(m.rows[0]));
             super::explosion::start(w, ctx, p[2], p, dir);
-            ctx.host.play_sound(&w.mobys[id], 1, 0);
+            if !plus { ctx.host.play_sound(&w.mobys[id], 1, 0); }
             let steering = ctx.hero.state == 0x1c && ctx.game.scenes.mode != crate::scene::SCENE;
             if !steering { camera_release(&mut ctx.game.cameras); }
             let m = &mut w.mobys[id];
             m.state = 6;
             m.mode |= 0x41;
-            m.set_pv_i(pv::TIMER, if steering { BLAST_TICKS } else { 0 });
-            m.set_pv_f(pv::REACH, 0.0);
+            m.set_pv_i(l.timer, if steering { BLAST_TICKS } else { 0 });
+            m.set_pv_f(l.reach, 0.0);
         }
     }
+    // The upgraded bot's guns while it walks (`0x401c08`, states 2 and 3), before its draw.
+    if plus && matches!(w.mobys[id].state, 2 | 3) { spiderbot_plus::gun(w, id, ctx); }
     // `0x2eaef8(0x3fac68, bot)`: its blast's sphere on the frame's second list ([`draw_blast`]).
     w.register_draw(id);
     // `0x321c88(0.6, bot)`: its blob shadow (from state 2 on the moving frame's carry, not ported, comes first).
@@ -543,21 +624,25 @@ pub fn update_bot(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 
 /// The steering over (Ratchet out of 0x1c or a scene): the camera let go, **9** at once.
 fn give_up(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    let l = layout(w.mobys[id].o_class);
     camera_release(&mut ctx.game.cameras);
     w.mobys[id].state = 9;
-    w.mobys[id].set_pv_i(pv::TIMER, 0);
+    w.mobys[id].set_pv_i(l.timer, 0);
 }
 
-/// State 1's flight: true when it landed (the update ends there).
-fn fly(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> bool {
+/// State 1's flight: true when it landed (the base bot's update ends there; the upgraded one's goes on). The
+/// upgraded bot grows to 0.023 and keeps its velocity when it lands.
+fn fly(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, plus: bool) -> bool {
+    let l = layout(w.mobys[id].o_class);
+    let (most, to_scale) = if plus { (PLUS_SCALE_MAX, PLUS_SCALE_TO) } else { (SCALE_MAX, SCALE_TO) };
     let m = &mut w.mobys[id];
     m.scale += SCALE_GROW;
-    if SCALE_MAX < m.scale { m.scale = SCALE_TO; }
+    if most < m.scale { m.scale = to_scale; }
     let from = m.pos;
-    let mut vel = m.pv_v(pv::VEL);
+    let mut vel = m.pv_v(l.vel);
     m.pos = add(m.pos, vel);
     vel[2] -= GRAVITY;
-    m.set_pv_v(pv::VEL, vel);
+    m.set_pv_v(l.vel, vel);
     let to = m.pos;
     let hit = w.coll_line(ctx, from, to, 0, Some(id));
     let Some(h) = hit else { return false };
@@ -565,7 +650,7 @@ fn fly(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> bool {
     {
         let m = &mut w.mobys[id];
         m.pos = h.point;
-        m.set_pv_v(pv::VEL, [0.0; 3]);
+        if !plus { m.set_pv_v(l.vel, [0.0; 3]); }
     }
     ctx.game.prompt.force(6, 0, 1);
     ctx.hero.request_state(0x1c, true);
@@ -582,24 +667,26 @@ fn fly(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> bool {
 /// `0x3f9bd8`: the stick (`0x18bdd0`; its x reversed unless the controls are mirrored, `0x1a7a4c`: never here) as
 /// ahead / across, each held to ±1, and its size.
 fn stick(w: &mut MobyWorld, id: usize, ctx: &Ctx) {
+    let l = layout(w.mobys[id].o_class);
     let s = ctx.hero.stick;
     let across = (-s[0]).clamp(-1.0, 1.0);
     let ahead = (-s[1]).clamp(-1.0, 1.0);
     let m = &mut w.mobys[id];
-    m.set_pv_f(pv::ACROSS, across);
-    m.set_pv_f(pv::AHEAD, ahead);
-    m.set_pv_f(pv::STICK, (ahead * ahead + across * across).sqrt());
+    m.set_pv_f(l.across, across);
+    m.set_pv_f(l.ahead, ahead);
+    m.set_pv_f(l.stick, (ahead * ahead + across * across).sqrt());
 }
 
 /// `0x3fa790`: the turn toward the stick. The stick's way in the camera's rows (`0x1ba730`, the last view), flattened
 /// on the bot's up row; the bot faces it within 0.75; the turn's size `1 − cos`; the rows turned by a tenth of the
 /// angle about `way × forward` (none: about the forward row) (`0x2f3ba8` / `0x2f3920`). The turn eases by 0.7 a tick.
 fn turn(w: &mut MobyWorld, id: usize, ctx: &Ctx) {
+    let l = layout(w.mobys[id].o_class);
     let cam = ctx.game.cameras.last_view.1;
     let m = &mut w.mobys[id];
-    let v = [m.pv_f(pv::AHEAD), m.pv_f(pv::ACROSS), 0.0];
-    m.set_pv_i(pv::FACING, 0);
-    m.set_pv_f(pv::TURN, m.pv_f(pv::TURN) * 0.7);
+    let v = [m.pv_f(l.ahead), m.pv_f(l.across), 0.0];
+    m.set_pv_i(l.facing, 0);
+    m.set_pv_f(l.turn, m.pv_f(l.turn) * 0.7);
     if len(v) == 0.0 { return; }
     let v = unit(v);
     let v: V3 = std::array::from_fn(|k| v[0] * cam[0][k] + v[1] * cam[1][k] + v[2] * cam[2][k]);
@@ -608,8 +695,8 @@ fn turn(w: &mut MobyWorld, id: usize, ctx: &Ctx) {
     let mut axis = cr(m.rows[0], v);
     if len(axis) == 0.0 { axis = m.rows[0]; }
     let d = dot(m.rows[0], v);
-    m.set_pv_f(pv::TURN, 1.0 - d);
-    if 0.75 < d { m.set_pv_i(pv::FACING, 1); }
+    m.set_pv_f(l.turn, 1.0 - d);
+    if 0.75 < d { m.set_pv_i(l.facing, 1); }
     let a = (std::f32::consts::FRAC_PI_2 - d.clamp(-1.0, 1.0).asin()) * 0.1;
     m.rows = turn_rows(m.rows, axis, a);
 }
@@ -619,18 +706,19 @@ fn turn(w: &mut MobyWorld, id: usize, ctx: &Ctx) {
 /// facing), the move along the forward row; then its corners (`0x3f9e08`), the push out of walls (`0x3f9f80`) and
 /// the hold on the surface (`0x3fa2c8`).
 fn walk(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, down: V3) {
+    let l = layout(w.mobys[id].o_class);
     let m = &mut w.mobys[id];
-    let (mag, facing) = (m.pv_f(pv::STICK), m.pv_i(pv::FACING) != 0);
-    let mut speed = m.pv_f(pv::SPEED);
+    let (mag, facing) = (m.pv_f(l.stick), m.pv_i(l.facing) != 0);
+    let mut speed = m.pv_f(l.speed);
     if mag == 0.0 || !facing {
         speed *= 0.85;
     } else {
         speed += mag * 0.008_333_334;
         if TOP_SPEED * 0.016_666_668 < speed.abs() { speed = TOP_SPEED * mag * 0.016_666_668; }
     }
-    m.set_pv_f(pv::SPEED, speed);
+    m.set_pv_f(l.speed, speed);
     let mut anim = speed * 25.0;
-    if !facing { anim += m.pv_f(pv::TURN) + m.pv_f(pv::TURN); }
+    if !facing { anim += m.pv_f(l.turn) + m.pv_f(l.turn); }
     m.pos = add(m.pos, set_len(m.rows[0], speed));
     ctx.host.set_anim_speed(&w.mobys[id], anim);
     let corners = corners(w, id, down);
@@ -655,11 +743,12 @@ fn corners(w: &MobyWorld, id: usize, down: V3) -> [V3; 8] {
 /// 0..π/2), flags 0: each hit adds how far it went in (a moby of class type 5 blows the bot up: **9**, 10 ticks); it
 /// moves back by their mean.
 fn push_out(w: &mut MobyWorld, id: usize, ctx: &Ctx, down: V3) {
-    let speed = w.mobys[id].pv_f(pv::SPEED);
+    let l = layout(w.mobys[id].o_class);
+    let speed = w.mobys[id].pv_f(l.speed);
     if speed.abs() < 0.0001 { return; }
     let back = speed <= 0.0;
     let c = add(w.mobys[id].pos, scale(down, -HALF));
-    if w.mobys[id].pv_i(pv::SURFACE6) == 0 {
+    if w.mobys[id].pv_i(l.surface6) == 0 {
         if let Some(h) = ctx.coll.and_then(|coll| crate::collision::coll_sphere_m(coll, None, c, SIZE, QueryFlags(0), None)) {
             let p = h.pushed_centre.unwrap_or(c);
             let m = &mut w.mobys[id];
@@ -681,7 +770,7 @@ fn push_out(w: &mut MobyWorld, id: usize, ctx: &Ctx, down: V3) {
             let kind = h.moby.and_then(|t| w.mobys.get(t)).and_then(|x| w.class(x.o_class)).map_or(0, |c| c.kind);
             if kind == 5 {
                 w.mobys[id].state = 9;
-                w.mobys[id].set_pv_i(pv::TIMER, 10);
+                w.mobys[id].set_pv_i(l.timer, 10);
             }
         }
     }
@@ -697,6 +786,7 @@ fn push_out(w: &mut MobyWorld, id: usize, ctx: &Ctx, down: V3) {
 /// tilts the rows toward it (`(n × up)·sin(up·n · 0.125)`), and the bot moves half way to their mean height along
 /// `down`. With no hit at all it falls (**4**, its velocity its speed along its forward row).
 fn hold(w: &mut MobyWorld, id: usize, ctx: &Ctx, down: V3, corners: &[V3; 8]) {
+    let l = layout(w.mobys[id].o_class);
     let mut kept: Vec<V3> = Vec::new();
     let mut any = false;
     for &k in &ORDER {
@@ -705,10 +795,10 @@ fn hold(w: &mut MobyWorld, id: usize, ctx: &Ctx, down: V3, corners: &[V3; 8]) {
         any = true;
         if surface_kind(h.surface_id()) == 0 {
             let n = unit(h.normal);
-            if 0.5 < dot(n, scale(down, -1.0)) || w.mobys[id].pv_i(pv::MAGNETIC) != 0 { kept.push(h.point); }
+            if 0.5 < dot(n, scale(down, -1.0)) || w.mobys[id].pv_i(l.magnetic) != 0 { kept.push(h.point); }
         } else {
             w.mobys[id].state = 9;
-            w.mobys[id].set_pv_i(pv::TIMER, 10);
+            w.mobys[id].set_pv_i(l.timer, 10);
         }
     }
     let m = &mut w.mobys[id];
@@ -734,23 +824,24 @@ fn hold(w: &mut MobyWorld, id: usize, ctx: &Ctx, down: V3, corners: &[V3; 8]) {
     }
     if !any {
         m.state = 4;
-        let s = m.pv_f(pv::SPEED);
-        m.set_pv_v(pv::VEL, set_len(m.rows[0], s));
+        let s = m.pv_f(l.speed);
+        m.set_pv_v(l.vel, set_len(m.rows[0], s));
     }
 }
 
 /// `0x3f9ad8`: its feet's sounds — the animation frame (`0x315998`) crossing one of [`STEPS`] since the last tick
 /// plays that class sound.
 fn steps(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    let l = layout(w.mobys[id].o_class);
     let f = ctx.host.frame_time(&w.mobys[id]);
-    let last = w.mobys[id].pv_f(pv::FRAME);
+    let last = w.mobys[id].pv_f(l.frame);
     for &(t, sound) in &STEPS {
         if (0.0 < f - t || 0.0 < last - t) && (f - t < 0.0 || last - t < 0.0) {
             ctx.host.play_sound(&w.mobys[id], sound, 0);
             break;
         }
     }
-    w.mobys[id].set_pv_f(pv::FRAME, f);
+    w.mobys[id].set_pv_f(l.frame, f);
 }
 
 /// `0x3fa9a8`: on odd frames (`0x1b30c8`) every live moby (`0x334d38`'s list `0x1b35a8`: not deleted, not mode 2,
@@ -769,26 +860,27 @@ fn pull_bolts(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 
 /// State 4: the fall under 22 a second², then [`sweep`].
 fn fall(w: &mut MobyWorld, id: usize, ctx: &Ctx) {
+    let l = layout(w.mobys[id].o_class);
     let m = &mut w.mobys[id];
     let from = m.pos;
-    let mut vel = m.pv_v(pv::VEL);
+    let mut vel = m.pv_v(l.vel);
     let to = add(from, vel);
     vel[2] -= FALL_GRAVITY;
     let (r, at, surface) = sweep(w, ctx, id, from, to, &mut vel);
     let m = &mut w.mobys[id];
     m.pos = at;
-    m.set_pv_v(pv::VEL, vel);
+    m.set_pv_v(l.vel, vel);
     if r == 2 {
         if surface_kind(surface) == 0 && surface != 0xc {
             m.state = 2;
-            m.set_pv_v(pv::VEL, [0.0; 3]);
+            m.set_pv_v(l.vel, [0.0; 3]);
         } else {
             m.state = 9;
-            m.set_pv_i(pv::TIMER, 10);
+            m.set_pv_i(l.timer, 10);
         }
     } else if 0.4 < len(vel) {
         m.state = 9;
-        m.set_pv_i(pv::TIMER, 10);
+        m.set_pv_i(l.timer, 10);
     }
 }
 
@@ -814,17 +906,19 @@ fn sweep(w: &MobyWorld, ctx: &Ctx, id: usize, from: V3, to: V3, vel: &mut V3) ->
 
 /// `0x3faaa0`: the blast's hits, its first 21 ticks — every moby with health or one the lines test (mode 0x4000), not
 /// Ratchet, within the reach (at most 8) takes the record's damage (`+0x60`: 12) with flags 0x830000 along the line
-/// from the bot.
+/// from the bot. The upgraded bot's (`0x403320`): every tick, its row's damage (18, 30, 100), flags 0x810000.
 fn blast(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
-    if w.mobys[id].pv_i(pv::TIMER) < BLAST_TICKS - 0x14 { return; }
+    let l = layout(w.mobys[id].o_class);
+    let plus = w.mobys[id].o_class == PLUS_BOT;
+    if !plus && w.mobys[id].pv_i(l.timer) < BLAST_TICKS - 0x14 { return; }
     let Some(sc) = ctx.scene else { return };
-    let (at, r) = (w.mobys[id].pos, w.mobys[id].pv_f(pv::REACH).min(BLAST_MAX));
+    let (at, r) = (w.mobys[id].pos, w.mobys[id].pv_f(l.reach).min(BLAST_MAX));
     let damage = row(ctx.game, SPIDERBOT).map_or(0.0, |r| r.damage);
     for t in crate::collision::coll_sphere_mobys(sc, at, r, QueryFlags(0), Some(id)) {
         let Some(x) = w.mobys.get(t) else { continue };
         if !(aim::health(w, t).is_some() || x.mode & mode::LINE != 0) || Some(t) == ctx.hero_moby { continue; }
         let d = unit(sub(x.pos, at));
-        let mut tm = HitTemplate::new(damage, Some(id), 0x0083_0000, [d[0], d[1], d[2], NO_KNOCK_LIMIT]);
+        let mut tm = HitTemplate::new(damage, Some(id), if plus { 0x0081_0000 } else { 0x0083_0000 }, [d[0], d[1], d[2], NO_KNOCK_LIMIT]);
         tm.kind = (x.o_class as u16 as u32) << 16 | 0x0305;
         let p = x.pos;
         w.deliver_hit_any(t, &tm, [p[0], p[1], p[2], 1.0]);
@@ -863,10 +957,18 @@ impl SphereMesh {
 
 /// The blast sphere's shared state: its mesh (set by the engine, crate's level code) and the wobbles (`0x2496d0`:
 /// angle, turn a tick; one set for the game, made by a new bot's state 0).
-#[derive(Clone, Debug, Default)]
+/// Also the upgraded bot's guns' globals (crate::moby::classes::spiderbot_plus): `gp+0x1ca4` / `gp+0x1ca8` its two
+/// barrels' angles (from 0 and π, kept from bot to bot) and `gp+0x1c6c` the charge's loop sound (−1 none).
+#[derive(Clone, Debug)]
 pub struct Blast {
     pub mesh: Option<std::sync::Arc<SphereMesh>>,
     pub wobbles: Vec<[f32; 2]>,
+    pub barrels: [f32; 2],
+    pub charge_sound: i32,
+}
+
+impl Default for Blast {
+    fn default() -> Self { Blast { mesh: None, wobbles: Vec::new(), barrels: [0.0, std::f32::consts::PI], charge_sound: -1 } }
 }
 
 /// `0x3fac68` → `0x3facb0`, the bot's draw (a second-list callback, every tick): while the blast's reach is under 8,
@@ -878,7 +980,8 @@ pub struct Blast {
 /// `0x31f9e0` = `1 − (1 − x)²`), held to 0..1: the world behind it seen through a lens that ripples less as it grows.
 /// Then every wobble turns by its rate (`0x2f3de8`). With no reach yet the quads have no area: none are made.
 pub fn draw_blast(w: &mut MobyWorld, id: usize, cam: V3, cam_rows: [V3; 3], out: &mut Vec<crate::fx::FrameQuad>) {
-    let (pos, reach) = (w.mobys[id].pos, w.mobys[id].pv_f(pv::REACH));
+    let l = layout(w.mobys[id].o_class);
+    let (pos, reach) = (w.mobys[id].pos, w.mobys[id].pv_f(l.reach));
     if BLAST_MAX <= reach { return; }
     let b = &mut w.spiderbot;
     if let Some(mesh) = b.mesh.as_deref().filter(|_| 0.0 < reach && b.wobbles.len() == WOBBLES) {
@@ -960,8 +1063,9 @@ pub fn camera_release(cams: &mut Cameras) {
 
 /// `0x4575e8`: the bot's camera's update (module docs).
 fn camera_update(w: &MobyWorld, ctx: &mut Ctx, id: usize) {
+    let l = layout(w.mobys[id].o_class);
     let (bpos, brows) = (w.mobys[id].pos, w.mobys[id].rows);
-    let magnetic = w.mobys[id].pv_i(pv::MAGNETIC) != 0;
+    let magnetic = w.mobys[id].pv_i(l.magnetic) != 0;
     let c = ctx.game.cameras.bot;
     let up = if magnetic { brows[2] } else { [0.0, 0.0, 1.0] };
     let look = add(set_len(brows[2], 0.25), bpos);

@@ -45,10 +45,23 @@ pub const CLASS: i16 = 4;
 pub const RATE_OUT: f32 = 0.018;
 /// `0x428518`: the blend in's rate (0x3d99999a).
 const RATE_IN: f32 = 0.075;
-/// `gp+0x257c`: the most the view turns a tick (1.5°); `gp+0x2580` / `+0x2584`: the input's ease.
-const TURN: f32 = 0.026_179_94;
-const EASE_K: f32 = 0.03;
-const EASE_D: f32 = 0.4;
+/// `gp+0x257c`: the most the view turns a tick (1.5°); `gp+0x2580` / `+0x2584`: the input's ease ([`Tune`]).
+pub const TURN: f32 = 0.026_179_94;
+pub const EASE_K: f32 = 0.03;
+pub const EASE_D: f32 = 0.4;
+
+/// The view's turn as globals others retune (`gp+0x257c` / `+0x2580` / `+0x2584`; the Pulse Rifle's zoom slows it,
+/// crate::moby::classes::pulse_rifle): the most it turns a tick, the input's ease.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Tune {
+    pub turn: f32,
+    pub k: f32,
+    pub d: f32,
+}
+
+impl Default for Tune {
+    fn default() -> Self { Tune { turn: TURN, k: EASE_K, d: EASE_D } }
+}
 /// 80°: the view and Ratchet's facing too far apart (a reset or a cut).
 const APART: f32 = 1.396_263_6;
 
@@ -75,6 +88,8 @@ pub struct FirstPerson {
     pub turn_back: i16,
     /// The activation's verdict of this tick (`0x428188` returned 1), taken by the choice.
     pub want: bool,
+    /// The turn's globals ([`Tune`]).
+    pub tune: Tune,
 }
 
 /// The switch blend (`0x1b8e90..0x1b8f00`), kind 0 only.
@@ -229,6 +244,7 @@ impl FirstPerson {
         let up = set_len(hero.rows[2], 1.0);
         self.pos = add(eye(hero), hero.carry);
         let lock = !blending;
+        let tune = self.tune;
         let d = &mut self.d;
         let bit = |b: u32| if pad.held & b != 0 { 1.0 } else { 0.0 };
         // The yaw.
@@ -238,9 +254,9 @@ impl FirstPerson {
             v = bit(button::LEFT);
             if v == 0.0 { v = -bit(button::RIGHT); }
         }
-        let rate = TURN * d[0].abs();
+        let rate = tune.turn * d[0].abs();
         let (mut v0, mut v1) = (d[0], d[1]);
-        v0 = interp(v0, v, EASE_K, EASE_D, 0.0, &mut v1);
+        v0 = interp(v0, v, tune.k, tune.d, 0.0, &mut v1);
         (d[0], d[1]) = (v0, v1);
         let mut fwd = self.rows[0];
         if d[0] != 0.0 { fwd = rot(fwd, rate * d[0], up); }
@@ -252,9 +268,9 @@ impl FirstPerson {
         if v == 0.0 { v = -bit(button::DOWN); }
         if blending && hero.prev_state == 2 { v = 0.0; }
         if !pitch_normal { v = -v; }
-        let rate = TURN * d[2].abs();
+        let rate = tune.turn * d[2].abs();
         let (mut v2, mut v3) = (d[2], d[3]);
-        v2 = interp(v2, v, EASE_K, EASE_D, 0.0, &mut v3);
+        v2 = interp(v2, v, tune.k, tune.d, 0.0, &mut v3);
         (d[2], d[3]) = (v2, v3);
         if d[2] != 0.0 {
             let left = cross_ba(fwd, up);

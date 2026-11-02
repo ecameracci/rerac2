@@ -68,7 +68,7 @@ const BLAST_DAMAGE: f32 = 4.0;
 const NO_KNOCK_LIMIT: f32 = 5627.987;
 /// `0x37dfc0`'s two quads: their FX textures and colours (`gp−0x14e0`).
 const MARKER_FX: [usize; 2] = [0x11, 0x12];
-const MARKER_RGBA: [u32; 2] = [0x70f0_f0b0, 0x50f0_f0b0];
+pub const MARKER_RGBA: [u32; 2] = [0x70f0_f0b0, 0x50f0_f0b0];
 
 /// `0x3ef940`.
 pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
@@ -158,7 +158,11 @@ fn look_aim(ctx: &Ctx) -> (V3, f32) { look_aim_with(ctx, LEAST, REACH) }
 
 /// [`look_aim`] with the throw's own least and reach (the same code with other arguments: the Spiderbot Glove's
 /// `0x385b58`, crate::moby::classes::spiderbot).
-pub fn look_aim_with(ctx: &Ctx, least: f32, max: f32) -> (V3, f32) {
+pub fn look_aim_with(ctx: &Ctx, least: f32, max: f32) -> (V3, f32) { look_aim_from(ctx, least, max, ctx.hero.pos) }
+
+/// [`look_aim_with`] from the place `feet` (`0x37e328`'s moby: Ratchet, or the upgraded Spiderbot's own place,
+/// crate::moby::classes::spiderbot_plus).
+pub fn look_aim_from(ctx: &Ctx, least: f32, max: f32, feet: V3) -> (V3, f32) {
     use crate::hero::physics::unit;
     const DOWN: V3 = [0.0, 0.0, -1.0];
     let cam = ctx.host.camera_rows();
@@ -170,7 +174,7 @@ pub fn look_aim_with(ctx: &Ctx, least: f32, max: f32) -> (V3, f32) {
     let a = scale(axis, f32::from_bits(s));
     let row = crate::quat::rotate([a[0], a[1], a[2], f32::from_bits(c)], [1.0, 0.0, 0.0]);
     let way: V3 = std::array::from_fn(|k| row[0] * cam[0][k] + row[1] * cam[1][k] + row[2] * cam[2][k]);
-    let height = -dot(ctx.hero.pos, DOWN);
+    let height = -dot(feet, DOWN);
     let fwd = unit(cam[0]);
     let down = dot(DOWN, fwd);
     let mut reach = max;
@@ -188,14 +192,17 @@ pub fn look_aim_with(ctx: &Ctx, least: f32, max: f32) -> (V3, f32) {
 /// `0x37e988(gravity, from, vel, ..)`: the arc from `from` at `vel`, ten ticks between line tests (flags 0x12, not the
 /// hand), up to 300; where it lands and the surface's normal, the point pulled 6% toward the camera. Nothing while
 /// Ratchet dies (0x6f) or in a scene.
-fn landing(w: &MobyWorld, ctx: &Ctx, id: usize, from: V3, vel: V3) -> Option<(V3, V3)> {
+fn landing(w: &MobyWorld, ctx: &Ctx, id: usize, from: V3, vel: V3) -> Option<(V3, V3)> { landing_with(w, ctx, id, from, vel, GRAVITY) }
+
+/// [`landing`] under the gravity `gravity` a tick² (the upgraded Spiderbot's charge, crate::moby::classes::spiderbot_plus).
+pub fn landing_with(w: &MobyWorld, ctx: &Ctx, id: usize, from: V3, vel: V3, gravity: f32) -> Option<(V3, V3)> {
     if ctx.hero.state == 0x6f || ctx.game.scenes.mode != crate::scene::PLAY { return None; }
     let (mut p, mut v) = (from, vel);
     for _ in 0..300 {
         let a = p;
         for _ in 0..10 {
             p = add(p, v);
-            v[2] -= GRAVITY;
+            v[2] -= gravity;
         }
         if let Some(h) = w.coll_line(ctx, a, p, 0x12, Some(id)) {
             let n = crate::hero::physics::unit(h.normal);
@@ -458,9 +465,13 @@ fn nuke_damage(row: usize) -> f32 {
 /// ([`nuke_damage`]) with flags 0x830000 along the line from the centre; then **2** (40 ticks): the alpha
 /// `0x7f·t/40`, then down 1 a tick; at 0 **6**: the growth eased down 1/60 a tick to 1/12, gone once its effect is.
 ///
-/// Not ported: its effect — the trail slot it takes (`0x32b1b8`, as the Chopper's: lost, it goes), its particle buffers
-/// and their update and draw (`0x3e7978`, `0x3e67c0` at its start and 20 ticks into state 2, `0x3e7aa8`, `0x3e6ad0`, the
-/// scrolls `gp+0x1594` / `+0x1598`); so state 6 ends at once. The statistics (`0x3f9f70`).
+/// At its start and 20 ticks into state 2 its debris flies ([`mini_debris`], `0x3e67c0`).
+///
+/// Not ported: its effect — the trail slot it takes (`0x32b1b8`, as the Chopper's: lost, it goes), its smoke buffers
+/// (320 records of three kinds, `0x3e7bf8`: 48 of the ring at its start `0x3e7978`, two of the column a tick on odd
+/// rands `0x3e7aa8`, their update `0x3e8090`) and their draw (`0x3e6ad0`: `0x3e6b90`, `0x3e6df8`, `0x3e6a30`,
+/// `0x3e7058`, `0x3e74b0`, `0x3e7b90`), the scrolls `gp+0x1594` / `+0x1598`; so state 6 ends at once, and the random
+/// draws of the ring's 48 records are missing before the debris's. The statistics (`0x3f9f70`).
 pub fn update_mini_blast(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     if w.mobys[id].state == 0 {
         let m = &mut w.mobys[id];
@@ -472,6 +483,7 @@ pub fn update_mini_blast(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         m.set_pv_i(0x14, 0x14);
         let at = m.pos;
         crate::moby::blast::smoke_burst(w, ctx, 2.0, 20.0, Some(id), add(at, [0.0, 0.0, 1.0]), -1);
+        mini_debris(w, ctx, id, at);
         if !ctx.view.is_some_and(|v| v.culled(100.0, [at[0], at[1], at[2] + 1.0, 2.0])) {
             ctx.game.shakes.ask(0, 0.45, 0x28);
         }
@@ -505,6 +517,11 @@ pub fn update_mini_blast(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         }
         2 => {
             m.set_pv_f(0x10, m.pv_f(0x10) + m.pv_f(0x18));
+            if m.pv_i(0x14) == 0x14 {
+                let at = m.pos;
+                mini_debris(w, ctx, id, at);
+            }
+            let m = &mut w.mobys[id];
             let mut t = m.pv_i(0x14);
             let f = t as f32;
             if !countdown(&mut t) {
@@ -522,6 +539,38 @@ pub fn update_mini_blast(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             m.set_pv_f(0x10, m.pv_f(0x10) + g);
             w.delete(id);
         }
+    }
+}
+
+/// `0x3e67c0(blast, at)`: the Mini-Nuke's debris (crate::moby::classes::debris), 60..90 ticks each — a chunk (kind 0)
+/// toward the camera, 1/300 of its distance a random way plus twice its distance a second toward it lifted by half the
+/// distance, at most 10 a second; nine out at 15°..75° up, 8..12 a second plus 0.05 up a tick, through the blast's
+/// rows, one in three smoking (kind 1).
+fn mini_debris(w: &mut MobyWorld, ctx: &mut Ctx, id: usize, at: V3) {
+    use super::{debris, shot::polar};
+    let rows = w.mobys[id].rows;
+    let through = |v: V3| -> V3 { std::array::from_fn(|k| v[0] * rows[0][k] + v[1] * rows[1][k] + v[2] * rows[2][k]) };
+    let mut d = sub(ctx.host.camera_pos(), at);
+    let dist = len(d);
+    let g = &mut ctx.game.rng;
+    let r = [g.randf(-1.0, 1.0), g.randf(-1.0, 1.0), g.randf(-1.0, 1.0)];
+    d[2] += dist * 0.5;
+    let mut v = add(set_len(r, dist * 0.003_333_333_6), set_len(d, (dist + dist) * 0.016_666_668));
+    // `0x2ef1d0(1/6, v, v)`: at most that long.
+    let l = len(v);
+    if 0.0 < l && 0.166_666_67 <= l { v = scale(v, 0.166_666_67 / l); }
+    let life = g.rand_range(0x3c, 0x5a);
+    debris::spawn(w, ctx, at, v, life, 0);
+    for _ in 0..9 {
+        let g = &mut ctx.game.rng;
+        let pitch = g.randf(f32::from_bits(0x3e86_0a93), f32::from_bits(0x3fa7_8d37));
+        let yaw = g.rand_angle();
+        let speed = g.randf(8.0, 12.0);
+        let mut v = polar(speed * 0.016_666_668, yaw, pitch);
+        v[2] += 0.050_000_004;
+        let smoking = g.rand() % 3 == 0;
+        let life = g.rand_range(0x3c, 0x5a);
+        debris::spawn(w, ctx, at, through(v), life, smoking as u8);
     }
 }
 
@@ -595,7 +644,11 @@ pub fn draw_marker(w: &MobyWorld, id: usize, hero_state: i32, frame: i32, out: &
 
 /// `0x37dfc0`'s two quads at `at` in the plane of the normal `n`, in the colours `rgba` (the Spiderbot Glove's copy
 /// `0x3857f0` passes its own when the throw is refused, crate::moby::classes::spiderbot).
-pub fn marker_quads(at: V3, n: V3, rgba: [u32; 2], frame: i32, out: &mut Vec<crate::fx::FxQuad>) {
+pub fn marker_quads(at: V3, n: V3, rgba: [u32; 2], frame: i32, out: &mut Vec<crate::fx::FxQuad>) { marker_quads_sized(1.0, at, n, rgba, frame, out) }
+
+/// [`marker_quads`] `size` across each way (`0x37dfc0`'s first argument scales its ±1 template; the upgraded
+/// Spiderbot's charge marker is 0.2, crate::moby::classes::spiderbot_plus).
+pub fn marker_quads_sized(size: f32, at: V3, n: V3, rgba: [u32; 2], frame: i32, out: &mut Vec<crate::fx::FxQuad>) {
     // Its frame: the second axis along the normal.
     let pitch = add_rot(-crate::hero::physics::atan2((n[0] * n[0] + n[2] * n[2]).sqrt(), n[1]), std::f32::consts::FRAC_PI_2);
     let yaw = crate::hero::physics::atan2(n[2], n[0]);
@@ -609,7 +662,7 @@ pub fn marker_quads(at: V3, n: V3, rgba: [u32; 2], frame: i32, out: &mut Vec<cra
         let (sn, cs) = s.sin_cos();
         let corner = |x: f32, z: f32| {
             let (x, z) = (x * cs + z * sn, z * cs - x * sn);
-            add(at, add(scale(rows[0], x), scale(rows[2], z)))
+            add(at, add(scale(rows[0], x * size), scale(rows[2], z * size)))
         };
         let c = rgba[k];
         out.push(crate::fx::FxQuad {

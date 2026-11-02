@@ -2,9 +2,11 @@
 //! update, 0x2a3978}` up to o_class −1, written to the slot table `0x1da240` by `0x32e1f8`) as Rust ports.
 
 pub mod arena;
+pub mod beam;
 pub mod area_switch;
 pub mod beast;
 pub mod blitz;
+pub mod blitz_mega;
 pub mod bolt;
 pub mod bosses;
 pub mod carriers;
@@ -27,6 +29,7 @@ pub mod gate;
 pub mod gravity_bomb;
 pub mod keeper;
 pub mod lancer;
+pub mod pulse_rifle;
 pub mod leaper;
 pub mod oozla;
 pub mod light;
@@ -41,6 +44,7 @@ pub mod shot;
 pub mod smash;
 pub mod spawn_point;
 pub mod spiderbot;
+pub mod spiderbot_plus;
 pub mod swingshot;
 pub mod teleport;
 pub mod tie_lights;
@@ -75,8 +79,11 @@ use super::UpdateFn;
 /// Endako's boss's shots (crate::moby::classes::endako_boss: the laser 0x09df, the tracer 0x0a72, the rocket 0x0b1b;
 /// L03's update table `0x2a9604` holds them) are listed so too, for when the level's class list lacks their models.
 /// The Blitz Gun's tracer 0x0d5e (L00 `lvl.vtbl` `0x2a360c`) has no model. The Mini-Nuke's bomb 0x0c07 and blast 0x0c06
-/// (L00 `0x2a3450` / `0x2a3444`) are listed for the levels whose class list lacks them.
-pub const CREATED_LOGIC: &[i16] = &[crate::ship::LASER_CLASS, teleport::CLASS, explosion::CLASS, spiderbot::BOT_CLASS, endako_boss::BEAM, endako_boss::TRACER, endako_boss::ROCKET, blitz::TRACER, gravity_bomb::MINI_BOMB, gravity_bomb::MINI_BLAST];
+/// (L00 `0x2a3450` / `0x2a3444`) are listed for the levels whose class list lacks them. The Pulse Rifle's shot 0x05d6
+/// (L00 `lvl.vtbl`) has no model: its smoke and beams are its draw's.
+/// The upgraded Spiderbot 0x0e79 and its shot 0x0eaa and shell 0x0eab (L00 `lvl.vtbl`) are listed for the levels whose
+/// class list lacks them. The upgraded Blitz's tracer 0x0d9c and the beam 0x0dc1 have no model.
+pub const CREATED_LOGIC: &[i16] = &[crate::ship::LASER_CLASS, teleport::CLASS, explosion::CLASS, spiderbot::BOT_CLASS, endako_boss::BEAM, endako_boss::TRACER, endako_boss::ROCKET, blitz::TRACER, gravity_bomb::MINI_BOMB, gravity_bomb::MINI_BLAST, pulse_rifle::SHOT, spiderbot::PLUS_BOT, spiderbot_plus::SHOT, spiderbot_plus::LOB, blitz::MEGA_TRACER, beam::CLASS];
 
 pub fn update_for(o_class: i16) -> Option<UpdateFn> {
     match o_class {
@@ -92,10 +99,20 @@ pub fn update_for(o_class: i16) -> Option<UpdateFn> {
         gravity_bomb::BLAST_CLASS => Some(gravity_bomb::update_blast),
         spiderbot::HAND_CLASS => Some(spiderbot::update_hand),
         spiderbot::BOT_CLASS => Some(spiderbot::update_bot),
+        // The upgraded glove (`0x403ec8`) and its bot (`0x4010a0`): the same machines (crate::moby::classes::spiderbot).
+        spiderbot::PLUS_HAND => Some(spiderbot::update_hand),
+        spiderbot::PLUS_BOT => Some(spiderbot::update_bot),
+        spiderbot_plus::SHOT => Some(spiderbot_plus::update_shot),
+        spiderbot_plus::LOB => Some(spiderbot_plus::update_lob),
         chopper::HAND_CLASS | chopper::MEGA_CLASS => Some(chopper::update),
         chopper::BLADE => Some(chopper::update_blade),
         blitz::HAND_CLASS => Some(blitz::update),
-        blitz::TRACER => Some(blitz::update_tracer),
+        blitz::TRACER | blitz::MEGA_TRACER => Some(blitz::update_tracer),
+        // The upgraded Blitz Gun (`0x3d3178`, rows 0x44 / 0x5b / 0x5c).
+        blitz_mega::HAND_CLASS => Some(blitz_mega::update),
+        beam::CLASS => Some(beam::update),
+        pulse_rifle::HAND_CLASS => Some(pulse_rifle::update),
+        pulse_rifle::SHOT => Some(pulse_rifle::update_shot),
         swingshot::HAND_CLASS => Some(swingshot::update),
         swingshot::HOOK_CLASS => Some(swingshot::update_hook),
         0xbfe => Some(shot::update),
