@@ -217,7 +217,7 @@ impl Hero {
         let wading_in = self.prev_group == 0x12 && self.surf.wading;
         if !(self.air_ticks < 5 || wading_in || self.height <= 1.35 || self.step_down(env)) { return Some(6); }
         let n = if self.glide_lag != 0 { 1 } else { 9 };
-        if Self::cross_within(env, n) && !(4 < self.air_ticks) {
+        if Self::cross_within(env, n) && (self.air_ticks < 5 || self.stuck != 0) {
             self.stick_target(env, 1.0, 0);
             if self.try_jump(anim, env, n, true) { return None; }
             return Some(if 0.85 < self.stick_mag && self.strafe == 0 { 9 } else { 7 });
