@@ -14,9 +14,9 @@
 //! velocity eases toward the stick by 1/1470 + the opposition, the slope pulls 0.17·slope, `0x2b96a0`); wading
 //! (`0x18c0d9`, water 0.25..0.85 deep) into 0x70 (sequence 0x59, 0.8 of the run speed, at least 2.5).
 //!
-//! Not ported: the held item's run speeds and the item 10's kept direction, the water effects, the body lean
-//! (`0x2b7c88`, `0x2b8dc0`, the slide's lean angles), the sliding floors' drag (`0x18a890`), the weapon stances on
-//! stopping (`0x2cb1c8`). In the gravity frames (`0x18c0e3`, crate::gravity) the helpers take their frame branches
+//! With the wrench in hand the run keeps the stick's direction (`0x18a230`) once at full tilt.
+//!
+//! Not ported: the water effects, the slide's lean angles, the sliding floors' drag (`0x18a890`). In the gravity frames (`0x18c0e3`, crate::gravity) the helpers take their frame branches
 //! (crate::hero::frame) and the step down ahead is off; the edge slide's frame branch is not ported.
 
 use super::physics::*;
@@ -103,8 +103,17 @@ impl Hero {
             self.target_yaw = self.run_yaw;
         } else {
             self.run_target(env);
-            self.run_dir = self.rows[0];
-            self.run_yaw = self.rot[2];
+            // The wrench in hand, at full tilt last tick or already keeping, its swing not holding the stance: the
+            // run keeps the stick's direction instead of his facing.
+            let wrench = self.items.ready == 2 && self.items.item == super::items::WRENCH;
+            if wrench && (self.stick_mag_prev == 1.0 || self.run_keep != 0) && !self.items.keep {
+                self.run_dir = self.stick_dir;
+                self.run_keep = 1;
+                self.run_yaw = self.target_yaw;
+            } else {
+                self.run_dir = self.rows[0];
+                self.run_yaw = self.rot[2];
+            }
         }
         let mut acc_k = 1.0;
         if self.strafe == 0 {
