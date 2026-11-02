@@ -206,7 +206,8 @@ impl Hero {
                 (j.fallover_h, j.max_air, j.air_speed, j.f346, j.curve_on) = (4.5, 0x82, 0.055, 0x55, true);
                 self.ledge.cooldown = 0x46;
                 let j = &mut self.jump;
-                // `0x1a7b98` (the Heli-Pack's upgrade) starts the lift a tick earlier: not ported.
+                // The options' first word `0x1a7b98` (Progressive Scan, crate::menus::special; the port leaves it 0) set
+                // starts the lift a tick earlier (0x22).
                 (j.curve, j.curve_start) = (&HELI_CURVE, 0x23);
                 (j.curve_end, j.f34e, j.curve_frame, j.curve_hold, j.curve_last) = (0x23 + 0x24, 1, 29.0, 50.0, 0x56);
             }
@@ -251,8 +252,11 @@ impl Hero {
                 Entry::Done
             }
             0x29 => {
-                // The hop's side by the rail ahead (`0x18a3f0` − `0x18a430`): not ported, the left one.
-                Entry::Anim(5.0, 0x1e, 0)
+                // The hop's side: 0x1f when the new rail's point lies more than 90° off his facing from the old one's
+                // (`0x18a3f0` − `0x18a430`), else 0x1e.
+                let (p, o) = (self.grind.point, self.grind.old_point);
+                let to = atan2(p[0] - o[0], p[1] - o[1]);
+                Entry::Anim(5.0, if f32::from_bits(0x3fc9_0fdc) < rot_dist(self.rot[2], to) { 0x1f } else { 0x1e }, 0)
             }
             9 => {
                 let v = anim.view();
