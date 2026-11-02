@@ -2,11 +2,10 @@
 //! addresses): the laser sentry 0x0ffd ([`update_0ffd`], below), the flame turret 0x0ffc on its rail
 //! ([`update_0ffc`]) and the floating mine 0x0b23 ([`update_0b23`]).
 //!
+//! The energy field **0x0944** is [`update_0944`] / [`draw_0944`].
+//!
 //! Not ported (the set's other classes):
 //! * **0x10f6** (`0x422a78`): the wall the remote crane's bomb box breaks, crate::moby::classes::endako_crane.
-//! * **0x0944** (`0x3c75f8`, 5; no function in Ghidra): an energy field drawn by its own callback (`0x3c7810`: pulsing
-//!   quads from two phases at `$gp+0x1020..`), its looped sound 0; hooked, it fades (`+0x14` to 0 at 1/30 a tick) and
-//!   turns off without collision (2). Its draw is a system of its own; left for the field's pass.
 //! * **0x0972** (`0x3cb898`): the cage of the robot 0x0964, crate::moby::classes::endako_d::update_0972.
 //!
 //! **The laser sentry 0x0ffd** ([`update_0ffd`], `0x41f9b0`, 28 placed; its senses `0x4201b8`, beam `0x420850`, sparks
@@ -1046,5 +1045,122 @@ fn dark_puffs(ctx: &mut Ctx, spread: f32, k: f32, grow: f32, pos: V3, vel: V3, n
             r[0x2b] = r[0xa];
             if flat { r[3] = 0x44; }
         }
+    }
+}
+
+/// 0x0944 (`0x3c75f8`, five placed; no Ghidra function): an energy field. Its pvars: `+0x00` its size, `+0x04` /
+/// `+0x10` two phases, `+0x08` / `+0x0c` two turns, `+0x14` its strength, `+0x18` its looped sound. **0**: its model
+/// hidden (mode | 1, `+0x31` 0), its strength 1, 1 (its sphere's radius `+0x2c` the class's `+0x24` × its size: the
+/// port's rebuild keeps its own). **1**: the phases turn 240° and 720° a second, the turns 87° and −120° (`$gp+0x1020..`
+/// on L03); its draw ([`draw_0944`]) on the frame's first list (`0x2e8310`); hooked (`0x32bf38`), its strength fades by
+/// 1/30 a tick, and at 0 it goes off without collision (`+0x98` 0), 2. Its class sound 0 loops while in 1 and stops
+/// otherwise.
+pub fn update_0944(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    let k = 0.000_290_888_25;
+    match w.mobys[id].state {
+        0 => {
+            let m = &mut w.mobys[id];
+            m.set_state(1, -1);
+            m.mode |= 1;
+            m.drawn = 0;
+            m.set_pv_f(0x14, 1.0);
+        }
+        1 => {
+            let m = &mut w.mobys[id];
+            m.set_pv_f(4, add_rot(m.pv_f(4), 240.0 * k));
+            m.set_pv_f(0x10, add_rot(m.pv_f(0x10), 720.0 * k));
+            m.set_pv_f(8, add_rot(m.pv_f(8), 87.0 * k));
+            m.set_pv_f(0xc, add_rot(m.pv_f(0xc), -120.0 * k));
+            w.register_draw_first(id);
+            if w.mobys[id].once & 4 != 0 {
+                let m = &mut w.mobys[id];
+                let mut f = m.pv_f(0x14);
+                crate::hero::physics::approach(0.0, f32::from_bits(0x3d08_8889), &mut f);
+                m.set_pv_f(0x14, f);
+                if f <= 0.0 {
+                    m.set_state(2, -1);
+                    m.has_collision = false;
+                }
+            }
+        }
+        _ => {}
+    }
+    let h = w.mobys[id].pv_i(0x18);
+    if w.mobys[id].state == 1 {
+        if !(h != -1 && ctx.host.sound_playing(h)) {
+            let h = ctx.host.play_sound(&w.mobys[id], 0, 4);
+            w.mobys[id].set_pv_i(0x18, h);
+        }
+    } else {
+        if h != -1 && ctx.host.sound_playing(h) { ctx.host.stop_sound(h); }
+        w.mobys[id].set_pv_i(0x18, -1);
+    }
+}
+
+/// `0x3c7810`: 0x0944's field, in its frame (its rows × its scale × its size, at its place), additive (ALPHA
+/// `Cs·As + Cd`), every colour's alpha × its strength. The quads go round its x axis, a pair of corners stepping on
+/// alternately (`0x2ec4f0` each): **1** (FX 5) a disc from 1 to 4.5 out, 32 quads of π/16, the colours between
+/// `0x60800000` / `0x60806000` and `0x60806010` / `0x60800010` by the first phase; **2** (FX 5) two arcs 4.5 out and
+/// `0.5 + 0.1·p` thick from 30° up, 16 quads of −π/48 each, the second mirrored below, between `0x60804040` /
+/// `0x60808080` and `0x60800000` by the second phase; **3** and **4** (FX 0xf) half rings 2.8..3.25 and 2.25..2.7 out
+/// turned by the two turns, 20 quads of π/20 ($gp+0x1030..0x110c on L03).
+pub fn draw_0944(w: &MobyWorld, id: usize, out: &mut Vec<crate::fx::FxQuad>) {
+    use crate::hero::physics::euler_rows;
+    let m = &w.mobys[id];
+    let size = m.pv_f(0);
+    let s = m.scale * if size != 1.0 { size } else { 1.0 };
+    let (rows, pos) = (m.rows.map(|r| scale(r, s)), m.pos);
+    let world = |v: V3| add(pos, add(add(scale(rows[0], v[0]), scale(rows[1], v[1])), scale(rows[2], v[2])));
+    let turn = |v: V3, r: &[V3; 3]| -> V3 { std::array::from_fn(|j| v[0] * r[0][j] + v[1] * r[1][j] + v[2] * r[2][j]) };
+    let mul = |a: &[V3; 3], b: &[V3; 3]| -> [V3; 3] { std::array::from_fn(|i| turn(a[i], b)) };
+    let fade = m.pv_f(0x14);
+    let faded = |c: u32| lerp_rgba(fade, c & 0xff_ffff, c);
+    let p1 = m.pv_f(4).sin() * 0.5 + 0.5;
+    let p2 = m.pv_f(0x10).sin() * 0.5 + 0.5;
+    let emit = |out: &mut Vec<crate::fx::FxQuad>, fx: usize, v: &[V3; 4], st: &[[f32; 2]; 4], rgba: &[u32; 4]| {
+        out.push(crate::fx::FxQuad { fx, additive: true, corners: v.map(|p| world(p)), st: *st, rgba: *rgba });
+    };
+    // A ring: the second pair turned by `a`, then `n` quads, a pair turned by 2a before each (the first pair first
+    // unless `second`).
+    let ring = |out: &mut Vec<crate::fx::FxQuad>, v: &mut [V3; 4], a: f32, n: usize, second: bool, fx: usize, st: &[[f32; 2]; 4], rgba: &[u32; 4]| {
+        let r = euler_rows([a, 0.0, 0.0]);
+        v[2] = turn(v[2], &r);
+        v[3] = turn(v[3], &r);
+        let r2 = mul(&r, &r);
+        for i in 0..n {
+            let k = if (i & 1 == 0) != second { 0 } else { 2 };
+            v[k] = turn(v[k], &r2);
+            v[k + 1] = turn(v[k + 1], &r2);
+            emit(out, fx, v, st, rgba);
+        }
+    };
+    // 1: the disc.
+    let st1 = [[0.5, 0.5], [0.5, 1.5], [0.5, 0.5], [0.5, 1.5]];
+    let c1: [u32; 4] = std::array::from_fn(|k| faded(if k & 1 == 0 { lerp_rgba(p1, 0x6080_0000, 0x6080_6000) } else { lerp_rgba(p1, 0x6080_6010, 0x6080_0010) }));
+    let (outer, inner) = ([0.0, 0.0, 4.5], [0.0, 0.0, 1.0]);
+    let mut v = [outer, inner, outer, inner];
+    ring(out, &mut v, 0.196_349_55, 32, false, 5, &st1, &c1);
+    // 2: the arcs.
+    let st2 = [[0.5, 0.5], [0.5, 1.0], [0.5, 0.5], [0.5, 1.0]];
+    let c2: [u32; 4] = std::array::from_fn(|k| faded(if k & 1 == 0 { lerp_rgba(p2, 0x6080_4040, 0x6080_8080) } else { lerp_rgba(p2, 0x6080_0000, 0x6080_0000) }));
+    let up = euler_rows([0.523_598_8, 0.0, 0.0]);
+    let thin = [0.0, 0.0, 4.5 - (p2 * 0.1 + 0.5)];
+    let mut v = [turn(outer, &up), turn(thin, &up), turn(outer, &up), turn(thin, &up)];
+    ring(out, &mut v, -0.065_449_85, 16, false, 5, &st2, &c2);
+    for p in v.iter_mut() { p[2] = -p[2]; }
+    let r2 = mul(&euler_rows([-0.065_449_85, 0.0, 0.0]), &euler_rows([-0.065_449_85, 0.0, 0.0]));
+    for i in 0..16 {
+        let k = if i & 1 == 0 { 2 } else { 0 };
+        v[k] = turn(v[k], &r2);
+        v[k + 1] = turn(v[k + 1], &r2);
+        emit(out, 5, &v, &st2, &c2);
+    }
+    // 3 and 4: the half rings.
+    let st3 = [[0.0, 0.0], [0.0, 1.0], [1.0, 0.0], [1.0, 1.0]];
+    let c3 = [0x6080_0000, 0x6080_0000, 0x6080_8000, 0x6080_8000].map(faded);
+    for (turned, (a, b)) in [(m.pv_f(8), (3.25, 2.8)), (m.pv_f(0xc), (2.7, 2.25))] {
+        let r = euler_rows([turned, 0.0, 0.0]);
+        let mut v = [a, b, a, b].map(|z| turn([0.0, 0.0, z], &r));
+        ring(out, &mut v, 0.157_079_64, 20, false, 0xf, &st3, &c3);
     }
 }

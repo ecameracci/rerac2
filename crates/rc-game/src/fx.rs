@@ -46,6 +46,7 @@
 //! | `0x3d7858` / `0x3dc2d0` | Maktar's arena bosses 0x09f8 / 0x0a44 | their lights (crate::moby::classes::bosses) |
 //! | `0x423e10` | 0x0a44's shot 0x0d08 (the first list) | its glow and sparks (crate::moby::classes::bosses::draw_shot) |
 //! | `0x4137d0` | the space fights' laser 0xffa | a streak ([`crate::ship::draw_laser`]) |
+//! | `0x3c7810` (L03, first list) | Endako's energy field 0x0944 | its disc, arcs and rings (crate::moby::classes::endako_c::draw_0944) |
 //! | `0x3cc380` (L03, first list) | Endako's beam of light 0x097b | one camera-facing quad (crate::moby::classes::endako_b::draw_097b) |
 //! | `0x3d20e8` (L03) | the Endako boss's laser 0x09df | its glows and strips ([`sprite`], crate::moby::classes::endako_boss::draw_beam) |
 //! | `0x426410` (L02) | the big explosion 0x0d4e | its discs and glare ([`crate::moby::classes::explosion::draw`]); its shimmer ([`FrameQuad`]) |
@@ -343,6 +344,7 @@ fn one(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut crate::ga
         crate::moby::classes::spiderbot_plus::LOB => crate::moby::classes::spiderbot_plus::draw_lob(w, id, &mut game.rng, cam, out),
         0x0ce9 => tie_lights::draw(w, id, view, cam, out),
         0x097b => crate::moby::classes::endako_b::draw_097b(w, id, cam, out),
+        0x0944 => crate::moby::classes::endako_c::draw_0944(w, id, out),
         0x0b0a => draw_0b0a(w, id, &mut game.rng, cam, out),
         0x0b0b | 0x0b22 => draw_0b0b(w, host, id, &mut game.rng, cam, out),
         crate::moby::classes::shot::SHOT_CLASS => crate::moby::classes::shot::draw_trail(&mut w.mobys[id], cam, &mut game.trail_phase, out),
