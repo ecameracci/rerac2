@@ -633,6 +633,8 @@ pub struct MobyWorld {
     pub maktar: classes::maktar::Globals,
     /// Endako's globals (classes::endako_c::Globals).
     pub endako: classes::endako_c::Globals,
+    /// Level 11's globals (classes::level11::Globals).
+    pub level11: classes::level11::Globals,
     /// The point lights (`0x1c6ec0`), owned by the explosion lights (classes::light); the engine lights the world and
     /// the mobys with them.
     pub point_lights: crate::point_lights::PointLights,
