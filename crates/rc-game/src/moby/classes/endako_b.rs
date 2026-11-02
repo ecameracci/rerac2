@@ -812,3 +812,54 @@ pub fn update_0f16(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         w.mobys[a].ambient = [c as u8, (c >> 8) as u8, (c >> 16) as u8];
     }
 }
+
+/// 0x1304 (`0x385810`, four placed): steam off up to 16 ties (their indices `+0x68`[0..16], −1 none) while the camera
+/// is in its cuboid (`+0x68`[0x11], `0x322d00`). **0**: each tie's size (its first two rows' lengths multiplied,
+/// `+0x7c` of the tie's record; `+0x3c` the larger as an integer), 2. **1**: the steam ([`steam_1304`]); every 16
+/// frames (staggered by the moby), the camera out of the cuboid → 2. **2**: every 16 frames, the camera in it → 1.
+pub fn update_1304(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    let stagger = |frame: i32| frame & 0xf == (id as i32) & 0xf;
+    let inside = || { let c = w.mobys[id].pv_i(0x44); ctx.level.in_cuboid(c, ctx.host.camera_pos()) };
+    match w.mobys[id].state {
+        0 => w.mobys[id].set_state(2, -1),
+        1 => {
+            steam_1304(w, id, ctx);
+            let c = w.mobys[id].pv_i(0x44);
+            if stagger(ctx.game.frame) && !ctx.level.in_cuboid(c, ctx.host.camera_pos()) { w.mobys[id].set_state(2, -1); }
+        }
+        2 => if stagger(ctx.game.frame) && inside() { w.mobys[id].set_state(1, -1) },
+        _ => {}
+    }
+}
+
+/// `0x3859a8`: for each tie, `0.025` × its size puffs a tick (half when its place is out of view within 64,
+/// `0x2f1080`; the fraction left a chance): at ±0.9 across its first two rows from its place, a staged puff
+/// (`0x333f48`, crate::particles::staged) rising `0..1` then `2..3` a second, its size `0.5..0.75` then `1..2`, a
+/// colour between `0x40001020` and `0x400060f0` fading to nothing, 30 / 60 / 60 ticks ($gp−0x3f0.. on L03).
+fn steam_1304(w: &MobyWorld, id: usize, ctx: &mut Ctx) {
+    let len3 = |r: [f32; 4]| (r[0] * r[0] + r[1] * r[1] + r[2] * r[2]).sqrt();
+    for k in 0..16 {
+        let i = w.mobys[id].pv_i(4 * k);
+        let Some(t) = usize::try_from(i).ok().and_then(|i| w.ties.get(i)) else { continue };
+        let (l0, l1) = (len3(t[0]), len3(t[1]));
+        let mut n = 0.025 * l0 * l1;
+        let r = f32::from_bits(l0.max(l1) as i32 as u32);
+        if ctx.view.is_some_and(|v| v.culled(64.0, [t[3][0], t[3][1], t[3][2], r])) { n *= 0.5; }
+        let Some(sys) = ctx.parts.as_deref_mut() else { return };
+        let rng = &mut ctx.game.rng;
+        while 0.0 < n {
+            if 1.0 <= n || rng.randf(0.0, 1.0) < n {
+                let k = f32::from_bits(0x3f66_6666);
+                let (a, b) = (rng.randf(-k, k), rng.randf(-k, k));
+                let at: V3 = std::array::from_fn(|j| a * t[0][j] + b * t[1][j] + t[3][j]);
+                let v0z = rng.randf(0.0, 1.0) * 0.016_666_668;
+                let v1z = rng.randf(2.0, 3.0) * 0.016_666_668;
+                let v0w = rng.randf(0.5, 0.75);
+                let v1w = rng.randf(1.0, 2.0);
+                let c = crate::hud::lerp_rgba(rng.randf(0.0, 1.0), 0x4000_1020, 0x4000_60f0);
+                crate::particles::staged(sys, rng, at, [0.0, 0.0, v0z, v0w], [0.0, 0.0, v1z, v1w], c, c & 0xff_ffff, 0x1e, 0x3c, 0x3c, -1);
+            }
+            n -= 1.0;
+        }
+    }
+}
