@@ -1029,7 +1029,7 @@ pub fn update_0b23(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 /// 1..`grow`, 70000..150000 × k, moving `vel` plus up to `spread` a random way, `rgba`), 120 ticks long with their
 /// alpha stage 2 at `rgba` dimmed by `randf(0.2, 1)`; `flat`: not additive (ALPHA 0x44).
 #[allow(clippy::too_many_arguments)]
-fn dark_puffs(ctx: &mut Ctx, spread: f32, k: f32, grow: f32, pos: V3, vel: V3, n: i32, rgba: u32, flat: bool) {
+pub fn dark_puffs(ctx: &mut Ctx, spread: f32, k: f32, grow: f32, pos: V3, vel: V3, n: i32, rgba: u32, flat: bool) {
     for _ in 0..n {
         let rng = &mut ctx.game.rng;
         let size = k * rng.randf(70_000.0, 150_000.0);

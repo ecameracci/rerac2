@@ -13,6 +13,8 @@
 //! * **0x0fea** ([`update_0fea`], `0x45d708`, 6 placed): explodes into its pieces.
 //! * **0x0912** ([`update_0912`], `0x403990`, 6 placed): breaks into its pieces.
 //! * **0x0faa** ([`update_0faa`], `0x457890`, 4 placed): explodes, its pieces thrown one by one.
+//! * **0x0fd2** / **0x0fd4** / **0x0fe9** ([`update_0fd2`], `0x4590e8` / `0x4593b8` / `0x45d5d8`, 41, 19 and 21
+//!   placed): break into their first pieces.
 //!
 //! The engine functions: `0x36c408` = L00 `0x32b580` ([`shards::throw_all`]), `0x367818` = L00 `0x327648`
 //! ([`shards::throw_chunks`]), `0x367558` = L00 `0x327388` ([`bolts::level_drop`]), `0x380418` = L00 `0x33f550`
@@ -307,4 +309,44 @@ pub fn update_0faa(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         shards::break_into(w, id, ctx, (3.0, 6.0), (3.0, 6.0), mask, v, 0xff);
     }
     w.delete(id);
+}
+
+/// 0x0fd2 / 0x0fd4 (`0x4590e8` / `0x4593b8`, 41 and 19 placed; the same code) and 0x0fe9 (`0x45d5d8`, 21 placed).
+/// **0**: mode 0x800, 1. **1**: the hit ([`hit`]) → 2. **2**: its pieces 0..2 (0x0fe9: 0..1) thrown ([`glow_pieces`]:
+/// 3..6 a second across and up, plus 1/30 a tick back along its second row), its class sound 0, the level's bolts;
+/// deleted.
+pub fn update_0fd2(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    let mask = if w.mobys[id].o_class == 0x0fe9 { 3 } else { 7 };
+    match w.mobys[id].state {
+        0 => {
+            w.mobys[id].mode |= 0x800;
+            w.mobys[id].set_state(1, -1);
+        }
+        1 => if hit(w, id).is_some() { w.mobys[id].set_state(2, -1) },
+        2 => {
+            let v = scale(w.mobys[id].rows[1], f32::from_bits(0xbd08_8889));
+            glow_pieces(w, id, ctx, (3.0, 6.0), (3.0, 6.0), mask, v);
+            ctx.host.play_sound(&w.mobys[id], 0, 0);
+            bolts::level_drop(w, id, 0.0, 1, ctx);
+            w.delete(id);
+        }
+        _ => {}
+    }
+}
+
+/// `0x459218(h₀, h₁, v₀, v₁, m, mask, velocity, 0xff)`: L00 `0x327498` ([`shards::break_into`]: each piece of the
+/// mask a random heading `h₀..h₁` across and `v₀..v₁` up a second plus the velocity, spin 90..270, gravity 10..20)
+/// with each piece put on the glow list (mode 0x10).
+fn glow_pieces(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, h: (f32, f32), v: (f32, f32), mask: u32, velocity: V3) {
+    for k in 0..15u8 {
+        if mask >> k & 1 == 0 { continue; }
+        let rng = &mut ctx.game.rng;
+        let yaw = rng.rand_angle();
+        let across = rng.randf(h.0, h.1) * 0.016_666_668;
+        let up = rng.randf(v.0, v.1) * 0.016_666_668;
+        let vel = add([yaw.cos() * across, yaw.sin() * across, up], velocity);
+        let spin = rng.randf(90.0, 270.0);
+        let gravity = rng.randf(10.0, 20.0);
+        if let Some(p) = shards::spawn_piece(w, id, ctx, spin, gravity, k, vel, 0xff) { w.mobys[p].mode |= crate::moby::mode::GLOW; }
+    }
 }

@@ -4,6 +4,7 @@
 
 pub mod breakables;
 pub mod props;
+pub mod traffic;
 
 use crate::hero::physics::V3;
 use crate::moby::MobyWorld;
@@ -19,10 +20,15 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         0x0fea => Some(breakables::update_0fea),
         0x0912 => Some(breakables::update_0912),
         0x0faa => Some(breakables::update_0faa),
+        0x0fd2 | 0x0fd4 | 0x0fe9 => Some(breakables::update_0fd2),
         0x0dda => Some(props::update_0dda),
+        0x086b | 0x086d => Some(traffic::update_086b),
         0x089d => Some(props::update_089d),
         0x0948 => Some(props::update_0948),
         0x0fe2 => Some(props::update_0fe2),
+        0x02ee => Some(props::update_02ee),
+        0x07ef => Some(props::update_07ef),
+        0x0c4b => Some(props::update_0c4b),
         _ => None,
     }
 }

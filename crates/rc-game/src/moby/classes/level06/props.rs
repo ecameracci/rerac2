@@ -6,6 +6,9 @@
 //! * **0x089d** ([`update_089d`], `0x4019e0`, 17 placed): bobs up and down.
 //! * **0x0948** ([`update_0948`], `0x4054b0`, 2 placed): rises and falls with a linked moby's travel.
 //! * **0x0fe2** ([`update_0fe2`], `0x459b80`, 2 placed): a chain turned by a linked moby's travel.
+//! * **0x02ee** ([`update_02ee`], `0x3e22c0`, 1 placed): a planet's coordinates.
+//! * **0x07ef** ([`update_07ef`], `0x3f5e50`, 1 placed): deletes itself.
+//! * **0x0c4b** ([`update_0c4b`], `0x42cdf0`, 1 placed): opens and closes when its group pokes it.
 
 use crate::hero::physics::add_rot;
 use crate::moby::{Ctx, MobyWorld};
@@ -202,5 +205,117 @@ fn chain_0fe2(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         m.pos = j;
         w.rebuild(c, &*ctx.host);
         at = c;
+    }
+}
+
+/// 0x02ee (`0x3e22c0`, 1 placed): a planet's coordinates, `+0x68`[0] the planet. Its pvars: `[4]` a count, `[8]` the
+/// ticks the name shows, `[0xc]` a fade. **0**: update distance 0xff; the planet unlocked already (`0x1a7bd0`):
+/// deleted, else 1. **1**: Ratchet within 2 across and 2 up or down (`0x32e628`, `0x32e3a0`) — or the planet 0x18
+/// unlocked by now — unlocks it (`0x363748` = L00 `0x322730`, crate::game::GameState::unlock_planet), mode 0x100,
+/// 180 ticks, 2. **2**: while drawn its first two rows shrink 1/15 a tick and its third grows to match (`0x35ed48`,
+/// `0x32e710`; at 0 hidden); the planet's name held on the prompt (`0x3e2580` from the frame's callbacks `0x326e78`,
+/// `0x367f48(8, text, 1)` = L00 `0x327ae0`, crate::prompt::Prompt::force: `0x29cb60`[planet − 1], 0x11f0 + planet −
+/// 1; 0x18's 0x1243); `[4]` up every even frame; the fade toward 1 by 0.05 for the 180 ticks, then toward 0, and at 0
+/// deleted.
+pub fn update_02ee(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    use crate::hero::physics::{approach, dist2, len, set_len};
+    let planet = w.mobys[id].pv_i(0);
+    let unlocked = |g: &crate::game::GameState, p: i32| usize::try_from(p).ok().and_then(|p| g.planets.get(p)).is_some_and(|&b| b != 0);
+    match w.mobys[id].state {
+        0 => {
+            w.mobys[id].update_dist = 0xff;
+            if unlocked(ctx.game, planet) { return w.delete(id); }
+            w.mobys[id].set_state(1, -1);
+        }
+        1 => {
+            let m = &w.mobys[id];
+            let near = dist2(m.pos, ctx.hero.pos) < 2.0 && (m.pos[2] - ctx.hero.pos[2]).abs() < 2.0;
+            if near || (planet == 0x18 && unlocked(ctx.game, 0x18)) {
+                ctx.game.unlock_planet(planet);
+                let m = &mut w.mobys[id];
+                m.set_state(2, -1);
+                m.mode |= crate::moby::mode::KEEP_ROWS;
+                m.set_pv_i(8, 0xb4);
+            }
+        }
+        2 => {
+            let m = &mut w.mobys[id];
+            if m.mode & 1 == 0 {
+                let mut s = len(m.rows[0]);
+                approach(0.0, f32::from_bits(0x3d88_8889), &mut s);
+                m.rows[0] = set_len(m.rows[0], s);
+                m.rows[1] = set_len(m.rows[1], s);
+                m.rows[2] = set_len(m.rows[2], 2.0 - s);
+                if s <= 0.0 {
+                    m.drawn = 0;
+                    m.mode |= 1;
+                }
+            }
+            let text = if planet == 0x18 { 0x1243 } else if (1..=0x14).contains(&planet) { 0x11f0 + planet as u32 - 1 } else { 0 };
+            ctx.game.prompt.force(8, text, 1);
+            let m = &mut w.mobys[id];
+            if ctx.game.frame & 1 == 0 { m.set_pv_i(4, m.pv_i(4) + 1); }
+            let mut t = m.pv_i(8);
+            let over = crate::moby::countdown(&mut t);
+            m.set_pv_i(8, t);
+            let mut f = m.pv_f(0xc);
+            approach(if over { 0.0 } else { 1.0 }, f32::from_bits(0x3d4c_ccce), &mut f);
+            m.set_pv_f(0xc, f);
+            if over && f <= 0.0 { w.delete(id); }
+        }
+        _ => {}
+    }
+}
+
+/// 0x07ef (`0x3f5e50`, 1 placed): on its first update the six words `0x1b375c..0x1b3774` (0x0fc2's, `0x458a00`, not
+/// ported) cleared, and deleted.
+pub fn update_07ef(w: &mut MobyWorld, id: usize, _ctx: &mut Ctx) {
+    if w.mobys[id].state == 0 { w.delete(id); }
+}
+
+/// 0x0c4b (`0x42cdf0`, 1 placed): opens when its group pokes it. Its pvar `[0]` the ticks it stays open. **0**:
+/// 1500 ticks, 1. **1**: poked (`+0xbc` ≠ 0): sequence 1 (`0x35b5e8` = L00 `0x31b5f0`), no collision, 2. **2**: at
+/// the sequence's end (`+0x60 & 2`) sequence 2, 3. **3**: the ticks out (`0x32e0a0`): sequence 3, 4. **4**: at its
+/// end sequence 0, its collision back (the class's), 1500 ticks, its group's pokes cleared (`0x35cb88(group, 0)`),
+/// 1.
+pub fn update_0c4b(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    use super::super::props::{set_seq, wrapped};
+    match w.mobys[id].state {
+        0 => {
+            let m = &mut w.mobys[id];
+            m.state = 1;
+            m.set_pv_i(0, 0x5dc);
+        }
+        1 => if w.mobys[id].timer != 0 {
+            w.mobys[id].state = 2;
+            set_seq(w, id, ctx, 1, 0, 0);
+            w.mobys[id].has_collision = false;
+            w.changed = true;
+        },
+        2 => if wrapped(w, id, ctx) {
+            w.mobys[id].state = 3;
+            set_seq(w, id, ctx, 2, 0, 0);
+        },
+        3 => {
+            let mut t = w.mobys[id].pv_i(0);
+            let out = crate::moby::countdown(&mut t);
+            w.mobys[id].set_pv_i(0, t);
+            if out {
+                w.mobys[id].state = 4;
+                set_seq(w, id, ctx, 3, 0, 0);
+            }
+        }
+        4 => if wrapped(w, id, ctx) {
+            w.mobys[id].state = 1;
+            set_seq(w, id, ctx, 0, 0, 0);
+            let solid = w.class(w.mobys[id].o_class).is_some_and(|c| c.has_collision);
+            let m = &mut w.mobys[id];
+            m.has_collision = solid;
+            m.set_pv_i(0, 0x5dc);
+            let g = m.group as i32;
+            w.changed = true;
+            w.poke_group(g, 0);
+        },
+        _ => {}
     }
 }
