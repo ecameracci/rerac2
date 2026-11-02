@@ -299,7 +299,7 @@ impl ItemBlock {
     /// The held item's record (its row `0x139568[0x18b068]`, [`ItemBlock::row`]).
     pub fn held_row(&self) -> Option<&'static ItemRow> { if self.item <= 0 { None } else { row_at(self.row) } }
 
-    /// `0x2b05a0`'s record: the attachment's rows into the ring.
+    /// `0x2b05a0`'s record: the attachment's rows (their columns made unit, [`unit_columns`]) into the ring.
     pub fn ring_push(&mut self, rows: [V3; 3]) {
         self.ring[self.ring_at] = rows;
         self.ring_at = (self.ring_at + 1) % 16;
@@ -442,6 +442,20 @@ pub fn item_pass(world: &mut MobyWorld, ctx: &mut Ctx) {
     first_person_weapon(world, ctx);
 }
 
+/// `0x31f858(m)`: each column of the 3×3 set to length 1 (`0x2ef138(1, ..)`). `0x2b09e0` does it to the hand
+/// attachment (Ratchet's arm joints carry scale keys, the holding classes' too, so its rows are not unit) before the
+/// ring records it (`0x2b05a0`) and before an item of no stance takes it as its matrix (moby `+0xc0`).
+fn unit_columns(r: [V3; 3]) -> [V3; 3] {
+    let mut out = r;
+    for c in 0..3 {
+        let l = (r[0][c] * r[0][c] + r[1][c] * r[1][c] + r[2][c] * r[2][c]).sqrt();
+        if 0.0 < l {
+            for row in out.iter_mut() { row[c] /= l; }
+        }
+    }
+    out
+}
+
 /// After the hero's transitions (`0x2b21f0`): create the hand item when there is none ([`create_hand`]), place it at
 /// its row's attachment of Ratchet while it is in the hand (`0x2b09e0`: the rebuild, then the attachment matrix for its
 /// rows, mode 6: out of the moby loop), carry out the states' requests, test for a change ([`switch`]) and run its
@@ -503,6 +517,7 @@ fn hand_pass(world: &mut MobyWorld, ctx: &mut Ctx) {
         if let Some((rows, mut pos)) = ctx.host.hero_attach(attach) {
             let stance = it.held_row().is_some_and(|r| r.stance != 0);
             // `0x2b05a0`: the attachment's rows into the ring; an item of a stance turns as their recent average.
+            let rows = unit_columns(rows);
             it.ring_push(rows);
             let mut out = if stance { it.smoothed(ctx.hero.state == 2).unwrap_or(world.mobys[id].rows) } else { rows };
             // `0x2b09e0`: out of first person the weapon blends back from where it was drawn there (`0x18b318` eased to

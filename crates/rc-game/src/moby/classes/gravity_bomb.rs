@@ -194,7 +194,11 @@ pub fn look_aim_from(ctx: &Ctx, least: f32, max: f32, feet: V3) -> (V3, f32) {
 
 /// `0x37e988(gravity, from, vel, ..)`: the arc from `from` at `vel`, ten ticks between line tests (flags 0x12, not the
 /// hand), up to 300; where it lands and the surface's normal, the point pulled 6% toward the camera. Nothing while
-/// Ratchet dies (0x6f) or in a scene.
+/// Ratchet dies (0x6f) or in a scene. (Its loop would go on past a moby primitive's hit, `0x1bf19c` < 1 with no face
+/// type `0x2e23e0`, but flag 2 keeps the primitives out of the line.)
+///
+/// Not ported: on Oozla (`0x1a79f8` = 1) a face of type 3 lands at the water height `*0x1aa1b4` pulled 0.9 back along
+/// the throw (nothing in the port sets that height).
 fn landing(w: &MobyWorld, ctx: &Ctx, id: usize, from: V3, vel: V3) -> Option<(V3, V3)> { landing_with(w, ctx, id, from, vel, GRAVITY) }
 
 /// [`landing`] under the gravity `gravity` a tick² (the upgraded Spiderbot's charge, crate::moby::classes::spiderbot_plus).
