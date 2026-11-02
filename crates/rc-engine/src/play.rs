@@ -472,8 +472,8 @@ fn tick(
             // starts with it and not with the save's item swapped out a few ticks later. The items never held (the
             // Synthenoids, the Shield Charger) are only asked for: the first item change uses them.
             if let Some(&last) = items.last() {
-                use rc_game::hero::items::{SHIELD, SYNTHENOID};
-                if last != rc_game::hero::items::WRENCH && !matches!(last, SYNTHENOID | SHIELD) && rc_game::hero::items::row(&p.game, last).is_some() {
+                use rc_game::hero::items::{SHIELD, SYNTHENOID, ZAPPER};
+                if last != rc_game::hero::items::WRENCH && !matches!(last, SYNTHENOID | SHIELD | ZAPPER) && rc_game::hero::items::row(&p.game, last).is_some() {
                     p.game.held = last;
                     p.game.wrench_out = false;
                 }

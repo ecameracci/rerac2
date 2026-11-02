@@ -90,6 +90,9 @@ pub const RYNO_CLASS: i16 = crate::moby::classes::ryno::HAND_CLASS;
 /// The Sheepinator: item 0x10, class 0xa5d (L00 row `0x263300`; crate::moby::classes::sheepinator).
 pub const SHEEPINATOR: i32 = crate::moby::classes::sheepinator::ITEM;
 pub const SHEEPINATOR_CLASS: i16 = crate::moby::classes::sheepinator::HAND_CLASS;
+/// The Clank Zapper: item 9 (L00 row `0x262ce0`; not held: asked for, it turns on, crate::moby::classes::zapper). Its
+/// row's class is the zap 0x0ed8.
+pub const ZAPPER: i32 = crate::moby::classes::zapper::ITEM;
 
 /// An item record (`0x262500 + 0xe0·row`, row `0x139568[item]`: crate::upgrades): the fields the port reads.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -123,7 +126,7 @@ pub struct ItemRow {
 /// Blitz Gun's L00 `0x263bc0`; the Pulse Rifle's L00 `0x263920`; the Mini-Turret Glove's L00 `0x2648e0`; the
 /// Synthenoids' L00 `0x264020`; the Lava Gun's L00 `0x263e60`; the Seeker Gun's L00 `0x263a00`; the Bouncer's L00 `0x264560`;
 /// the Minirocket Tube's L00 `0x263ca0`; the Plasma Coil's L00 `0x263d80`; the Hoverbomb Gun's L00 `0x263ae0`; the Shield Charger's L00 `0x264c60`; the Zodiac's L00 `0x264aa0`; the RYNO II's L00 `0x264b80`; the Sheepinator's L00 `0x263300`).
-pub const ROWS: [ItemRow; 23] = [
+pub const ROWS: [ItemRow; 24] = [
     ItemRow { item: WRENCH, attach: 0, class: WRENCH_CLASS, stance: 0, icon: 0, use_seq: 0, keep: false, fire_seq: [0, 0], speed: 0.0, rate: 0.0, damage: 1.0, ammo: false, max_ammo: 0, start_ammo: 0 },
     ItemRow { item: LANCER, attach: 0, class: LANCER_CLASS, stance: 1, icon: 0xea64, use_seq: 0x38, keep: true, fire_seq: [-1, 0x3e], speed: 60.0, rate: 7.0, damage: 0.5, ammo: true, max_ammo: 200, start_ammo: 200 },
     ItemRow { item: DYNAMO, attach: 1, class: DYNAMO_CLASS, stance: 1, icon: 0xea7f, use_seq: 0x8d, keep: false, fire_seq: [0x8e, 0x8d], speed: 0.0, rate: 0.0, damage: 0.0, ammo: false, max_ammo: 0, start_ammo: 0 },
@@ -147,6 +150,7 @@ pub const ROWS: [ItemRow; 23] = [
     ItemRow { item: ZODIAC, attach: 0, class: ZODIAC_CLASS, stance: 1, icon: 0xea76, use_seq: 0x94, keep: false, fire_seq: [-1, 0x3e], speed: 0.0, rate: 0.25, damage: 100.0, ammo: true, max_ammo: 4, start_ammo: 4 },
     ItemRow { item: RYNO, attach: 0, class: RYNO_CLASS, stance: 2, icon: 0xea6c, use_seq: 0x36, keep: false, fire_seq: [-1, 0x46], speed: 0.0, rate: 6.5, damage: 100.0, ammo: true, max_ammo: 100, start_ammo: 100 },
     ItemRow { item: SHEEPINATOR, attach: 0, class: SHEEPINATOR_CLASS, stance: 1, icon: 0xea77, use_seq: 0x38, keep: true, fire_seq: [-1, 0x3e], speed: 0.0, rate: 0.0, damage: 0.0, ammo: false, max_ammo: 0, start_ammo: 0 },
+    ItemRow { item: ZAPPER, attach: 5, class: crate::moby::classes::zapper::ZAP, stance: 0, icon: 0xea99, use_seq: -1, keep: false, fire_seq: [-1, -1], speed: 30.0, rate: 2.4, damage: 16.0, ammo: true, max_ammo: 30, start_ammo: 10 },
 ];
 
 /// The upgraded rows the port has (L00 `0x262500 + 0xe0·row`; their item in brackets): the Heavy Lancer 0x3c and the
@@ -163,7 +167,7 @@ pub const ROWS: [ItemRow; 23] = [
 /// `0x267740`; their class the drone's, crate::moby::classes::synthenoid), the upgraded Shield Charger 0x4d, 0x6b, 0x6c
 /// (0x2d: L00 `0x266860`, `0x2682a0`, `0x268380`; their class the shield's, crate::moby::classes::shield).
 /// Each names its own hand class (`+0x04`).
-pub const UPGRADE_ROWS: [ItemRow; 46] = [
+pub const UPGRADE_ROWS: [ItemRow; 47] = [
     ItemRow { item: 0x3c, attach: 0, class: 0xc05, stance: 2, icon: 0xea64, use_seq: 0x33, keep: true, fire_seq: [-1, -1], speed: 80.0, rate: 10.0, damage: 0.67, ammo: true, max_ammo: 300, start_ammo: 300 },
     ItemRow { item: 0x4f, attach: 0, class: 0xc05, stance: 2, icon: 0xea64, use_seq: 0x33, keep: true, fire_seq: [-1, -1], speed: 80.0, rate: 10.0, damage: 4.0, ammo: true, max_ammo: 400, start_ammo: 300 },
     ItemRow { item: 0x50, attach: 0, class: 0xc05, stance: 2, icon: 0xea64, use_seq: 0x33, keep: true, fire_seq: [-1, -1], speed: 80.0, rate: 10.0, damage: 8.0, ammo: true, max_ammo: 500, start_ammo: 300 },
@@ -210,6 +214,8 @@ pub const UPGRADE_ROWS: [ItemRow; 46] = [
     ItemRow { item: 0x4d, attach: 0, class: crate::moby::classes::shield::PLUS_CLASS, stance: 1, icon: 0xea74, use_seq: 0x38, keep: true, fire_seq: [0x39, 0x3e], speed: 0.0, rate: 1.0, damage: 5.0, ammo: true, max_ammo: 8, start_ammo: 5 },
     ItemRow { item: 0x6b, attach: 0, class: crate::moby::classes::shield::PLUS_CLASS, stance: 1, icon: 0xea74, use_seq: 0x38, keep: true, fire_seq: [0x39, 0x3e], speed: 0.0, rate: 1.0, damage: 24.0, ammo: true, max_ammo: 10, start_ammo: 5 },
     ItemRow { item: 0x6c, attach: 0, class: crate::moby::classes::shield::PLUS_CLASS, stance: 1, icon: 0xea74, use_seq: 0x38, keep: true, fire_seq: [0x39, 0x3e], speed: 0.0, rate: 1.0, damage: 64.0, ammo: true, max_ammo: 15, start_ammo: 5 },
+    // The upgraded Clank Zapper (L00 `0x2664e0`): its class is Clank's back moby 0x259 (crate::hero::back).
+    ItemRow { item: 0x49, attach: 5, class: crate::hero::back::CLANK_CLASS, stance: 0, icon: 0xea99, use_seq: -1, keep: false, fire_seq: [-1, -1], speed: 30.0, rate: 2.0, damage: 20.0, ammo: true, max_ammo: 30, start_ammo: 10 },
 ];
 
 /// Row `row` of the records ([`ROWS`], [`UPGRADE_ROWS`]).
@@ -556,6 +562,8 @@ fn hand_pass(world: &mut MobyWorld, ctx: &mut Ctx) {
     feet_pass(world, ctx);
     // Slot 3: Clank on the back and the pack (crate::hero::back).
     crate::hero::back::back_pass(world, ctx);
+    // `0x2b2408` (from the hero update `0x2a6dd0`): the Clank Zapper's zaps, from the point on Clank's head.
+    crate::moby::classes::zapper::fire(world, ctx);
     look_kind(world, ctx);
     create_hand(world, ctx);
     {
@@ -923,6 +931,12 @@ fn switch(world: &mut MobyWorld, ctx: &mut Ctx) {
         it.request = 0;
         crate::moby::classes::shield::deploy(world, ctx);
     }
+    // The Clank Zapper asked for: on (crate::moby::classes::zapper, `0x2b13c8`'s item 9).
+    let it = &mut ctx.hero.items;
+    if ctx.hero.no_menu != 0 && it.item == WRENCH && it.request == ZAPPER {
+        it.request = 0;
+        crate::moby::classes::zapper::request(world, ctx);
+    }
     let h = &mut *ctx.hero;
     let it = &mut h.items;
     if it.no_use != 0 && (!it.wrench_req || it.item == WRENCH) {
@@ -936,6 +950,10 @@ fn switch(world: &mut MobyWorld, ctx: &mut Ctx) {
     if ctx.hero.items.request == SHIELD {
         ctx.hero.items.request = 0;
         crate::moby::classes::shield::deploy(world, ctx);
+    }
+    if ctx.hero.items.request == ZAPPER {
+        ctx.hero.items.request = 0;
+        crate::moby::classes::zapper::request(world, ctx);
     }
     let h = &mut *ctx.hero;
     let it = &mut h.items;

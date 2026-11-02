@@ -371,6 +371,7 @@ fn one(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut crate::ga
         crate::moby::classes::plasma_storm::HAND_CLASS => crate::moby::classes::plasma_storm::draw_hand(w, host, id, &mut game.rng, cam, out),
         crate::moby::classes::plasma_storm::BALL => crate::moby::classes::plasma_storm::draw_ball(w, id, &mut game.rng, cam, out),
         crate::moby::classes::shield_zap::CLASS => crate::moby::classes::shield_zap::draw(w, id, cam, out),
+        crate::moby::classes::zapper::ZAP => crate::moby::classes::zapper::draw(w, id, cam, out),
         crate::moby::classes::shield::CLASS | crate::moby::classes::shield::PLUS_CLASS => crate::moby::classes::shield::draw(w, host, id, game.scenes.mode == crate::scene::PLAY, &mut game.rng, cam, out),
         crate::moby::classes::turret::HAND_CLASS | crate::moby::classes::turret::UP_HAND => crate::moby::classes::turret::draw_marker(w, id, hero_state, game.scenes.mode, game.frame, out),
         crate::moby::classes::bouncer::HAND_CLASS | crate::moby::classes::bouncer::UPGRADED_HAND => crate::moby::classes::bouncer::draw_marker(w, id, hero_state, game.scenes.mode, game.frame, out),

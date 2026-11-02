@@ -437,7 +437,7 @@ pub fn draw_flash(w: &mut MobyWorld, id: usize) {
 }
 
 /// `0x31bca0(t, out, p0, p3, c1, c2)`: the curve's point at `t`.
-fn curve(t: f32, p0: V3, p3: V3, c1: V3, c2: V3) -> V3 {
+pub(super) fn curve(t: f32, p0: V3, p3: V3, c1: V3, c2: V3) -> V3 {
     if t == 0.0 { return p0; }
     if t == 1.0 { return p3; }
     let (t2, t3) = (t * t, t * t * t);
