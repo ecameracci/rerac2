@@ -326,6 +326,8 @@ pub struct Hero {
     pub glide_sink: f32,
     /// `0x18b6e0`: the lava hops in a row.
     pub hot_hops: i32,
+    /// `0x18a022`: the ticks stuck falling (crate::hero::air).
+    pub stuck: i16,
     /// `0x18a00e`: after a glide's landing the next jump's ✕ window is 1 tick (counted down); `0x18a220` / `0x18a224`:
     /// the ice slide's speed along the stick and the slope it last had.
     pub glide_lag: i16,
@@ -443,7 +445,7 @@ impl Hero {
             pos_hist: [[0.0; 3]; HISTORY], pos_hist_idx: 0, pos_hist_count: 0, yaw_hist: [0.0; HISTORY], yaw_hist_idx: 0,
             yaw_hist_count: 0, melee: Default::default(), items: Default::default(), back: Default::default(), carry: [0.0; 3], carry_yaw: 0.0, ledge: Default::default(), anim_frame: 0.0, damage: Default::default(), pending_damage: None, show_health: None, underwater_write: None,
             surf: Default::default(), wall: Default::default(), ahead: Default::default(), edge: Default::default(), frame: 0, ground_moby: None, ground_class: -1, wall_moby: None, push_moby: None,
-            bounce: [37.0, 13.0], glide_vz: 0.0, glide_sink: 0.0, hot_hops: 0, glide_lag: 0, ice_along: 0.0, ice_slope: 0.0, strafe: 0, strafe_yaw: 0.0, strafe_dir: [1.0, 0.0, 0.0], stick_sector: 2, strafe_back: false, strafe_flip: [0; 2], strafe_yaw_vel: 0.0,
+            bounce: [37.0, 13.0], glide_vz: 0.0, glide_sink: 0.0, hot_hops: 0, stuck: 0, glide_lag: 0, ice_along: 0.0, ice_slope: 0.0, strafe: 0, strafe_yaw: 0.0, strafe_dir: [1.0, 0.0, 0.0], stick_sector: 2, strafe_back: false, strafe_flip: [0; 2], strafe_yaw_vel: 0.0,
             ground_yaw: 0.0, slide_yaw: 0.0, slide_bank: 0.0, slide_hold: 0, slide_vel: [0.0; 2], slide_speed: 0.0, stagger: 0, rot_vel: [0.0; 2], bonk_yaw: 0.0, push: [0.0; 3], gravity: Default::default(), swing: Default::default(), swing_cooldown: 0, gear: Default::default(), grind: Default::default(), water: Default::default(), no_menu: 0, rng: Default::default(), state_req: None, anim_req: None, walk_to: Default::default(), fidget_rest: [0; 4], fidget_gap: 0, no_update: false, hits_out: Vec::new(), sounds: Vec::new(), level_sounds: Vec::new(), loops: Vec::new(), loop_stops: Vec::new(), loops_off: false, posture: Default::default(), layers: Default::default(), aim_point: [0.0; 3], unported_seen: Vec::new(), warps: 0,
             body: Default::default(),
         }
@@ -570,6 +572,14 @@ impl Hero {
         if 0 < self.slide_hold { self.slide_hold -= 1; }
         if 0 < self.items.swap_face { self.items.swap_face -= 1; }
         if 0 < self.back.flash { self.back.flash -= 1; }
+        // Stuck falling: in the air, moving down, the history full and its last 8 ticks under 1/60 a tick.
+        if self.air_ticks == 0 || 0.0 <= self.local_z(self.vel) {
+            self.stuck = 0;
+        } else if self.pos_hist_count == HISTORY {
+            let (a, b) = (self.pos_hist[(self.pos_hist_idx + 31) & 31], self.pos_hist[(self.pos_hist_idx + 23) & 31]);
+            let d = physics::len(physics::sub(a, b));
+            if d * 0.125 < f32::from_bits(0x3c88_8889) { self.stuck = self.stuck.saturating_add(1) } else { self.stuck = 0 }
+        }
         self.frame_hold();
     }
 

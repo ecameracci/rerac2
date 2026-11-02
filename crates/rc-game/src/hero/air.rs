@@ -11,8 +11,10 @@
 //! In the gravity frames (crate::gravity) the fall's gravity and caps run along his local up and the air
 //! acceleration takes its frame branch.
 //!
-//! Not ported: the stuck-in-air jump (`0x18a022`), the landing effects (`0x2a6188`) and the
-//! camera jolt (`0x2d35e8`).
+//! **Stuck in the air** (`0x18a022`, counted by `0x2c3330`): falling while the last 8 ticks moved him less than 1/60
+//! a tick; after 21 such ticks ✕ jumps (the ground's jump chooser) as if he stood.
+//!
+//! Not ported: the landing effects (`0x2a6188`) and the camera jolt (`0x2d35e8`).
 
 use super::physics::*;
 use super::states::Entry;
@@ -78,6 +80,8 @@ impl Hero {
             // In the air: ✕ held with Clank on the back → the glide; a ledge in reach is grabbed (`0x18a398`), a rail
             // (0x27) or a pole (0x71).
             if env.pad.held & crate::pad::button::CROSS != 0 && env.clank && env.pack != 4 && self.land_lag == 0 && 0.6 < self.height { return Some(8); }
+            // Stuck falling for 21 ticks (`0x18a022`, caught on something): he may jump out.
+            if 0x14 < self.stuck && self.try_jump(anim, env, if self.glide_lag == 0 { 6 } else { 1 }, false) { return None; }
             if self.ledge.found { return Some(0x17); }
             if self.grind.found { return Some(0x27); }
             if self.grind.pole.is_some() { return Some(0x71); }
