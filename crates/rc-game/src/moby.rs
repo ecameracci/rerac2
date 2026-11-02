@@ -295,17 +295,28 @@ impl SpawnRules<'_> {
     }
 }
 
-/// A mover's step for Ratchet: grounded on moby `id` he is carried by its move from `old` (and turned by its yaw's
-/// change about its new place). It stands in for his own read of the mover's platform block (crate::moby::platform:
-/// `0x2b4a08` and the others through `0x322028`), which turns him about every axis.
+/// A mover's step for Ratchet: grounded on moby `id`, or climbing (0x1b) or in the ledge group 3 with the ledge on it
+/// (`0x18a3a8`), he is carried by its move from `old` (and turned by its yaw's change about its new place); the ledge's
+/// hang point, edge and yaw follow too. It stands in for his own read of the mover's platform block (`0x2d44e0`
+/// through `0x322028`, crate::moby::platform), which turns him about every axis.
 pub fn carry_hero(ctx: &mut Ctx, id: usize, old: V3, old_yaw: f32, new: V3, yaw: f32) {
     let h = &mut *ctx.hero;
-    if h.ground_moby != Some(id) || h.air_ticks != 0 { return; }
+    let ground = h.ground_moby == Some(id) && h.air_ticks == 0;
+    let ledge = h.air_ticks != 0 && (h.state == 0x1b || h.group == 3) && h.ledge.moby == Some(id);
+    if !ground && !ledge { return; }
     let dy = crate::hero::physics::sub_rot(yaw, old_yaw);
     let (s, c) = dy.sin_cos();
-    let r = [h.pos[0] - old[0], h.pos[1] - old[1]];
+    let follow = |p: V3| {
+        let r = [p[0] - old[0], p[1] - old[1]];
+        [new[0] + r[0] * c - r[1] * s, new[1] + r[0] * s + r[1] * c, p[2] + new[2] - old[2]]
+    };
     let was = h.pos;
-    h.pos = [new[0] + r[0] * c - r[1] * s, new[1] + r[0] * s + r[1] * c, h.pos[2] + new[2] - old[2]];
+    h.pos = follow(h.pos);
+    if ledge {
+        h.ledge.hang = follow(h.ledge.hang);
+        h.ledge.edge = follow(h.ledge.edge);
+        h.ledge.yaw = crate::hero::physics::add_rot(h.ledge.yaw, dy);
+    }
     h.rot[2] = crate::hero::physics::add_rot(h.rot[2], dy);
     h.carry = crate::hero::physics::add(h.carry, crate::hero::physics::sub(h.pos, was));
     h.carry_yaw = crate::hero::physics::add_rot(h.carry_yaw, dy);

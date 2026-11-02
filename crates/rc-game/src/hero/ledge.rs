@@ -16,7 +16,9 @@
 //! Clank's body (`0x18c0d4` = 1) probes with its own sizes (0.725 up, 0.7 down, 0.71 below the edge, 0.32 out); its
 //! ledge states 0x46 / 0x47 / 0x49 / 0x4a are in `clank.rs`.
 //!
-//! Not ported: the ledge's moby carrying Ratchet (`+0x38`), the head check flag (`+0x34`, a 0.45 sphere above the
+//! A ledge on a mover carries Ratchet with it (crate::moby::carry_hero).
+//!
+//! Not ported: the head check flag (`+0x34`, a 0.45 sphere above the
 //! edge), the gravity frames.
 
 use super::physics::*;
