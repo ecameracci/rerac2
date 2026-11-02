@@ -67,6 +67,7 @@ pub mod plasma_storm;
 pub mod synthenoid_bomb;
 pub mod shield_zap;
 pub mod zapper;
+pub mod black_sheep;
 pub mod swamp_monster;
 pub mod tractor;
 pub mod vaporizer;
@@ -179,6 +180,8 @@ pub fn update_for(o_class: i16) -> Option<UpdateFn> {
         shield::CLASS | shield::PLUS_CLASS => Some(shield::update),
         shield_zap::CLASS => Some(shield_zap::update),
         zapper::ZAP => Some(zapper::update),
+        sheepinator::BLACK_CLASS => Some(sheepinator::update),
+        black_sheep::CLASS => Some(black_sheep::update),
         lava_gun::HAND_CLASS => Some(lava_gun::update),
         // The Meteor Gun (`0x3eb9c0`, rows 0x3f / 0x5f / 0x60) and its meteor (`0x3dc568`).
         meteor::HAND_CLASS => Some(meteor::update_hand),

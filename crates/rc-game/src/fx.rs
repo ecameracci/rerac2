@@ -361,7 +361,7 @@ fn one(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut crate::ga
         crate::moby::classes::ryno::MISSILE => crate::moby::classes::ryno::draw(w, id, &mut game.rng, cam, out),
         crate::moby::classes::zodiac::HAND_CLASS => crate::moby::classes::zodiac::draw_flash(w, id),
         crate::moby::classes::zodiac::EFFECT => crate::moby::classes::zodiac::draw_effect(w, id, &mut game.rng, cam, out),
-        crate::moby::classes::sheepinator::HAND_CLASS => crate::moby::classes::sheepinator::draw(w, id, cam, out),
+        crate::moby::classes::sheepinator::HAND_CLASS | crate::moby::classes::sheepinator::BLACK_CLASS => crate::moby::classes::sheepinator::draw(w, id, cam, out),
         crate::moby::classes::vaporizer::SHOT => crate::moby::classes::vaporizer::draw(w, id, hero_state, cam, out),
         crate::moby::classes::synthenoid::SHOT => crate::moby::classes::synthenoid::draw(w, id, cam, out),
         crate::moby::classes::lava_gun::HAND_CLASS => crate::moby::classes::lava_gun::draw(w, id, &mut game.rng, cam, out),

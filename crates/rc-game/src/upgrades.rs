@@ -281,7 +281,7 @@ impl GameState {
             if crate::vendor::upgrades(records, i) <= 0 { continue; }
             if !(0 < r.xp_max && r.xp_max <= self.upgrades.xp[i as usize] >> 5) { continue; }
             // Not the original's: a weapon whose next row's hand the port does not run yet (the rows not in
-            // hero::items::UPGRADE_ROWS: the Sheepinator's 0x48 / 0x6e) stays at its
+            // hero::items::UPGRADE_ROWS: none now) stays at its
             // row rather than lose its hand.
             // The Clank Zapper's upgraded row names Clank's back moby (crate::hero::back), not a hand: its zaps run.
             let ported = crate::hero::items::row_at(r.next as usize).is_some_and(|n| i == crate::hero::items::ZAPPER || crate::moby::classes::update_for(n.class).is_some());

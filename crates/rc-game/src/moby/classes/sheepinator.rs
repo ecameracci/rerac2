@@ -58,12 +58,16 @@
 //!
 //! Its glow in the hand (`0x2a7ed8`'s case 0x10): crate::hero::items.
 //!
-//! Not ported: the upgraded hand **0x0ead** (`0x406cf8`, rows 0x48 "Black Sheepinator" and 0x6e: the muzzle (0.15, −1,
-//! 0.06) in its rows, its own targeting `0x4066b8` (no walk through the sheep), drain 12.5 a second (50 at level 3,
-//! × 1.33 with item 0x48's row past its base), a black meter `0x60000000`, its beam `0x407640` / draw `0x4084a0` with
-//! their own constants (`$gp+0x1de4..`), and the black sheep **0x0eb0** (`0x409cf0`, update `0x409328`: it seeks an
-//! enemy (`0x325680`) and charges, its blast `0x409ef0` hurting 10 (55 at level 3) within 3; listed as a decoy
-//! `0x3216e0(…, 0x1b1fb0, 0x1f)`)); the weapon's use statistics (`0x18c420..0x18c428`), the gravity frames' branches (the targeting's
+//! **The Black Sheepinator** (rows 0x48 and 0x6e, the hand **0x0ead**, `0x406cf8`; [`BLACK_CLASS`]) runs this machine
+//! with: its muzzle (0.15, −1, 0.06) through the hand's rows from its place (not joint 0); its targeting `0x4066b8`
+//! ([`target`]'s plain line: no walk through the sheep — the line may meet only the target); its drain 12.5 a second
+//! (50 on a Mega row at level 3) × 1.33 with item 0x48's row past its base (`0x139568[0x48]`'s level byte); its meter
+//! black (`0x60000000`, no blink); its beam `0x407640` this one's code over its own globals (`0x2549f0..`,
+//! `$gp+0x1de8..`, the same values) but the swirls' colours (blues `0x7fff5f20` .. `0x7fff1010`); its draw `0x4084a0`
+//! this one's with the second strip `0x7f1010`, the tube `0x40ff0000` and the glow `0x60ff0000` (read where this one's
+//! has its literal); its transform `0x409cf0`, the black sheep (crate::moby::classes::black_sheep).
+//!
+//! Not ported: the weapon's use statistics (`0x18c420..0x18c428`), the gravity frames' branches (the targeting's
 //! `0x1a8ff0` / `0x18a168` / `0x1a8ff4` walls-and-ceilings test, `0x380e08`), `0x37c948(0x47, 0x5360b)` after the
 //! strips (a GS register reset).
 
@@ -71,6 +75,12 @@ use crate::hero::items::row_at;
 use crate::hero::physics::{add, add_rot, atan2, cross, dist, dist2, dot, len, len2, rot_dist, scale, set_len, sub, V3};
 use crate::moby::{ai, countdown, Ctx, MobyWorld};
 use crate::point_lights::PointLight;
+
+/// The Black Sheepinator's hand (rows 0x48 / 0x6e, `0x406cf8`).
+pub const BLACK_CLASS: i16 = 0xead;
+/// The swirls' colours: this one's reds (`$gp+0xfcc..`), the black one's blues (`$gp+0x1e3c..`).
+const REDS: [u32; 5] = [0x7f30_7fff, 0x7f00_64ff, 0x7f20_20ff, 0x7f00_7fff, 0x7f20_20ff];
+const BLUES: [u32; 5] = [0x7fff_5f20, 0x7fff_5400, 0x7fff_0000, 0x7fff_6f00, 0x7fff_1010];
 
 /// The hand's class (item 0x10's row `+0x04`; the challenge mode's level-2 row 0x6d too).
 pub const HAND_CLASS: i16 = 0xa5d;
@@ -166,10 +176,12 @@ pub struct Mem {
     pub skill_count: i32,
     /// `0x1b2bb0`: the sheep (16 at most, crate::moby::classes::sheep).
     pub flock: [Option<usize>; 16],
+    /// The hand in use is the Black Sheepinator's ([`BLACK_CLASS`]): its globals' copies are these.
+    pub black: bool,
 }
 
 impl Default for Mem {
-    fn default() -> Self { Mem { light: -1, light_ticks: 0, sound: -1, beam: Beam::default(), count: 0, skill_count: 0, flock: [None; 16] } }
+    fn default() -> Self { Mem { light: -1, light_ticks: 0, sound: -1, beam: Beam::default(), count: 0, skill_count: 0, flock: [None; 16], black: false } }
 }
 
 /// The level whose class-0xfb4 targets count toward the skill point, the class, the count past which it is given.
@@ -204,6 +216,7 @@ const MEGA_ROWS: [usize; 4] = [0x10, 0x48, 0x6d, 0x6e];
 /// `0x3c76e0` (module docs).
 pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     w.mobys[id].pvars.resize(crate::moby::PVAR_BYTES, 0);
+    w.sheep.black = w.mobys[id].o_class == BLACK_CLASS;
     let away = ctx.hero.items.ready == 3;
     if w.mobys[id].state == 0 {
         w.mobys[id].state = 1;
@@ -241,7 +254,15 @@ fn fire(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     if !ctx.hero.items.using { ctx.hero.items.use_start(ctx.hero.group); }
     if w.mobys[id].pv_s(0x1e) == 0 { w.mobys[id].set_pv_s(0x1e, 1); }
     if w.mobys[id].pv_s(0x1c) == 0 { w.mobys[id].set_pv_s(0x1c, 0xf); }
-    let muzzle = ctx.host.joint(&w.mobys[id], 0).unwrap_or(w.mobys[id].pos);
+    let black = w.sheep.black;
+    let muzzle = if black {
+        // `0x406cf8`: (0.15, −1, 0.06) through its rows from its place.
+        let m = &w.mobys[id];
+        let v = [f32::from_bits(0x3e19_999a), -1.0, f32::from_bits(0x3d75_c28f)];
+        add(m.pos, std::array::from_fn(|k| v[0] * m.rows[0][k] + v[1] * m.rows[1][k] + v[2] * m.rows[2][k]))
+    } else {
+        ctx.host.joint(&w.mobys[id], 0).unwrap_or(w.mobys[id].pos)
+    };
     w.mobys[id].set_pv_v(0, muzzle);
     if ctx.hero.state == 1 { ctx.hero.request_state(0x1d, true); }
     let hidden = ctx.hero_moby.and_then(|h| w.mobys.get(h)).is_some_and(|m| m.mode & 1 != 0);
@@ -280,17 +301,28 @@ fn fire(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             }
         }
         let (level, mega) = row_level(ctx.game);
-        let rate = if mega && level == 2 { 35.0 } else { 10.0 };
+        let rate = if black {
+            let k = if crate::upgrades::level_of(ctx.game.item_row(0x48)) != 0 { 1.33 } else { 1.0 };
+            (if mega && level == 3 { 50.0 } else { 12.5 }) * k
+        } else if mega && level == 2 {
+            35.0
+        } else {
+            10.0
+        };
         let m = &mut w.mobys[id];
         let left = (m.pv_f(0x18) - rate * TICK).max(0.0);
         m.set_pv_f(0x18, left);
         left / m.pv_f(0x14)
     };
     // `0x327240(lerp(1440, 360, f) · π/180/60, &+0x50, 0x60ffffff, 0x40ffc0a0)`: the sine of the phase before its turn.
-    let speed = lerp(1440.0, 360.0, meter) * 0.000_290_888_25;
-    let phase = w.mobys[id].pv_f(0x50);
-    w.mobys[id].set_pv_f(0x50, add_rot(phase, speed));
-    let colour = crate::hud::lerp_rgba(phase.sin() * 0.5 + 0.5, 0x60ff_ffff, 0x40ff_c0a0);
+    let colour = if black {
+        0x6000_0000
+    } else {
+        let speed = lerp(1440.0, 360.0, meter) * 0.000_290_888_25;
+        let phase = w.mobys[id].pv_f(0x50);
+        w.mobys[id].set_pv_f(0x50, add_rot(phase, speed));
+        crate::hud::lerp_rgba(phase.sin() * 0.5 + 0.5, 0x60ff_ffff, 0x40ff_c0a0)
+    };
     ctx.game.side_meter.show(meter, 1, colour, 0);
     if let Some(t) = ai::link(&w.mobys[id], 0x10) {
         if w.mobys[id].pv_f(0x18) <= 0.0 {
@@ -299,7 +331,7 @@ fn fire(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 if 0xf < w.sheep.skill_count { ctx.game.award_skill_point(SKILL_POINT); }
             }
             ctx.host.play_sound(&w.mobys[id], 3, 0);
-            transform(w, ctx, t);
+            if black { crate::moby::classes::black_sheep::transform(w, ctx, t); } else { transform(w, ctx, t); }
             w.sheep.count += 1;
             ai::set_link(&mut w.mobys[id], 0x10, None);
         }
@@ -451,9 +483,14 @@ pub fn target(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, from: V3) -> Option<u
             }
         }
         if CONE <= a { continue; }
-        let clear = match walk(w, ctx, from, q, 6, Some(id), &mut taken) {
-            Walk::Clear | Walk::Full(_) => true,
-            Walk::Met(m, _) => m == Some(tid),
+        // `0x4066b8`: a plain line, which may meet only the target.
+        let clear = if w.sheep.black {
+            w.coll_line(ctx, from, q, 6, Some(id)).is_none_or(|h| h.moby == Some(tid))
+        } else {
+            match walk(w, ctx, from, q, 6, Some(id), &mut taken) {
+                Walk::Clear | Walk::Full(_) => true,
+                Walk::Met(m, _) => m == Some(tid),
+            }
         };
         if !clear { continue; }
         w.mobys[id].set_pv_f(0x4c, -elev);
@@ -569,8 +606,8 @@ fn sparks(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, reach: f32, target: Optio
     let d = set_len(sub(points[1], points[0]), 0.2);
     if g.randi(2) != 0 { return; }
     let at = add(points[0], set_len(row1, -0.25));
-    const REDS: [u32; 5] = [0x7f30_7fff, 0x7f00_64ff, 0x7f20_20ff, 0x7f00_7fff, 0x7f20_20ff];
-    let c = REDS[g.randi(5) as usize];
+    let reds = if w.sheep.black { BLUES } else { REDS };
+    let c = reds[g.randi(5) as usize];
     let a = g.randf_signed(0.0, f32::from_bits(0x3e86_0a93));
     let bb = g.randf_signed(0.0, f32::from_bits(0x3e86_0a93));
     let v = crate::camera::rot(d, bb, down);
@@ -640,7 +677,8 @@ pub fn draw(w: &mut MobyWorld, _id: usize, cam: V3, out: &mut Vec<crate::fx::FxQ
     b.strip_scroll = if s <= -8.0 { s + 8.0 } else { s };
     let b = &*b;
     strips(out, &b.side[0], b.strip_scroll, 0x10_3fff, cam);
-    strips(out, &b.side[1], b.strip_scroll, 0x10_107f, cam);
+    let black = w.sheep.black;
+    strips(out, &b.side[1], b.strip_scroll, if black { 0x7f_1010 } else { 0x10_107f }, cam);
     draw_pulses(out, b);
     // `0x3c9a50`: the muzzle's glow.
     {
@@ -648,7 +686,7 @@ pub fn draw(w: &mut MobyWorld, _id: usize, cam: V3, out: &mut Vec<crate::fx::FxQ
         let to_cam = set_len(sub(cam, c), 1.0);
         let side = set_len(cross_ba(to_cam, b.down), -1.0);
         let up = cross_ba(side, to_cam);
-        for (size, rgba) in [(0.4f32, 0x7f20_7f7fu32), (0.1, 0xffff_ffff)] {
+        for (size, rgba) in [(0.4f32, if black { 0x60ff_0000 } else { 0x7f20_7f7fu32 }), (0.1, 0xffff_ffff)] {
             let corners = SQUARE.map(|[y, z]| add(c, add(scale(side, y * size), scale(up, z * size))));
             quad(out, 0xb, corners, ST, [rgba; 4]);
         }
@@ -666,7 +704,8 @@ pub fn draw(w: &mut MobyWorld, _id: usize, cam: V3, out: &mut Vec<crate::fx::FxQ
     let along = f32::from_bits(0x3d88_88b5);
     let round = f32::from_bits(0x3d4c_cccd);
     let mut u = b.tube_scroll[0];
-    let mut colours = [0x4000_00ffu32; 4];
+    let tube = if black { 0x40ff_0000 } else { 0x4000_00ffu32 };
+    let mut colours = [tube; 4];
     for i in 2..POINTS {
         let (mut v1, mut v2) = (b.tube_scroll[1], b.tube_scroll[2]);
         for k in 0..RING {
@@ -679,8 +718,8 @@ pub fn draw(w: &mut MobyWorld, _id: usize, cam: V3, out: &mut Vec<crate::fx::FxQ
                 continue;
             }
             if i == POINTS - 1 {
-                colours[0] = 0xff;
-                colours[1] = 0xff;
+                colours[0] = tube & 0xff_ffff;
+                colours[1] = tube & 0xff_ffff;
             }
             for v in [&mut v1, &mut v2] {
                 quad(out, 0xd, c, [[u, *v], [u, *v + round], [u - along, *v], [u - along, *v + round]], colours);

@@ -167,7 +167,7 @@ pub const ROWS: [ItemRow; 24] = [
 /// `0x267740`; their class the drone's, crate::moby::classes::synthenoid), the upgraded Shield Charger 0x4d, 0x6b, 0x6c
 /// (0x2d: L00 `0x266860`, `0x2682a0`, `0x268380`; their class the shield's, crate::moby::classes::shield).
 /// Each names its own hand class (`+0x04`).
-pub const UPGRADE_ROWS: [ItemRow; 47] = [
+pub const UPGRADE_ROWS: [ItemRow; 49] = [
     ItemRow { item: 0x3c, attach: 0, class: 0xc05, stance: 2, icon: 0xea64, use_seq: 0x33, keep: true, fire_seq: [-1, -1], speed: 80.0, rate: 10.0, damage: 0.67, ammo: true, max_ammo: 300, start_ammo: 300 },
     ItemRow { item: 0x4f, attach: 0, class: 0xc05, stance: 2, icon: 0xea64, use_seq: 0x33, keep: true, fire_seq: [-1, -1], speed: 80.0, rate: 10.0, damage: 4.0, ammo: true, max_ammo: 400, start_ammo: 300 },
     ItemRow { item: 0x50, attach: 0, class: 0xc05, stance: 2, icon: 0xea64, use_seq: 0x33, keep: true, fire_seq: [-1, -1], speed: 80.0, rate: 10.0, damage: 8.0, ammo: true, max_ammo: 500, start_ammo: 300 },
@@ -205,6 +205,9 @@ pub const UPGRADE_ROWS: [ItemRow; 47] = [
     ItemRow { item: 0x67, attach: 0, class: crate::moby::classes::hoverbomb::TETRA_HAND, stance: 2, icon: 0xea72, use_seq: 0x89, keep: false, fire_seq: [0x8a, 0x8a], speed: 7.0, rate: 3.0, damage: 30.0, ammo: true, max_ammo: 15, start_ammo: 10 },
     ItemRow { item: 0x68, attach: 0, class: crate::moby::classes::hoverbomb::TETRA_HAND, stance: 2, icon: 0xea72, use_seq: 0x89, keep: false, fire_seq: [0x8a, 0x8a], speed: 7.0, rate: 3.0, damage: 100.0, ammo: true, max_ammo: 25, start_ammo: 10 },
     ItemRow { item: 0x6d, attach: 0, class: SHEEPINATOR_CLASS, stance: 1, icon: 0xea77, use_seq: 0x38, keep: true, fire_seq: [-1, 0x3e], speed: 0.0, rate: 0.0, damage: 0.0, ammo: false, max_ammo: 0, start_ammo: 0 },
+    // The Black Sheepinator (L00 `0x266400` / `0x268540`; crate::moby::classes::sheepinator::BLACK_CLASS).
+    ItemRow { item: 0x48, attach: 0, class: crate::moby::classes::sheepinator::BLACK_CLASS, stance: 1, icon: 0xea77, use_seq: 0x38, keep: true, fire_seq: [0x38, 0x3e], speed: 0.0, rate: 0.0, damage: 0.0, ammo: false, max_ammo: 0, start_ammo: 0 },
+    ItemRow { item: 0x6e, attach: 0, class: crate::moby::classes::sheepinator::BLACK_CLASS, stance: 1, icon: 0xea77, use_seq: 0x38, keep: true, fire_seq: [-1, 0x3e], speed: 0.0, rate: 0.0, damage: 0.0, ammo: false, max_ammo: 0, start_ammo: 0 },
     ItemRow { item: 0x3e, attach: 0, class: crate::moby::classes::plasma_storm::HAND_CLASS, stance: 2, icon: 0xea71, use_seq: 0, keep: true, fire_seq: [-1, -1], speed: 15.0, rate: 1.0, damage: 24.0, ammo: true, max_ammo: 15, start_ammo: 15 },
     ItemRow { item: 0x65, attach: 0, class: crate::moby::classes::plasma_storm::HAND_CLASS, stance: 2, icon: 0xea71, use_seq: 0, keep: true, fire_seq: [-1, -1], speed: 15.0, rate: 1.0, damage: 30.0, ammo: true, max_ammo: 25, start_ammo: 15 },
     ItemRow { item: 0x66, attach: 0, class: crate::moby::classes::plasma_storm::HAND_CLASS, stance: 2, icon: 0xea71, use_seq: 0, keep: true, fire_seq: [-1, -1], speed: 15.0, rate: 1.0, damage: 50.0, ammo: true, max_ammo: 50, start_ammo: 15 },
