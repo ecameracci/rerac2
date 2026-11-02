@@ -505,7 +505,8 @@ fn tick(
         // The Gravity Bomb's shockwave mesh (rc_game::moby::classes::gravity_bomb): the blast's tables at this level's
         // copy of Aranos's addresses (crate::level_code), on the levels that have the bomb's class (the blast's own
         // class has no assets of its own: it is not in the level's class list).
-        m.world.gravity_bomb.mesh = m.world.class(rc_game::moby::classes::gravity_bomb::BOMB_CLASS).is_some().then(|| {
+        let bombs = m.world.class(rc_game::moby::classes::gravity_bomb::BOMB_CLASS).is_some() || m.world.class(rc_game::moby::classes::gravity_bomb::MINI_BOMB).is_some();
+        m.world.gravity_bomb.mesh = bombs.then(|| {
             let code = crate::level_code::LevelCode::load(&crate::level_load::extracted_root(), crate::level_load::level_index())
                 .map_err(|e| eprintln!("play: the level's code not read ({e:#}): no shockwave mesh"))
                 .ok()?;
@@ -513,6 +514,17 @@ fn tick(
             match &mesh {
                 Some(d) => println!("play: the Gravity Bomb's shockwave mesh: {} quads, {} vertices", d.quads.len(), d.verts.len()),
                 None => eprintln!("play: the Gravity Bomb's shockwave tables not found in the level's overlay: no shockwave mesh"),
+            }
+            mesh.map(std::sync::Arc::new)
+        }).flatten();
+        // The Mini-Nuke's cloud meshes (rc_game::moby::classes::mini_nuke): its stem and cap at this level's copy of
+        // Aranos's addresses, on the levels that have its bomb's class.
+        m.world.nuke.mesh = m.world.class(rc_game::moby::classes::gravity_bomb::MINI_BOMB).is_some().then(|| {
+            let code = crate::level_code::LevelCode::load(&crate::level_load::extracted_root(), crate::level_load::level_index()).ok()?;
+            let mesh = code.with_reader(|read| rc_game::moby::classes::mini_nuke::CloudMesh::read(read));
+            match &mesh {
+                Some(c) => println!("play: the Mini-Nuke's cloud: {} stem quads, {} cap quads", c.stem.quads.len(), c.cap.quads.len()),
+                None => eprintln!("play: the Mini-Nuke's cloud tables not found in the level's overlay: no cloud"),
             }
             mesh.map(std::sync::Arc::new)
         }).flatten();
@@ -804,10 +816,11 @@ fn tick(
         let scene = crate::mobys::scene_of(&mobys.snap, &mobys.coll, &mobys.cache);
         // The movers' carry of this tick starts from nothing (`0x189f70`).
         (p.hero.carry, p.hero.carry_yaw) = ([0.0; 3], 0.0);
-        // The view the updates test their spheres against: the camera as the last tick left it (`0x2f0080`).
+        // The view the updates test their spheres against: the camera as the last tick left it (`0x2f0080`) — the
+        // first-person camera's (or a blend's) when that is the one shown.
         let (tx, ty) = crate::game_camera::projection_tans(None);
-        let [fwd, left, up] = p.camera.rows;
-        let view = Some(rc_game::particles::BSphereView::from_camera(p.camera.pos, fwd, left, up, tx, ty));
+        let (eye, [fwd, left, up]) = p.game.cameras.hero_view().unwrap_or((p.camera.pos, p.camera.rows));
+        let view = Some(rc_game::particles::BSphereView::from_camera(eye, fwd, left, up, tx, ty));
         let mut ctx = rc_game::moby::Ctx { host: &mut host, hero: &mut p.hero, game: &mut p.game, coll: Some(coll), scene: scene.as_ref(), hero_moby: mobys.hero_moby, hero_view, level: &mobys.level, parts: parts.as_deref_mut().map(|s| &mut s.sys), view };
         mobys.world.tick(p.camera.pos, &mut ctx);
     }
@@ -979,9 +992,10 @@ fn tick(
         // The callbacks read joints (0x0b0b's glows) through the loop's host, as the draw reads the mobys' poses.
         let host = crate::mobys::Host { lv: &lv.mobys, occl: occl.as_deref(), anim: anim.as_deref_mut(), created: &mut mobys.created, hero: None, hero_chains: &[], chains: Some(&mobys.chains), camera: p.camera.pos, camera_rows: p.camera.rows, sound: None };
         let (tx, ty) = crate::game_camera::projection_tans(None);
-        let [fwd, left, up] = p.camera.rows;
-        let view = rc_game::particles::BSphereView::from_camera(p.camera.pos, fwd, left, up, tx, ty);
-        let lists = rc_game::fx::callbacks(&mut mobys.world, &host, &mut p.game, p.hero.state, &view, p.camera.pos);
+        // The view shown: the first-person camera's (or a blend's) when it is that one.
+        let (eye, [fwd, left, up]) = p.game.cameras.hero_view().unwrap_or((p.camera.pos, p.camera.rows));
+        let view = rc_game::particles::BSphereView::from_camera(eye, fwd, left, up, tx, ty);
+        let lists = rc_game::fx::callbacks(&mut mobys.world, &host, &mut p.game, p.hero.state, &view, eye);
         (p.fx_quads_first, p.fx_quads, p.frame_quads) = (lists.first, lists.second, lists.frame);
     }
     // The point lights the mobys merge (crate::moby_render).

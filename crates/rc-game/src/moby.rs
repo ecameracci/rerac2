@@ -580,6 +580,8 @@ pub struct MobyWorld {
     pub shield: classes::shield::Mem,
     /// The Clank Zapper's on flag, target, wait, charges and strands (classes::zapper).
     pub zapper: classes::zapper::Mem,
+    /// The Mini-Nuke's cloud: its group, smoke records, cap slots, scrolls and meshes (classes::mini_nuke).
+    pub nuke: classes::mini_nuke::Mem,
     /// The Bouncer's cooldown (classes::bouncer).
     pub bouncer: classes::bouncer::Mem,
     /// The Zodiac's arcs (`0x25a8a0`, classes::zodiac).

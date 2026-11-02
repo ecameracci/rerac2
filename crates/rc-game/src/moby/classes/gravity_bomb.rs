@@ -474,11 +474,10 @@ fn nuke_damage(row: usize) -> f32 {
 ///
 /// At its start and 20 ticks into state 2 its debris flies ([`mini_debris`], `0x3e67c0`).
 ///
-/// Not ported: its effect — the trail slot it takes (`0x32b1b8`, as the Chopper's: lost, it goes), its smoke buffers
-/// (320 records of three kinds, `0x3e7bf8`: 48 of the ring at its start `0x3e7978`, two of the column a tick on odd
-/// rands `0x3e7aa8`, their update `0x3e8090`) and their draw (`0x3e6ad0`: `0x3e6b90`, `0x3e6df8`, `0x3e6a30`,
-/// `0x3e7058`, `0x3e74b0`, `0x3e7b90`), the scrolls `gp+0x1594` / `+0x1598`; so state 6 ends at once, and the random
-/// draws of the ring's 48 records are missing before the debris's. The statistics (`0x3f9f70`).
+/// Its effect — the cloud's smoke records, the dome, the stem and the cap — is crate::moby::classes::mini_nuke: started
+/// after the smoke burst, ticked and drawn each tick; state 6 lasts until its records are all gone.
+///
+/// Not ported: the trail slot it takes (`0x32b1b8`), the statistics (`0x3f9f70`).
 pub fn update_mini_blast(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     if w.mobys[id].state == 0 {
         let m = &mut w.mobys[id];
@@ -490,6 +489,7 @@ pub fn update_mini_blast(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         m.set_pv_i(0x14, 0x14);
         let at = m.pos;
         crate::moby::blast::smoke_burst(w, ctx, 2.0, 20.0, Some(id), add(at, [0.0, 0.0, 1.0]), -1);
+        super::mini_nuke::start(w, ctx, id);
         mini_debris(w, ctx, id, at);
         if !ctx.view.is_some_and(|v| v.culled(100.0, [at[0], at[1], at[2] + 1.0, 2.0])) {
             ctx.game.shakes.ask(0, 0.45, 0x28);
@@ -544,9 +544,17 @@ pub fn update_mini_blast(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             let g = (m.pv_f(0x18) - 0.016_666_668).max(0.083_333_336);
             m.set_pv_f(0x18, g);
             m.set_pv_f(0x10, m.pv_f(0x10) + g);
-            w.delete(id);
+            // Its effect's records all gone: deleted (`0x3e67b0`).
+            if w.nuke.group.is_none_or(|g| g.blast != id || g.count == 0) {
+                super::mini_nuke::free(w);
+                w.delete(id);
+                return;
+            }
         }
     }
+    // `0x3e6070`'s tail: the effect's scrolls and records (`0x3e7aa8`), its draw asked for (`0x3e6ad0`).
+    super::mini_nuke::tick(w, ctx, id);
+    w.register_draw(id);
 }
 
 /// `0x3e67c0(blast, at)`: the Mini-Nuke's debris (crate::moby::classes::debris), 60..90 ticks each — a chunk (kind 0)
@@ -687,27 +695,27 @@ pub fn marker_quads_sized(size: f32, at: V3, n: V3, rgba: [u32; 2], frame: i32, 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Flare {
     /// `+0x00` the place, `+0x10` the way out, `+0x24` the reach out a tick.
-    pos: V3,
-    dir: V3,
-    out: f32,
+    pub(crate) pos: V3,
+    pub(crate) dir: V3,
+    pub(crate) out: f32,
     /// `+0x28 / +0x2c / +0x30`: the roll's speed from, now and to; `+0x34` the roll.
-    spin: [f32; 3],
-    roll: f32,
+    pub(crate) spin: [f32; 3],
+    pub(crate) roll: f32,
     /// `+0x38 / +0x3c / +0x40`: the rise along the normal a tick; `+0x44 / +0x48 / +0x4c` the size.
-    rise: [f32; 3],
-    size: [f32; 3],
+    pub(crate) rise: [f32; 3],
+    pub(crate) size: [f32; 3],
     /// `+0x54 / +0x58`: the ticks left of the phase and its length.
-    left: i32,
-    ticks: i32,
+    pub(crate) left: i32,
+    pub(crate) ticks: i32,
     /// `+0x5c / +0x60`: the alpha from and now; `+0x64 / +0x68 / +0x6c` the colour from, now and to.
-    alpha0: i32,
-    alpha: i32,
-    colour: [u32; 3],
+    pub(crate) alpha0: i32,
+    pub(crate) alpha: i32,
+    pub(crate) colour: [u32; 3],
     /// `+0x70`: 2 additive (ALPHA (Cs − 0)·As + Cd), 1 blended.
-    blend: u8,
+    pub(crate) blend: u8,
     /// `+0x74`: 0 growing, 1 fading, 2 going; `+0x78` its kind (2: the blast's).
-    phase: u8,
-    kind: u8,
+    pub(crate) phase: u8,
+    pub(crate) kind: u8,
 }
 
 /// The blast's mesh (the 64 quads of `{vertex, ST}` pairs at L00's `0x29b400`, the vertices `0x29af00`, the STs
@@ -875,21 +883,25 @@ pub fn draw_blast(w: &MobyWorld, id: usize, view: &crate::particles::BSphereView
     }
     let e = &w.gravity_bomb;
     if e.blast != Some(id) { return; }
-    for f in &e.flares {
-        let d = sub(cam, f.pos);
-        let yaw = crate::hero::physics::atan2(d[0], d[1]);
-        let pitch = -crate::hero::physics::atan2((d[0] * d[0] + d[1] * d[1]).sqrt(), d[2]);
-        let rows = crate::hero::physics::euler_rows([f.roll, pitch, yaw]);
-        let at = add(f.pos, set_len(d, 0.25));
-        let s = f.size[1];
-        let corner = |y: f32, z: f32| add(at, add(scale(rows[1], y * s), scale(rows[2], z * s)));
-        let c = f.colour[1] & 0xff_ffff | (f.alpha.clamp(0, 0xff) as u32) << 24;
-        out.push(crate::fx::FxQuad {
-            fx: 0x2e,
-            additive: f.blend == 2,
-            corners: [corner(-1.0, -1.0), corner(-1.0, 1.0), corner(1.0, -1.0), corner(1.0, 1.0)],
-            st: [[0.0, 0.0], [1.0, 0.0], [0.0, 1.0], [1.0, 1.0]],
-            rgba: [c; 4],
-        });
+    for f in &e.flares { out.push(flare_quad(f, cam)); }
+}
+
+/// `0x3f1f90` / the Mini-Nuke's `0x3e8538`: a flare's sprite — FX 0x2e, ±its size, turned by its roll to face the
+/// camera, a quarter toward it (additive with blend 2).
+pub(crate) fn flare_quad(f: &Flare, cam: V3) -> crate::fx::FxQuad {
+    let d = sub(cam, f.pos);
+    let yaw = crate::hero::physics::atan2(d[0], d[1]);
+    let pitch = -crate::hero::physics::atan2((d[0] * d[0] + d[1] * d[1]).sqrt(), d[2]);
+    let rows = crate::hero::physics::euler_rows([f.roll, pitch, yaw]);
+    let at = add(f.pos, set_len(d, 0.25));
+    let s = f.size[1];
+    let corner = |y: f32, z: f32| add(at, add(scale(rows[1], y * s), scale(rows[2], z * s)));
+    let c = f.colour[1] & 0xff_ffff | (f.alpha.clamp(0, 0xff) as u32) << 24;
+    crate::fx::FxQuad {
+        fx: 0x2e,
+        additive: f.blend == 2,
+        corners: [corner(-1.0, -1.0), corner(-1.0, 1.0), corner(1.0, -1.0), corner(1.0, 1.0)],
+        st: [[0.0, 0.0], [1.0, 0.0], [0.0, 1.0], [1.0, 1.0]],
+        rgba: [c; 4],
     }
 }

@@ -347,6 +347,7 @@ fn one(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut crate::ga
         crate::moby::classes::nanotech::CLASS => crate::moby::classes::nanotech::draw(w, id, cam, out),
         crate::moby::classes::gravity_bomb::HAND_CLASS => crate::moby::classes::gravity_bomb::draw_marker(w, id, hero_state, game.frame, out),
         crate::moby::classes::gravity_bomb::BLAST_CLASS => crate::moby::classes::gravity_bomb::draw_blast(w, id, view, cam, out),
+        crate::moby::classes::gravity_bomb::MINI_BLAST => crate::moby::classes::mini_nuke::draw(w, id, &mut game.rng, view, cam, out),
         crate::moby::classes::chopper::BLADE => crate::moby::classes::chopper::draw(w, id, game, cam, out),
         crate::moby::classes::blitz::HAND_CLASS => crate::moby::classes::blitz::draw(w, id, cam, out),
         crate::moby::classes::blitz::TRACER | crate::moby::classes::blitz::MEGA_TRACER => crate::moby::classes::blitz::draw_tracer(w, id, cam, out),

@@ -68,6 +68,7 @@ pub mod synthenoid_bomb;
 pub mod shield_zap;
 pub mod zapper;
 pub mod black_sheep;
+pub mod mini_nuke;
 pub mod swamp_monster;
 pub mod tractor;
 pub mod vaporizer;
