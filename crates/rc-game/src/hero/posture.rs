@@ -51,14 +51,14 @@ pub struct PoseRec {
 }
 
 impl PoseRec {
-    const fn new(list: u8, k: f32, d: f32) -> PoseRec {
+    pub(crate) const fn new(list: u8, k: f32, d: f32) -> PoseRec {
         PoseRec { list, linked: false, cur: [0.0; 3], vel: [0.0; 3], target: [0.0; 3], trans: [0.0; 3], trans_vel: [0.0; 3], trans_target: [0.0; 3], k, d, scale: 1.0, node_scale: 1.0 }
     }
 
     /// `0x2a5048`: with a target, a translation, a scale ≠ 1 or an angle still out (≥ 0.005; a translation ≥ 0.003),
     /// the angle springs `0x31f0c8(target, k, d, 0, …, 2)` and the translation's `0x31ebd8(target, k, d, 0, …)`, and
     /// the node is linked with the new pose; else it is unlinked. Then the targets clear and the scale is 1 again.
-    fn update(&mut self) {
+    pub(crate) fn update(&mut self) {
         let active = self.target.iter().any(|&t| t != 0.0)
             || self.trans_target.iter().any(|&t| t != 0.0)
             || self.trans.iter().any(|&x| 0.003 <= x.abs())
@@ -392,6 +392,8 @@ impl Hero {
     /// looks somewhere new every 90..280 ticks (−25°..9° down, 20°..57° or 50°..70° near a wall to a random side; a
     /// fidget's look within 20° and 15°) with a random spring, the chest following at half.
     fn head_idle(&mut self, env: &Env, anim: &mut dyn AnimCtl) {
+        // Clank's head scale on his record 18 with his big-head cheat (crate::hero::back).
+        self.back_head_scale(env.cheat(crate::cheats::cheat::CLANK_HEAD));
         let p = &mut self.posture;
         p.recs[rec::SCALED].scale = p.head_scale;
         // The big-head cheat (`0x1a7a49`): toward 1.57 (`0x3fc8f5c3`) instead.
@@ -615,12 +617,13 @@ impl Hero {
 
     /// The posture's tick (module docs), after the transitions.
     pub(super) fn posture_tick(&mut self, env: &Env, anim: &mut dyn AnimCtl) {
-        // `0x2a5840` (Clank's body, `0x2a65d8`): his head's scale toward 1.0, or 1.8 (`0x3fe66666`) with Clank's
-        // big-head cheat (`0x1a7a4b`), 0.05 a tick. Not ported: the rest of `0x2a5840` (his glow, his blink).
-        if self.mode == 1 {
+        // `0x2a5840` (Clank's body, `0x2a65d8`; Ratchet's update below): his head's scale toward 1.0, or 1.8
+        // (`0x3fe66666`) with Clank's big-head cheat (`0x1a7a4b`), 0.05 a tick. Not ported: the body's glow and blink.
+        let clank_head = |p: &mut Posture| {
             let t = if env.cheat(crate::cheats::cheat::CLANK_HEAD) { f32::from_bits(0x3fe6_6666) } else { 1.0 };
-            approach(t, 0.05, &mut self.posture.clank_head);
-        }
+            approach(t, 0.05, &mut p.clank_head);
+        };
+        if self.mode == 1 { clank_head(&mut self.posture); }
         if self.mode != 0 { return; }
         self.feet_tilt();
         self.arm_at_wall(env);
@@ -628,6 +631,12 @@ impl Hero {
         self.head_look(env, anim);
         self.twitch(anim);
         self.neck_and_blink(anim);
+        // `0x2a5840` in Ratchet's update: the head scale, then Clank's blink on the back (crate::hero::back; his glow
+        // word is the item pass's).
+        clank_head(&mut self.posture);
+        if env.clank { self.back_blink(); }
         for r in self.posture.recs.iter_mut() { r.update(); }
+        // `0x2a5368`'s Clank records (on his back moby).
+        self.back_springs();
     }
 }

@@ -75,7 +75,8 @@
 //! (`0x360a10`; its random draw is kept), the GS test register the draws set (`0x37c948`), the ball point's spring
 //! (`0x31ec88`: the update resets it every tick, so the draw always snaps), the words `$gp+0x1694` / `$gp+0x1698` the
 //! shot writes and nothing reads, the strips' fixed alpha (ALPHA 0x68) as the vertex alpha of an additive quad (the
-//! texture's alpha is not left out), the upgraded Plasma Coil (row 0x3e: its own hand class 0x05ca, `0x3a2360`).
+//! texture's alpha is not left out). The upgraded Plasma Coil, the Plasma Storm (rows 0x3e / 0x65 / 0x66), is
+//! crate::moby::classes::plasma_storm; it shares the hand's twinkles ([`spark`]) and strips.
 //! The second strip of `0x3eb010` takes its second corner's colour from the stack (the store meant for it goes to
 //! the first strip's): here the first corner's.
 
@@ -116,7 +117,7 @@ pub struct Wobble {
 }
 
 impl Wobble {
-    fn step(&mut self, k: f32) -> V3 {
+    pub(super) fn step(&mut self, k: f32) -> V3 {
         for i in 0..3 { self.angles[i] = add_rot(self.angles[i], self.speeds[i] * k); }
         [self.angles[0].cos() * self.amps[0], self.angles[1].sin() * self.amps[1], -self.angles[2].sin() * self.amps[2]]
     }
@@ -178,6 +179,8 @@ pub struct Mem {
     pub latch: bool,
     pub wobble: [f32; 2],
     pub sparks: Vec<Spark>,
+    /// The Plasma Storm's (crate::moby::classes::plasma_storm).
+    pub storm: super::plasma_storm::Mem,
 }
 
 impl Default for Mem {
@@ -195,6 +198,7 @@ impl Default for Mem {
             // `$gp+0x16a0`'s data: 0.14.
             wobble: [0.0, 0.14],
             sparks: Vec::new(),
+            storm: Default::default(),
         }
     }
 }
@@ -225,7 +229,7 @@ fn turn(v: V3, axis: V3, a: f32) -> V3 {
 
 /// A moby's aim point (`0x31fa20` + `0x326520(m, out, 1)`): its place raised along the up there by its aim height
 /// when the enemy framework runs it.
-fn aim_at(w: &MobyWorld, ctx: &Ctx, t: usize) -> V3 {
+pub(super) fn aim_at(w: &MobyWorld, ctx: &Ctx, t: usize) -> V3 {
     let p = w.mobys[t].pos;
     match aim::health(w, t) {
         Some((_, h)) => add(p, scale(ctx.hero.gravity.up_at(p), h)),
@@ -235,7 +239,7 @@ fn aim_at(w: &MobyWorld, ctx: &Ctx, t: usize) -> V3 {
 
 /// `0x3ea9c0` / `0x3cd150(t, out, p₀, p₁, a, b)`: the cubic from `p0` to `p1` (`(f₆·t³ + (f₁ − f₆)·t² + (p₁ − a)·t + p₀`,
 /// f₁ = a − p₀, f₆ = (b − p₁) − f₁); exactly the ends at 0 and 1.
-fn cubic(t: f32, p0: V3, p1: V3, a: V3, b: V3) -> V3 {
+pub(super) fn cubic(t: f32, p0: V3, p1: V3, a: V3, b: V3) -> V3 {
     if t == 0.0 { return p0; }
     if t == 1.0 { return p1; }
     let (t2, t3) = (t * t, t * t * t);
@@ -390,7 +394,7 @@ fn spin(w: &mut MobyWorld, id: usize) {
 }
 
 /// `0x2eeb40(+0x00)`: the cooldown down a frame (1/60 s); true when out.
-fn cooldown(w: &mut MobyWorld, id: usize) -> bool {
+pub(super) fn cooldown(w: &mut MobyWorld, id: usize) -> bool {
     let c = w.mobys[id].pv_f(0);
     if 1.0 / 60.0 < c {
         w.mobys[id].set_pv_f(0, c - 1.0 / 60.0);
@@ -726,7 +730,7 @@ fn sparks(ctx: &mut Ctx, at: V3, n: i32, kind: i32) {
 
 /// The twinkles the hand's last draw asked for (`0x3eb608`, [`spark`]): still, 0.5..0.75 large, 60 ticks, `0x7f7f2020`
 /// and a `0x7fff4040` one 0.7 of it turning the other way; their `+0x09` 0x74.
-fn spawn_sparks(w: &mut MobyWorld, ctx: &mut Ctx) {
+pub(super) fn spawn_sparks(w: &mut MobyWorld, ctx: &mut Ctx) {
     let list = std::mem::take(&mut w.coil.sparks);
     let Some(sys) = ctx.parts.as_deref_mut() else { return };
     let g = &mut ctx.game.rng;
@@ -738,7 +742,7 @@ fn spawn_sparks(w: &mut MobyWorld, ctx: &mut Ctx) {
 
 /// `0x3eb608(fall, at, 1)`: the twinkles' random draws (their size, turn, way: the way then cleared), queued for the
 /// next update ([`spawn_sparks`]).
-fn spark(w: &mut MobyWorld, g: &mut crate::rng::Rng, fall: f32, at: V3) {
+pub(super) fn spark(w: &mut MobyWorld, g: &mut crate::rng::Rng, fall: f32, at: V3) {
     let size = g.randf(0.5, 0.75);
     let r = g.randi(2);
     let spin = if r == 0 { -1 } else { r };
@@ -794,7 +798,7 @@ fn strip(out: &mut Vec<crate::fx::FxQuad>, points: &[V3], cam: V3, fx: [usize; 2
 }
 
 /// `0x3cdb20(points, n)`: the last point the one before plus the last step.
-fn extrapolate(points: &mut Vec<V3>) {
+pub(super) fn extrapolate(points: &mut Vec<V3>) {
     let n = points.len();
     if n < 2 { return; }
     points.push(add(points[n - 1], sub(points[n - 1], points[n - 2])));
@@ -863,7 +867,7 @@ fn draw_ray(r: &Ray, g: &mut crate::rng::Rng, pos: V3, size: f32, cam: V3, out: 
 
 /// `0x3eaf80(size, hand, at, rgb, most)`: a glint — FX 0x2c, 1.5..2·size across, 0.08 toward the camera, a random roll,
 /// its alpha (`most`/2..`most`) put over `rgb`'s.
-fn glint(out: &mut Vec<crate::fx::FxQuad>, g: &mut crate::rng::Rng, size: f32, at: V3, rgba: u32, most: i32, cam: V3) {
+pub(super) fn glint(out: &mut Vec<crate::fx::FxQuad>, g: &mut crate::rng::Rng, size: f32, at: V3, rgba: u32, most: i32, cam: V3) {
     let a = g.rand_range(most >> 1, most);
     let s = g.randf(size * 0.75, size);
     let roll = g.rand_angle();
@@ -871,7 +875,7 @@ fn glint(out: &mut Vec<crate::fx::FxQuad>, g: &mut crate::rng::Rng, size: f32, a
 }
 
 /// The prongs' and joints' pair of glints.
-fn glints(out: &mut Vec<crate::fx::FxQuad>, g: &mut crate::rng::Rng, at: V3, small: bool, cam: V3) {
+pub(super) fn glints(out: &mut Vec<crate::fx::FxQuad>, g: &mut crate::rng::Rng, at: V3, small: bool, cam: V3) {
     glint(out, g, if small { f32::from_bits(0x3d61_47ae) } else { f32::from_bits(0x3de1_47ae) }, at, 0x7f7f_2020, 0x40, cam);
     glint(out, g, if small { f32::from_bits(0x3ccc_cccd) } else { 0.05 }, at, 0x7fff_4040, 0x78, cam);
 }
@@ -879,7 +883,7 @@ fn glints(out: &mut Vec<crate::fx::FxQuad>, g: &mut crate::rng::Rng, at: V3, sma
 /// `0x3eac00(hand, from, to, arc)` → `0x3eb010(hand, 0x80, points, 11)`: 10 points along the cubic between `from`
 /// and `to` (control points the arc's offsets from them) jittered 0.04, the last extrapolated, as a [`strip`] (FX 0x2b
 /// 0.0125 across `0x7f7f7f` / `0xff0000` at its second corners, FX 0xe 0.053 across `0xff0000`; fixed alpha 0x80).
-fn hand_strip(out: &mut Vec<crate::fx::FxQuad>, g: &mut crate::rng::Rng, from: V3, to: V3, arc: &HandArc, cam: V3) {
+pub(super) fn hand_strip(out: &mut Vec<crate::fx::FxQuad>, g: &mut crate::rng::Rng, from: V3, to: V3, arc: &HandArc, cam: V3) {
     let (a, b) = (add(arc.ctrl[0], from), add(arc.ctrl[1], to));
     let mut points: Vec<V3> = (0..10)
         .map(|i| {

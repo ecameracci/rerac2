@@ -13,7 +13,7 @@
 //!
 //! Environment: `RC_PLAY=0` (no tick), `RC_PLAY_FLY=1` (start on the fly camera; Tab switches), `RC_PLAY_TRACE=1`
 //! (one line per tick: state, position, velocity, air ticks, sequence), `RC_SCENES=0` (the scenes count as seen),
-//! `RC_HERO_AT=x,y,z,yaw` (Ratchet's start), `RC_GRAVITY_AT=x,y,z` (the gravity frames pinned on about a centre), `RC_GIVE_ITEMS=a,b,…` (the items had, the last in the hand), `RC_CHEATS=a,b,…` (those cheat bytes on), `RC_ITEM_ROWS=item:row,…` / `RC_WEAPON_XP=item:points,…` (weapons' rows and experience, rc_game::upgrades).
+//! `RC_HERO_AT=x,y,z,yaw` (Ratchet's start), `RC_GRAVITY_AT=x,y,z` (the gravity frames pinned on about a centre), `RC_GIVE_ITEMS=a,b,…` (the items had, the last in the hand; 2 / 3 give Clank on the back with the Heli-Pack / Thruster-Pack), `RC_CHEATS=a,b,…` (those cheat bytes on), `RC_ITEM_ROWS=item:row,…` / `RC_WEAPON_XP=item:points,…` (weapons' rows and experience, rc_game::upgrades).
 
 use crate::game_camera::CameraSource;
 use crate::input_map::{self, PadFrame, Script};
@@ -317,7 +317,7 @@ fn body_changes(bind: &mut Option<BodyBind>, hero: &mut Hero, side: (&mut usize,
                 let mut b = BodyBind { class: ci, instance: ii, scale: m.scale, anim: a, moby: Some(id), suspended: false };
                 b.swap(&mut *class, &mut *instance, &mut *scale, &mut *ranim, &mut mobys.hero_moby);
                 let it = &hero.items;
-                for h in [b.moby, it.hand, it.head, it.feet[0], it.feet[1]].into_iter().flatten() {
+                for h in [b.moby, it.hand, it.head, it.feet[0], it.feet[1]].into_iter().flatten().chain(hero.back.mobys()) {
                     if let Some(m) = mobys.world.mobys.get_mut(h) { m.mode |= 1; }
                 }
                 mobys.world.mobys[id].mode |= NO_UPDATE | NO_MATRIX;
@@ -459,6 +459,9 @@ fn tick(
         if let Some(v) = std::env::var("RC_GIVE_ITEMS").ok().filter(|_| dev) {
             let items: Vec<i32> = v.split(',').filter_map(|x| x.trim().parse().ok()).collect();
             for &i in &items {
+                // Items 2 / 3 (the Heli-Pack, the Thruster-Pack): Clank on the back (`0x1a7b02`, `0x1a7a11`).
+                if i == 2 || i == 3 { p.game.clank = true; }
+                if i == 3 { p.game.thruster = true; }
                 let Some(b) = p.game.items.get_mut(i as usize) else { continue };
                 *b = 1;
                 if let Some(r) = rc_game::hero::items::row(&p.game, i).filter(|r| r.ammo) {
@@ -1980,6 +1983,10 @@ fn start_scene(p: &mut Play, lv: &mut crate::level_load::LoadedLevel, id: i32) {
     }
     for m in mobys.world.mobys.iter_mut().filter(|m| m.o_class == 0xcb && m.state < 0x80) { m.mode |= 0x80; }
     if let Some(h) = p.hero.items.hand.and_then(|h| mobys.world.mobys.get_mut(h)) { h.mode |= 1; }
+    // `0x2d3208`: the back slot too (Clank on the back and the pack; the next item pass shows them again).
+    for id in p.hero.back.mobys() {
+        if let Some(m) = mobys.world.mobys.get_mut(id) { m.mode |= 1; }
+    }
     println!("play: scene {id:#x}: {} ticks, actors {:?}", scene.end_tick(), scene.actor_classes());
     // `0x370e08`: the music paused, the scene's speech streamed (its record's English VAG; crate::audio_out).
     use rc_game::audio::scene::{post, SceneAudioCmd};

@@ -281,9 +281,8 @@ impl GameState {
             if crate::vendor::upgrades(records, i) <= 0 { continue; }
             if !(0 < r.xp_max && r.xp_max <= self.upgrades.xp[i as usize] >> 5) { continue; }
             // Not the original's: a weapon whose next row's hand the port does not run yet (the rows not in
-            // hero::items::UPGRADE_ROWS: the Plasma Storm 0x3e / 0x65 / 0x66, the upgraded Synthenoids 0x3d / 0x5d /
-            // 0x5e, the upgraded Shield Charger 0x4d / 0x6b / 0x6c, the Sheepinator's 0x48 / 0x6d / 0x6e and the
-            // Clank Zapper's 0x49) stays at its row rather than lose its hand.
+            // hero::items::UPGRADE_ROWS: the Sheepinator's 0x48 / 0x6d / 0x6e and the Clank Zapper's 0x49) stays at its
+            // row rather than lose its hand.
             let ported = crate::hero::items::row_at(r.next as usize).is_some_and(|n| crate::moby::classes::update_for(n.class).is_some());
             if !ported { continue; }
             if matches!(i, 0x1f | 9 | 0x2d) {

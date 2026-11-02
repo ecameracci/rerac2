@@ -161,7 +161,11 @@ impl Hero {
                 // L1: the look stance (`0x4287b0`, a level's veto, is not ported).
                 if held & button::L1 != 0 { return Some(1); }
                 if self.gear.floating { return Some(0x82); }
+                // The back's run-out sequences and the turned head back to rest, then Ratchet's fidgets and Clank's
+                // (crate::hero::back).
+                self.back_idle_rest();
                 self.idle_fidget(anim, env);
+                self.back_idle_fidget();
                 {
                     let v = anim.view();
                     let idle = self.idle_seq();

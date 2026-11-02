@@ -8,7 +8,9 @@
 //!
 //! A game starts with the Lancer (crate::game::GameState::start_items), so Ratchet arrives holding it.
 //!
-//! Not ported: the other slots (the back item `0x18b130`: Clank, the packs), the quick select (`0x3227d8`), the
+//! The back slot (slot 3, `0x18b130`: Clank and the packs) is crate::hero::back's.
+//!
+//! Not ported: the quick select (`0x3227d8`), the
 //! gadgets a request uses instead of holding (0x1f, 0x3d, 9, 0x2d), the weapon before the last (`0x1a7a0c`), the item a forced wrench gives back (`0x18c120`), the class streaming (`0x305cc0` /
 //! `0x305ab0`: the engine loads every hand class with the level), the upper-body layers of a use (`0x311e10`, rows
 //! `+0x1c` / `+0x20`: the Lancer has none), the L2 + R2 weapon pull (`0x1a7a88` bit 0x20, `0x2d67b8`), the strafe /
@@ -156,9 +158,12 @@ pub const ROWS: [ItemRow; 23] = [
 /// 0x61, 0x62 (0x25: L00 `0x266780`, `0x2679e0`, `0x267ac0`), the Megarocket Cannon 0x45, 0x63, 0x64 (0x1b: L00
 /// `0x266160`, `0x267ba0`, `0x267c80`), the Tetrabomb Gun 0x46, 0x67, 0x68 (0x19: L00 `0x266240`, `0x267f20`, `0x268000`),
 /// the Sheepinator's challenge-mode Mega row 0x6d (0x10: L00 `0x268460`, the base hand 0xa5d; its 0x48 "Black
-/// Sheepinator" and 0x6e, the hand 0xead `0x406cf8`, are not ported).
+/// Sheepinator" and 0x6e, the hand 0xead `0x406cf8`, are not ported), the Plasma Storm 0x3e, 0x65, 0x66 (0x1c: L00
+/// `0x265b40`, `0x267d60`, `0x267e40`), the upgraded Synthenoids 0x3d, 0x5d, 0x5e (0x1f: L00 `0x265a60`, `0x267660`,
+/// `0x267740`; their class the drone's, crate::moby::classes::synthenoid), the upgraded Shield Charger 0x4d, 0x6b, 0x6c
+/// (0x2d: L00 `0x266860`, `0x2682a0`, `0x268380`; their class the shield's, crate::moby::classes::shield).
 /// Each names its own hand class (`+0x04`).
-pub const UPGRADE_ROWS: [ItemRow; 37] = [
+pub const UPGRADE_ROWS: [ItemRow; 46] = [
     ItemRow { item: 0x3c, attach: 0, class: 0xc05, stance: 2, icon: 0xea64, use_seq: 0x33, keep: true, fire_seq: [-1, -1], speed: 80.0, rate: 10.0, damage: 0.67, ammo: true, max_ammo: 300, start_ammo: 300 },
     ItemRow { item: 0x4f, attach: 0, class: 0xc05, stance: 2, icon: 0xea64, use_seq: 0x33, keep: true, fire_seq: [-1, -1], speed: 80.0, rate: 10.0, damage: 4.0, ammo: true, max_ammo: 400, start_ammo: 300 },
     ItemRow { item: 0x50, attach: 0, class: 0xc05, stance: 2, icon: 0xea64, use_seq: 0x33, keep: true, fire_seq: [-1, -1], speed: 80.0, rate: 10.0, damage: 8.0, ammo: true, max_ammo: 500, start_ammo: 300 },
@@ -196,6 +201,15 @@ pub const UPGRADE_ROWS: [ItemRow; 37] = [
     ItemRow { item: 0x67, attach: 0, class: crate::moby::classes::hoverbomb::TETRA_HAND, stance: 2, icon: 0xea72, use_seq: 0x89, keep: false, fire_seq: [0x8a, 0x8a], speed: 7.0, rate: 3.0, damage: 30.0, ammo: true, max_ammo: 15, start_ammo: 10 },
     ItemRow { item: 0x68, attach: 0, class: crate::moby::classes::hoverbomb::TETRA_HAND, stance: 2, icon: 0xea72, use_seq: 0x89, keep: false, fire_seq: [0x8a, 0x8a], speed: 7.0, rate: 3.0, damage: 100.0, ammo: true, max_ammo: 25, start_ammo: 10 },
     ItemRow { item: 0x6d, attach: 0, class: SHEEPINATOR_CLASS, stance: 1, icon: 0xea77, use_seq: 0x38, keep: true, fire_seq: [-1, 0x3e], speed: 0.0, rate: 0.0, damage: 0.0, ammo: false, max_ammo: 0, start_ammo: 0 },
+    ItemRow { item: 0x3e, attach: 0, class: crate::moby::classes::plasma_storm::HAND_CLASS, stance: 2, icon: 0xea71, use_seq: 0, keep: true, fire_seq: [-1, -1], speed: 15.0, rate: 1.0, damage: 24.0, ammo: true, max_ammo: 15, start_ammo: 15 },
+    ItemRow { item: 0x65, attach: 0, class: crate::moby::classes::plasma_storm::HAND_CLASS, stance: 2, icon: 0xea71, use_seq: 0, keep: true, fire_seq: [-1, -1], speed: 15.0, rate: 1.0, damage: 30.0, ammo: true, max_ammo: 25, start_ammo: 15 },
+    ItemRow { item: 0x66, attach: 0, class: crate::moby::classes::plasma_storm::HAND_CLASS, stance: 2, icon: 0xea71, use_seq: 0, keep: true, fire_seq: [-1, -1], speed: 15.0, rate: 1.0, damage: 50.0, ammo: true, max_ammo: 50, start_ammo: 15 },
+    ItemRow { item: 0x3d, attach: 6, class: crate::moby::classes::synthenoid::PLUS_DRONE, stance: 0, icon: 0xea6d, use_seq: 0x2c, keep: false, fire_seq: [0x42, 0x2c], speed: 80.0, rate: 3.0, damage: 0.5, ammo: true, max_ammo: 12, start_ammo: 12 },
+    ItemRow { item: 0x5d, attach: 6, class: crate::moby::classes::synthenoid::PLUS_DRONE, stance: 0, icon: 0xea6d, use_seq: 0x2c, keep: false, fire_seq: [0x42, 0x2c], speed: 80.0, rate: 4.0, damage: 4.0, ammo: true, max_ammo: 20, start_ammo: 12 },
+    ItemRow { item: 0x5e, attach: 6, class: crate::moby::classes::synthenoid::PLUS_DRONE, stance: 0, icon: 0xea6d, use_seq: 0x2c, keep: false, fire_seq: [0x42, 0x2c], speed: 80.0, rate: 4.0, damage: 8.0, ammo: true, max_ammo: 40, start_ammo: 12 },
+    ItemRow { item: 0x4d, attach: 0, class: crate::moby::classes::shield::PLUS_CLASS, stance: 1, icon: 0xea74, use_seq: 0x38, keep: true, fire_seq: [0x39, 0x3e], speed: 0.0, rate: 1.0, damage: 5.0, ammo: true, max_ammo: 8, start_ammo: 5 },
+    ItemRow { item: 0x6b, attach: 0, class: crate::moby::classes::shield::PLUS_CLASS, stance: 1, icon: 0xea74, use_seq: 0x38, keep: true, fire_seq: [0x39, 0x3e], speed: 0.0, rate: 1.0, damage: 24.0, ammo: true, max_ammo: 10, start_ammo: 5 },
+    ItemRow { item: 0x6c, attach: 0, class: crate::moby::classes::shield::PLUS_CLASS, stance: 1, icon: 0xea74, use_seq: 0x38, keep: true, fire_seq: [0x39, 0x3e], speed: 0.0, rate: 1.0, damage: 64.0, ammo: true, max_ammo: 15, start_ammo: 5 },
 ];
 
 /// Row `row` of the records ([`ROWS`], [`UPGRADE_ROWS`]).
@@ -487,7 +501,7 @@ pub fn item_pass(world: &mut MobyWorld, ctx: &mut Ctx) {
     hand_pass(world, ctx);
     if ctx.hero.view_lock != 0 {
         let it = &ctx.hero.items;
-        for id in [it.hand, it.head, it.feet[0], it.feet[1]].into_iter().flatten() {
+        for id in [it.hand, it.head, it.feet[0], it.feet[1]].into_iter().flatten().chain(ctx.hero.back.mobys()) {
             if let Some(m) = world.mobys.get_mut(id) { m.mode |= 1; }
         }
         if let Some(m) = it.hand.filter(|_| it.item == WRENCH).and_then(|id| world.mobys.get_mut(id)) {
@@ -540,6 +554,8 @@ fn hand_pass(world: &mut MobyWorld, ctx: &mut Ctx) {
     let away = in_water || h.group == 3 || matches!(h.state, 0x31 | 0x12 | 0x82);
     head_pass(world, ctx);
     feet_pass(world, ctx);
+    // Slot 3: Clank on the back and the pack (crate::hero::back).
+    crate::hero::back::back_pass(world, ctx);
     look_kind(world, ctx);
     create_hand(world, ctx);
     {
@@ -895,7 +911,7 @@ fn switch(world: &mut MobyWorld, ctx: &mut Ctx) {
     let idle = h.idle_seq();
     let it = &mut h.items;
     if h.no_menu != 0 && it.item != WRENCH { it.wrench_req = true; }
-    // The Synthenoids asked for (0x1f; 0x3d the upgraded, not ported) are sent out, not held (`0x3ee110`): locked
+    // The Synthenoids asked for (0x1f; 0x3d the upgraded) are sent out, not held (`0x3ee110`): locked
     // away with the wrench in the hand here, else past the items' lock below.
     if h.no_menu != 0 && it.item == WRENCH && matches!(it.request, SYNTHENOID | 0x3d) {
         it.request = 0;

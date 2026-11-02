@@ -63,6 +63,9 @@ pub mod minirocket;
 pub mod megarocket;
 pub mod ryno;
 pub mod plasma_coil;
+pub mod plasma_storm;
+pub mod synthenoid_bomb;
+pub mod shield_zap;
 pub mod swamp_monster;
 pub mod tractor;
 pub mod vaporizer;
@@ -104,8 +107,12 @@ use super::UpdateFn;
 /// are its draw's.
 /// The Plasma Coil's ball 0x0a9b (L00 `lvl.vtbl` `0x3cbb78`) is listed for the levels whose class list lacks it: its look
 /// is its draw's. The Shield Charger's shield 0x0a5c (`0x3c51d8`) has no model (`GADGET.WAD` has none): its look is its
-/// draw's. The Zodiac's lightning 0x139e (L00 `lvl.vtbl` `0x4185a8`) has no model: its arcs are its draw's.
-pub const CREATED_LOGIC: &[i16] = &[crate::ship::LASER_CLASS, teleport::CLASS, explosion::CLASS, spiderbot::BOT_CLASS, endako_boss::BEAM, endako_boss::TRACER, endako_boss::ROCKET, blitz::TRACER, gravity_bomb::MINI_BOMB, gravity_bomb::MINI_BLAST, pulse_rifle::SHOT, spiderbot::PLUS_BOT, spiderbot_plus::SHOT, spiderbot_plus::LOB, blitz::MEGA_TRACER, beam::CLASS, synthenoid::SHOT, turret::PLASMA, vaporizer::SHOT, plasma_coil::BALL, zodiac::EFFECT, shield::CLASS];
+/// draw's. The Zodiac's lightning 0x139e (L00 `lvl.vtbl` `0x4185a8`) has no model: its arcs are its draw's. The Plasma
+/// Storm's storm 0x09a9 (`0x3bc078`) is listed for the levels whose class list lacks it: its look is its draw's. The
+/// upgraded Synthenoids' drone 0x0b02 and bomb 0x0cf3 (L00 `lvl.vtbl` `0x3d5e70` / `0x3f56b0`) are listed so too. The
+/// upgraded Shield Charger's shield 0x1192 (`0x3c51d8`) and its zap 0x1195 (`0x414628`) have no model: their looks are
+/// their draws'.
+pub const CREATED_LOGIC: &[i16] = &[crate::ship::LASER_CLASS, teleport::CLASS, explosion::CLASS, spiderbot::BOT_CLASS, endako_boss::BEAM, endako_boss::TRACER, endako_boss::ROCKET, blitz::TRACER, gravity_bomb::MINI_BOMB, gravity_bomb::MINI_BLAST, pulse_rifle::SHOT, spiderbot::PLUS_BOT, spiderbot_plus::SHOT, spiderbot_plus::LOB, blitz::MEGA_TRACER, beam::CLASS, synthenoid::SHOT, turret::PLASMA, vaporizer::SHOT, plasma_coil::BALL, plasma_storm::BALL, synthenoid::PLUS_DRONE, synthenoid_bomb::CLASS, zodiac::EFFECT, shield::CLASS, shield::PLUS_CLASS, shield_zap::CLASS];
 
 pub fn update_for(o_class: i16) -> Option<UpdateFn> {
     match o_class {
@@ -158,13 +165,18 @@ pub fn update_for(o_class: i16) -> Option<UpdateFn> {
         // The Plasma Coil (`0x3e9608`) and its ball (`0x3cbb78`).
         plasma_coil::HAND_CLASS => Some(plasma_coil::update),
         plasma_coil::BALL => Some(plasma_coil::update_ball),
+        // The Plasma Storm (`0x3a2360`, rows 0x3e / 0x65 / 0x66) and its storm (`0x3bc078`).
+        plasma_storm::HAND_CLASS => Some(plasma_storm::update),
+        plasma_storm::BALL => Some(plasma_storm::update_ball),
         // The Hoverbomb Gun (`0x3c4860`) and its bomb (`0x3ab088`).
         hoverbomb::HAND_CLASS => Some(hoverbomb::update),
         // The Tetrabomb Gun (`0x3ff9c8`, rows 0x46 / 0x67 / 0x68).
         hoverbomb::TETRA_HAND => Some(hoverbomb::update_tetra),
         hoverbomb::BOMB => Some(hoverbomb::update_bomb),
         // The Shield Charger's shield (`0x3c51d8`).
-        shield::CLASS => Some(shield::update),
+        // The upgraded shield 0x1192 runs the same update (rows 0x4d / 0x6b / 0x6c), its zaps `0x414628`.
+        shield::CLASS | shield::PLUS_CLASS => Some(shield::update),
+        shield_zap::CLASS => Some(shield_zap::update),
         lava_gun::HAND_CLASS => Some(lava_gun::update),
         // The Meteor Gun (`0x3eb9c0`, rows 0x3f / 0x5f / 0x60) and its meteor (`0x3dc568`).
         meteor::HAND_CLASS => Some(meteor::update_hand),
@@ -172,7 +184,9 @@ pub fn update_for(o_class: i16) -> Option<UpdateFn> {
         bouncer::HAND_CLASS | bouncer::UPGRADED_HAND => Some(bouncer::update),
         bouncer::BOMB => Some(bouncer::update_bomb),
         bouncer::BOMBLET => Some(bouncer::update_bomblet),
-        synthenoid::DRONE => Some(synthenoid::update),
+        // The upgraded Synthenoids' drone (`0x3d5e70`, rows 0x3d / 0x5d / 0x5e) and its bomb (`0x3f56b0`).
+        synthenoid::DRONE | synthenoid::PLUS_DRONE => Some(synthenoid::update),
+        synthenoid_bomb::CLASS => Some(synthenoid_bomb::update),
         synthenoid::SHOT => Some(synthenoid::update_shot),
         turret::HAND_CLASS | turret::UP_HAND => Some(turret::update_hand),
         turret::TURRET | turret::UP_TURRET => Some(turret::update),

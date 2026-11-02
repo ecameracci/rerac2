@@ -68,8 +68,16 @@
 //! and 2 more fading out (to `0x801010`), its texture scrolling 0.1 a tick; over it one 0.6 wide and 4 long (FX 0xe
 //! additive, `0x40ff0020` fading out).
 //!
-//! Not ported: the upgraded Synthenoids (row 0x3d: the drone 0x0b02, `0x3d5230` / `0x3d5e70`, which also replaces a
-//! drone in the field), the gravity frames' bends (`0x380e08`, `0x380e58`) and the moving frames (`$gp−0x14e4`), the
+//! **The upgraded Synthenoids** (rows 0x3d / 0x5d / 0x5e, crate::hero::items::UPGRADE_ROWS; L00 `0x265a60`,
+//! `0x267660`, `0x267740`: 80 a second, 3 / 4 / 4 a second, damage 0.5 / 4 / 8, their bomb's 5 / 25 / 50 (`+0x64`), 72
+//! shots each): the drone **0x0b02** (`0x3d5e70`, made by `0x3d5230` into its own four slots `$gp+0x1270`) runs the
+//! drone's machine above with its own copies of the helpers (`0x3d5400`, `0x3d5998`, `0x3d67a8`, `0x3d5da8`: the same
+//! constants), but: its blob shadow whatever the gravity frames; no ammo at the make plays its class sound 6 at Ratchet;
+//! state 0 clears `+0x46`; its shot (`0x3d5528`) is, while it has its one bomb (`+0x44`), one time in 10 a bomb instead
+//! (crate::moby::classes::synthenoid_bomb, its class sound 3). The deploy sends out 0x0b02 with the row upgraded, and a
+//! base drone in the field (not leaving) swaps itself for one at its place and leaves (`0x3ed5c0`).
+//!
+//! Not ported: the gravity frames' bends (`0x380e08`, `0x380e58`) and the moving frames (`$gp−0x14e4`), the
 //! lock cheat (`0x18b270`), the weapon mods' effects on a hit (`0x4126b8`), the unreachable branch of state 1 (its
 //! leaving's ticks past 20 there: a random sequence-1 blend and speed).
 
@@ -82,8 +90,11 @@ use crate::moby::{aim, countdown, Ctx, MobyWorld};
 /// The drone's class (item 0x1f's row `+0x04`) and its shot's.
 pub const DRONE: i16 = 0xcb2;
 pub const SHOT: i16 = 0xcbb;
-/// The shots a drone has (the row's `+0x48`; crate::hero::items::ItemRow does not keep it).
+/// The upgraded drone's class (rows 0x3d / 0x5d / 0x5e `+0x04`).
+pub const PLUS_DRONE: i16 = 0xb02;
+/// The shots a drone has (the row's `+0x48`; crate::hero::items::ItemRow does not keep it): 24, the upgraded 72.
 const SHOTS: i32 = 24;
+const PLUS_SHOTS: i32 = 72;
 /// The drones in the field at most (`$gp+0x1758`).
 pub const SLOTS: usize = 4;
 /// `t[3]` of a shot's hit template (`0x45afdf66`).
@@ -106,31 +117,43 @@ fn turn(v: V3, axis: V3, a: f32) -> V3 {
 /// `0x2eef88(out, a, b)` = b × a.
 fn cross_ba(a: V3, b: V3) -> V3 { cross(b, a) }
 
-/// The drone in slot `k` (a live moby of the class holding it).
-fn slot(w: &MobyWorld, k: usize) -> Option<usize> { w.mobys.iter().position(|m| m.o_class == DRONE && m.state < 0xfd && m.pvars.len() >= 0x3c && m.pv_i(0x38) == k as i32) }
+/// The drone of `class` in slot `k` (a live moby of the class holding it: `$gp+0x1758`'s for 0x0cb2, `$gp+0x1270`'s
+/// for the upgraded 0x0b02).
+fn slot(w: &MobyWorld, class: i16, k: usize) -> Option<usize> { w.mobys.iter().position(|m| m.o_class == class && m.state < 0xfd && m.pvars.len() >= 0x3c && m.pv_i(0x38) == k as i32) }
 
-/// `0x3ee110(Ratchet + 1.5 up, 0xcb2)` (module docs).
+/// The Synthenoids' row is an upgraded one (its level byte, `0x2624f4 + 0xe0·row`, not 0).
+fn upgraded(game: &crate::game::GameState) -> bool { cur_row(game).is_some_and(|r| r.item != SYNTHENOID) }
+
+/// `0x3ee110(Ratchet + 1.5 up, class)` (module docs): the class 0x0b02 with the row upgraded (`0x2b13c8`), else 0x0cb2.
 pub fn deploy(w: &mut MobyWorld, ctx: &mut Ctx) {
     let mut at = ctx.hero.pos;
     at[2] += 1.5;
+    let class = if upgraded(ctx.game) { PLUS_DRONE } else { DRONE };
     let mut any = false;
     for _ in 0..4 {
-        if make(w, ctx, at).is_some() { any = true; }
+        if make(w, ctx, at, class).is_some() { any = true; }
     }
     if !any {
-        if let Some(h) = ctx.hero_moby { ctx.host.play_sound_of(&w.mobys[h], DRONE, 0, 0); }
+        if let Some(h) = ctx.hero_moby { ctx.host.play_sound_of(&w.mobys[h], class, 0, 0); }
     }
 }
 
-/// `0x3eca90(Ratchet, at)` (module docs).
-fn make(w: &mut MobyWorld, ctx: &mut Ctx, at: V3) -> Option<usize> {
-    let k = (0..SLOTS).find(|&k| slot(w, k).is_none())?;
-    if w.class(DRONE).is_none() { return None; }
+/// `0x3eca90(Ratchet, at)` / the upgraded `0x3d5230` (module docs): the upgraded one plays its class sound 6 at
+/// Ratchet when no ammo is left (`0x360698`), has 72 shots and one bomb (`+0x44`).
+fn make(w: &mut MobyWorld, ctx: &mut Ctx, at: V3, class: i16) -> Option<usize> {
+    let k = (0..SLOTS).find(|&k| slot(w, class, k).is_none())?;
+    let plus = class == PLUS_DRONE;
     // `0x2d42d0(0x1f, 1)`.
     let a = ctx.game.ammo.get_mut(SYNTHENOID as usize)?;
-    if *a < 1 { return None; }
+    if *a < 1 {
+        if plus {
+            if let Some(h) = ctx.hero_moby { ctx.host.play_sound_of(&w.mobys[h], class, 6, 0); }
+        }
+        return None;
+    }
+    if w.class(class).is_none() { return None; }
     *a -= 1;
-    let id = w.create(DRONE);
+    let id = w.create(class);
     let (light, ambient) = ctx.hero_moby.and_then(|h| w.mobys.get(h)).map_or((0, [0; 3]), |h| (h.light, h.ambient));
     let rows = ctx.hero.rows;
     let m = &mut w.mobys[id];
@@ -148,7 +171,8 @@ fn make(w: &mut MobyWorld, ctx: &mut Ctx, at: V3) -> Option<usize> {
     m.scale *= 0.1;
     m.set_pv_i(0x38, k as i32);
     m.set_pv_f(0x3c, 0.0);
-    m.set_pv_i(0x40, SHOTS);
+    m.set_pv_i(0x40, if plus { PLUS_SHOTS } else { SHOTS });
+    m.set_pv_s(0x44, plus as i16);
     m.set_pv_i(SOUND, -1);
     m.state = 0;
     Some(id)
@@ -190,7 +214,24 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         return;
     }
     if w.mobys[id].pv_s(0x46) == 1 { w.mobys[id].mode &= !0x41; }
-    let class_scale = w.class(DRONE).map_or(1.0, |c| c.scale);
+    let plus = w.mobys[id].o_class == PLUS_DRONE;
+    // The base drone with the row upgraded is swapped for an upgraded one at its place (`0x3ed5c0`; `0x3d5230`), and
+    // leaves.
+    if !plus && upgraded(ctx.game) && w.mobys[id].state != 2 {
+        let at = w.mobys[id].pos;
+        if make(w, ctx, at, PLUS_DRONE).is_some() {
+            {
+                let m = &mut w.mobys[id];
+                m.set_pv_v(0x10, [0.0; 3]);
+                m.set_pv_i(0x20, 30);
+            }
+            stop_loop(w, id, ctx);
+            ctx.host.play_sound(&w.mobys[id], 2, 0);
+            w.mobys[id].state = 2;
+            return;
+        }
+    }
+    let class_scale = w.class(w.mobys[id].o_class).map_or(1.0, |c| c.scale);
     {
         let m = &mut w.mobys[id];
         m.scale += (class_scale - m.scale) * 0.1;
@@ -229,6 +270,7 @@ fn start(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         m.set_pv_v(0x10, [0.0; 3]);
         m.set_pv_b(0x26, 0);
         m.set_pv_i(0x20, 0);
+        if m.o_class == PLUS_DRONE { m.set_pv_s(0x46, 0); }
     }
     if ctx.host.anim(&w.mobys[id]).is_some_and(|a| a.seq_b != 0) { ctx.host.set_anim(&w.mobys[id], 0, 0, 10); }
     let hero_pos = ctx.hero.pos;
@@ -331,7 +373,8 @@ fn tail(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             m.pos = add(p, scale(sub(to, p), 0.625));
         }
     }
-    if !ctx.hero.gravity.on { crate::shadows::request(w, ctx, 0.3, id); }
+    // The upgraded drone's shadow whatever the gravity frames (`0x3d5e70`).
+    if !ctx.hero.gravity.on || w.mobys[id].o_class == PLUS_DRONE { crate::shadows::request(w, ctx, 0.3, id); }
     // `0x3ed4f8`: while drawn, three exhaust puffs at joint 0 sinking 1..2 a second in its frame.
     if w.mobys[id].drawn != 0 {
         let f = ctx.game.rng.randf(1.0, 2.0);
@@ -507,8 +550,17 @@ fn fire(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         }
     }
     let from = add(muzzle, scale(sub(aim_at, muzzle), 0.3));
-    spawn(w, ctx, from, id, Some(t));
-    ctx.host.play_sound(&w.mobys[id], 0, 0);
+    // The upgraded drone's bomb (`0x3d5528`): while it has one, one shot in 10 (`$gp+0x125c`).
+    let bomb = w.mobys[id].o_class == PLUS_DRONE && w.mobys[id].pv_s(0x44) != 0 && ctx.game.rng.randi(10) == 0;
+    if bomb {
+        let n = (w.mobys[id].pv_s(0x44) - 1).max(0);
+        w.mobys[id].set_pv_s(0x44, n);
+        super::synthenoid_bomb::throw(w, ctx, id, from, aim_at);
+        ctx.host.play_sound(&w.mobys[id], 3, 0);
+    } else {
+        spawn(w, ctx, from, id, Some(t));
+        ctx.host.play_sound(&w.mobys[id], 0, 0);
+    }
     let rate = cur_row(ctx.game).map_or(2.0, |r| r.rate);
     let extra = ctx.game.rng.randf(0.0, f32::from_bits(0x3e2e_147b));
     let m = &mut w.mobys[id];

@@ -34,8 +34,12 @@
 //!
 //! Its glow in the hand: none (it is not held; `0x2a7ed8` has no case 0x2d).
 //!
-//! Not ported: the upgraded shield 0x1192 (rows 0x4d on: 100 strong, its zaps `0x4144f8` on the enemies about it,
-//! `$gp+0xf04`), the statistic of the shield's damage (`0x13991c`), the level sound a raise with none left or one up
+//! **The upgraded shield** 0x1192 (rows 0x4d / 0x6b / 0x6c, crate::hero::items::UPGRADE_ROWS; L00 `0x266860`,
+//! `0x2682a0`, `0x268380`: its zaps' damage 5 / 24 / 64, 8 / 10 / 15 charges): raised by `0x3c4eb8(1)` with the row
+//! upgraded, 100 strong; the same update and draw, but its arcs glow `0x606020`; it falls at its 40th zap (`$gp+0xf04`);
+//! each tick past its first 30 it may zap an enemy about it ([`zap`]; crate::moby::classes::shield_zap).
+//!
+//! Not ported: the statistic of the shield's damage (`0x13991c`), the level sound a raise with none left or one up
 //! plays (`0x3603c8`), the GS test register the draws set (`0x37c948`).
 
 use crate::hero::items::{row, SHIELD};
@@ -43,10 +47,17 @@ use crate::hero::physics::{add, cross, scale, set_len, sub, unit, V3};
 use crate::moby::hits::HitTemplate;
 use crate::moby::{countdown, Ctx, MobyWorld};
 
-/// The shield's class (item 0x2d's row `+0x04`).
+/// The shield's class (item 0x2d's row `+0x04`) and the upgraded one's (rows 0x4d / 0x6b / 0x6c).
 pub const CLASS: i16 = 0xa5c;
-/// `0x37fad8(0)`: the shield raised.
+pub const PLUS_CLASS: i16 = 0x1192;
+/// `0x37fad8(0)`: the shield raised; `0x37fad8(1)` the upgraded one.
 pub const STRENGTH: f32 = 40.0;
+pub const PLUS_STRENGTH: f32 = 100.0;
+/// `$gp+0xf00`: the upgraded shield's reach for its zaps; `$gp+0xf04`'s most (it falls at 40 zaps).
+const ZAP_REACH: f32 = 4.0;
+const ZAPS: i32 = 0x28;
+/// `$gp+0xee0` / `$gp+0xee4`: the arcs' glow, the upgraded shield's.
+const ARC_GLOW: [u32; 2] = [0x7f_2040, 0x60_6020];
 /// `0x37fa58`: the ticks a hit keeps the next off it.
 pub const HIT_WAIT: i32 = 0xf;
 /// `$gp+0xed0` / `+0xed4`: the colour at rest and just hit.
@@ -93,6 +104,9 @@ pub struct Mem {
     pub arcs: [Arc; ARCS],
     pub comets: Vec<Comet>,
     pub heads: Vec<(V3, u32)>,
+    /// `$gp+0xf04`: the upgraded shield's zaps so far; its zaps' points (super::shield_zap).
+    pub zaps: i32,
+    pub zap: super::shield_zap::Mem,
 }
 
 /// `0x321b28(out, v, q)`: `v` turned by `q` (`q·v·q*`).
@@ -130,17 +144,20 @@ fn holds(w: &MobyWorld, ctx: &Ctx) -> bool {
     0.0 < h.damage.shield && ctx.hero_moby.and_then(|m| w.mobys.get(m)).is_none_or(|m| m.o_class == 0) && h.mode == 0 && h.state != 0x31 && h.group != 0x14 && 0 < h.hp
 }
 
-/// `0x3c4eb8(0)` (module docs): from the item change (crate::hero::items).
+/// `0x3c4eb8(upgraded)` (module docs): from the item change (crate::hero::items), the upgraded shield 0x1192 (100 strong)
+/// with the row's level byte (`0x2624f4 + 0xe0·row`) not 0.
 pub fn deploy(w: &mut MobyWorld, ctx: &mut Ctx) {
     if w.shield.moby.is_some() { return; }
+    let plus = row(ctx.game, SHIELD).is_some_and(|r| r.item != SHIELD);
+    let (class, strength) = if plus { (PLUS_CLASS, PLUS_STRENGTH) } else { (CLASS, STRENGTH) };
     let Some(a) = ctx.game.ammo.get_mut(SHIELD as usize) else { return };
     if *a < 1 { return; }
-    if w.class(CLASS).is_none() {
-        eprintln!("rc_game::shield: class {CLASS:#x} is not loaded: no shield");
+    if w.class(class).is_none() {
+        eprintln!("rc_game::shield: class {class:#x} is not loaded: no shield");
         return;
     }
     *a -= 1;
-    let id = w.create(CLASS);
+    let id = w.create(class);
     let pos = ctx.hero.pos;
     let rows = {
         let m = &mut w.mobys[id];
@@ -163,10 +180,10 @@ pub fn deploy(w: &mut MobyWorld, ctx: &mut Ctx) {
     }).collect();
     w.shield.orbs = [false; 8];
     for a in w.shield.arcs.iter_mut() { a.ticks = 0; }
-    ctx.hero.damage.shield = STRENGTH;
+    ctx.hero.damage.shield = strength;
     ctx.hero.damage.shield_wait = 0;
     let m = &mut w.mobys[id];
-    m.set_pv_f(0, STRENGTH);
+    m.set_pv_f(0, strength);
     m.set_pv_i(0x14, 0x1e);
     m.set_pv_i(0xc, -1);
     m.set_pv_f(0x10, 0.0);
@@ -194,7 +211,9 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         w.mobys[id].set_pv_i(0xc, h);
     }
     spawn_heads(w, ctx);
-    if !holds(w, ctx) {
+    // The upgraded shield falls at its 40th zap (`$gp+0xf04`, cleared as any falls).
+    if !holds(w, ctx) || w.shield.zaps == ZAPS {
+        w.shield.zaps = 0;
         stop_sound(w, id, ctx);
         ctx.hero.damage.shield = 0.0;
         ctx.hero.damage.shield_wait = 0;
@@ -222,12 +241,23 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     w.mobys[id].pos = pos;
     let joint = ctx.hero_moby.and_then(|h| ctx.host.joint(&w.mobys[h], JOINT)).unwrap_or(pos);
     orbs(w, id, ctx, joint, colour);
-    // `+0x14`: the upgrade's zaps' wait; `+0x18..`: their ticks (the upgrade's).
+    // `+0x14`: the upgrade's zaps' wait; `+0x18..` (s16) the four target slots' ticks, `+0x20..` their targets: a
+    // slot run out frees its target, the last such slot the one a zap's ticks go to.
+    let mut free = 0;
     {
         let m = &mut w.mobys[id];
         let mut n = m.pv_i(0x14);
         countdown(&mut n);
         m.set_pv_i(0x14, n);
+        for k in 0..4 {
+            let mut t = m.pv_s(0x18 + 2 * k) as i32;
+            let out = countdown(&mut t);
+            m.set_pv_s(0x18 + 2 * k, t as i16);
+            if out {
+                m.set_pv_i(0x20 + 4 * k, 0);
+                free = k;
+            }
+        }
     }
     let ready = {
         let m = &mut w.mobys[id];
@@ -235,8 +265,35 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         if 1.0 / 60.0 < c { m.set_pv_f(0x10, c - 1.0 / 60.0); false } else { m.set_pv_f(0x10, 0.0); true }
     };
     if ready { touch(w, id, ctx, pos, colour); }
+    if w.mobys[id].o_class == PLUS_CLASS { zap(w, id, ctx, pos, free); }
     arcs(w, ctx, joint);
     w.register_draw_first(id);
+}
+
+/// The upgraded shield's zap (`0x3c51d8`'s 0x1192 part; module docs): a free slot past the first, the wait out, the
+/// items not kept away and the hand item in past 0x16 ticks — the first enemy within 4 (drawn, class type 5, health
+/// left) none of the four slots holds, put in a free slot, gets a zap (super::shield_zap, `0x4144f8`): the count up, the
+/// class sound 5, the slot `free`'s ticks 20..60. One a tick; no free slot ends the search.
+fn zap(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, pos: V3, free: usize) {
+    let it = ctx.hero.items;
+    if free == 0 || w.mobys[id].pv_i(0x14) != 0 || it.no_use != 0 || it.item_ticks < 0x17 { return; }
+    let near = ctx.scene.map(|sc| crate::collision::coll_sphere_mobys(sc, pos, ZAP_REACH, crate::collision::QueryFlags(1), ctx.hero_moby)).unwrap_or_default();
+    for t in near {
+        let Some(m) = w.mobys.get(t) else { continue };
+        if m.drawn == 0 || m.state == 0xfe || m.state == 0xfd || !w.class(m.o_class).is_some_and(|c| c.kind == 5) { continue; }
+        if crate::moby::aim::health(w, t).is_some_and(|(hp, _)| hp <= 0.0) { continue; }
+        let slots: [i32; 4] = std::array::from_fn(|k| w.mobys[id].pv_i(0x20 + 4 * k));
+        if slots.contains(&(t as i32)) { continue; }
+        let Some(k) = slots.iter().rposition(|&s| s == 0) else { return };
+        w.mobys[id].set_pv_i(0x20 + 4 * k, t as i32);
+        let Some(z) = super::shield_zap::spawn(w, ctx, t) else { return };
+        w.mobys[z].parent = Some(id);
+        w.shield.zaps += 1;
+        ctx.host.play_sound(&w.mobys[id], 5, 0);
+        let n = ctx.game.rng.rand_range(0x14, 0x3c);
+        w.mobys[id].set_pv_s(0x18 + 2 * free, n as i16);
+        return;
+    }
 }
 
 /// The eight orbs of the update (module docs).
@@ -369,13 +426,14 @@ pub fn draw(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, id: usize, hold
     let centre = hero.and_then(|h| w.mobys.get(h)).and_then(|h| host.joint(h, JOINT)).unwrap_or(w.mobys[id].pos);
     w.mobys[id].set_pv_v(0x30, centre);
     let colour = w.mobys[id].pv_i(8) as u32;
-    draw_arcs(w, centre, cam, out);
+    let glow = ARC_GLOW[(w.mobys[id].o_class == PLUS_CLASS) as usize];
+    draw_arcs(w, centre, glow, cam, out);
     draw_sphere(w, centre, colour, cam, out);
     draw_comets(w, centre, colour, rng, cam, out);
 }
 
 /// `0x3c5d18` (module docs).
-fn draw_arcs(w: &mut MobyWorld, centre: V3, cam: V3, out: &mut Vec<crate::fx::FxQuad>) {
+fn draw_arcs(w: &mut MobyWorld, centre: V3, glow: u32, cam: V3, out: &mut Vec<crate::fx::FxQuad>) {
     for a in w.shield.arcs.iter_mut().filter(|a| a.ticks != 0) {
         let steps: Vec<V3> = (0..ARC_POINTS - 1).map(|i| sub(a.points[i + 1], a.points[i])).collect();
         a.points[0] = centre;
@@ -385,7 +443,7 @@ fn draw_arcs(w: &mut MobyWorld, centre: V3, cam: V3, out: &mut Vec<crate::fx::Fx
     for a in w.shield.arcs.iter().filter(|a| a.ticks != 0) {
         let k = (a.alpha as u32) << 24;
         let pts: Vec<[f32; 4]> = a.points.iter().map(|p| [p[0], p[1], p[2], f32::from_bits(0x3d23_d70a)]).collect();
-        crate::fx::ribbon(out, 4.0, 0.0, &pts, cam, [0x17, 0xe], [k | 0x7f_7f7f, k | 0x7f_2040]);
+        crate::fx::ribbon(out, 4.0, 0.0, &pts, cam, [0x17, 0xe], [k | 0x7f_7f7f, k | glow]);
     }
 }
 

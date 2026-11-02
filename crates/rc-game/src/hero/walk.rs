@@ -120,6 +120,8 @@ impl Hero {
             self.strafe_turn(env);
         }
         self.lean();
+        // `0x2b8dc0`: Clank's sway on the back (crate::hero::back).
+        self.back_run_sway(env.cheat(crate::cheats::cheat::CLANK_HEAD));
         if self.quick_turn != 0 {
             let v = (0.099_166_67 - self.yaw_residual.abs() * 0.029_178_405).max(0.0);
             self.target_speed = self.target_speed.min(v);

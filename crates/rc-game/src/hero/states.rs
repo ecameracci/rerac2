@@ -87,6 +87,8 @@ impl Hero {
             Module::Grind => self.grind_entry(anim, env, id, play),
             Module::Unported => Entry::Done,
         };
+        // The hurts 0x16 / 0x42: Clank's glow turns red for 45 ticks (`0x18a02e`, crate::hero::back).
+        if matches!(id, 0x16 | 0x42) { self.back.flash = 0x2d; }
         match entry {
             Entry::Return(r) => return r,
             Entry::Anim(blend, seq, frame) => if play { self.set_anim(anim, blend, seq, frame) },

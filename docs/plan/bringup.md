@@ -427,7 +427,8 @@ sounds and its movies' audio, the help voice.
   scale where it is not 1 and its translation where it differs from the item's rest. Helmet: table `0x1a7d08`
   (+4: joints 8, 10), attachment 4 (joints 0..7). Ported: the helmet (`rc_game::hero::items::head_pass`,
   `Mobys::skin_head`); his joint modifiers' scale (the head's 0.875, `0x2d51f8` / `0x2ab498`) reaches it, the
-  head look's rotation not yet. Not ported: slots 1 and 3, `0x18b134`, the optional slots, the gloves.
+  head look's rotation not yet. Slot 3 and `0x18b134` (Clank on the back, the packs, his head glow 0x4b4): `rc_game::hero::back`
+  (2026-11-02). Not ported: slot 1, the optional slots, the gloves.
 * **The GS stash.** The classes on the core's `moby_gs_stash_list` (s16 list, negative end: Clank 601, the packs
   607..609, the helmet 1290, 0xa73, 0xb08) keep their textures resident; their moby texture entries hold offsets
   from the stash address (the gs_ram table's entry past `gs_ram.count`; word 0x84 is the stash's entry count) into

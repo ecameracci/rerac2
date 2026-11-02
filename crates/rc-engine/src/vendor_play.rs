@@ -109,7 +109,7 @@ impl VendorPlay {
         // `0x2c4560(0x61, 1)`, the items kept away, the worn items hidden (`0x2d3208`).
         p.hero.request_state(0x61, true);
         p.hero.items.no_use = 1;
-        for slot in [p.hero.items.hand, p.hero.items.head, p.hero.items.feet[0], p.hero.items.feet[1]].into_iter().flatten() {
+        for slot in [p.hero.items.hand, p.hero.items.head, p.hero.items.feet[0], p.hero.items.feet[1]].into_iter().flatten().chain(p.hero.back.mobys()) {
             if let Some(w) = p.world.mobys.get_mut(slot) { w.mode |= 1; }
         }
         // `0x2f5310`: the help panel closed.

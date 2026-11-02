@@ -7,8 +7,10 @@
 //! The owner is Ratchet's moby (`0x18c0b0`) for the Seeker Gun (crate::moby::classes::seeker: the hand `0x3a5360`
 //! ages them, the missile `0x3abb40` picks).
 //!
-//! Not ported: the class-type filter of the pick (`0x37f338`'s last argument, −1 at its callers here), the owner's
-//! release of all its claims (`0x37f500`: no caller on the ported levels' paths).
+//! The Plasma Storm's storms (crate::moby::classes::plasma_storm, `0x3bc078`) claim the targets they arc to, never age
+//! them and let them all go when they end (`0x37f500`).
+//!
+//! Not ported: the class-type filter of the pick (`0x37f338`'s last argument, −1 at its callers here).
 
 use super::{countdown, mode, MobyWorld};
 
@@ -31,6 +33,13 @@ impl Claims {
     /// `0x37f158(owner, target, ticks)`: a claim in the first free record (none free: none).
     pub fn claim(&mut self, owner: usize, target: usize, ticks: i32) {
         if let Some(r) = self.0.iter_mut().find(|r| r.is_none()) { *r = Some(Claim { target, owner, ticks }); }
+    }
+
+    /// `0x37f500(owner)`: every claim of `owner` let go.
+    pub fn release(&mut self, owner: usize) {
+        for r in self.0.iter_mut() {
+            if r.is_some_and(|c| c.owner == owner) { *r = None; }
+        }
     }
 
     /// `0x37f1c0`: `owner` has no claim on `target`.
