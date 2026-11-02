@@ -228,6 +228,9 @@ impl FirstPerson {
 
     /// `0x428518`: the blend in, the data cleared, the eye and the rows facing the old camera's forward `prev_fwd`.
     pub fn init(&mut self, hero: &Hero, prev_fwd: V3, blend: &mut Blend) {
+        // The activation's verdict is taken: the choice asks `0x428188` afresh, so a stale yes must not take the camera
+        // back at its release (the hook does not run while it is current).
+        self.want = false;
         blend.ask();
         (blend.next_rot, blend.next_pos) = (RATE_IN, RATE_IN);
         self.d = [0.0; 7];
