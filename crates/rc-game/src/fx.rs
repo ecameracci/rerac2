@@ -22,6 +22,8 @@
 //! | `0x41c328` | the Lava Gun in the hand 0x05c9 drawn | its stream, muzzle glows and burning pools ([`crate::moby::classes::lava_gun::draw`]) |
 //! | `0x3ec108` | the Mini-Turret Glove in the hand 0x0c5a | where its throw lands ([`crate::moby::classes::turret::draw_marker`]) |
 //! | `0x389818` | the Mini-Turret 0x1366 | its muzzle flash and its shots ([`crate::moby::classes::turret::draw`]) |
+//! | `0x3c9ea0` / `0x38bde8` | the upgraded glove 0x0a65 / its turret 0x1367 | the throw's landing; the muzzle flash (the same draws) |
+//! | `0x3cbaa0` | the upgraded turret's plasma shot 0x0a82 | its glow and trail ([`crate::moby::classes::turret::draw_plasma`]) |
 //! | `0x2a7ac8` (first list) | Ratchet | the hand item's glows ([`HeroGlow`]; its other glows are not ported) |
 //! | `0x3c6eb8` (L02) | the Spiderbot Glove in the hand 0x0907 | where its throw lands ([`crate::moby::classes::spiderbot::draw_marker`]) |
 //! | `0x3cac30` | Oozla's conveyor 0x0a7b out | its belt of light ([`crate::moby::classes::oozla::draw_0a7b`]) |
@@ -343,8 +345,10 @@ fn one(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut crate::ga
         crate::moby::classes::pulse_rifle::SHOT => crate::moby::classes::pulse_rifle::draw(w, id, hero_state, cam, out),
         crate::moby::classes::synthenoid::SHOT => crate::moby::classes::synthenoid::draw(w, id, cam, out),
         crate::moby::classes::lava_gun::HAND_CLASS => crate::moby::classes::lava_gun::draw(w, id, &mut game.rng, cam, out),
-        crate::moby::classes::turret::HAND_CLASS => crate::moby::classes::turret::draw_marker(w, id, hero_state, game.scenes.mode, game.frame, out),
-        crate::moby::classes::turret::TURRET => crate::moby::classes::turret::draw(w, host, id, &mut game.rng, cam, out),
+        crate::moby::classes::turret::HAND_CLASS | crate::moby::classes::turret::UP_HAND => crate::moby::classes::turret::draw_marker(w, id, hero_state, game.scenes.mode, game.frame, out),
+        crate::moby::classes::bouncer::HAND_CLASS => crate::moby::classes::bouncer::draw_marker(w, id, hero_state, game.scenes.mode, game.frame, out),
+        crate::moby::classes::turret::TURRET | crate::moby::classes::turret::UP_TURRET => crate::moby::classes::turret::draw(w, host, id, &mut game.rng, cam, out),
+        crate::moby::classes::turret::PLASMA => crate::moby::classes::turret::draw_plasma(w, id, &mut game.rng, cam, out),
         crate::moby::classes::spiderbot::HAND_CLASS | crate::moby::classes::spiderbot::PLUS_HAND => crate::moby::classes::spiderbot::draw_marker(w, id, hero_state, game.scenes.mode, game.frame, out),
         0x0a7b => crate::moby::classes::oozla::draw_0a7b(w, id, out),
         0x0a9d => crate::moby::classes::oozla::draw_0a9d(w, id, out),

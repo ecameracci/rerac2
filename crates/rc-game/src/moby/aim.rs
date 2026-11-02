@@ -45,7 +45,20 @@ pub fn aim_point(w: &MobyWorld, m: usize) -> V3 {
 }
 
 /// `0x3257a0(cone, from, dir, ..)`: the moby picked, if any.
-pub fn search(w: &MobyWorld, ctx: &Ctx, cone: Cone, from: V3, dir: V3, crates: bool) -> Option<usize> {
+pub fn search(w: &MobyWorld, ctx: &Ctx, cone: Cone, from: V3, dir: V3, crates: bool) -> Option<usize> { scan(w, ctx, cone, from, dir, crates, &EXCLUDED, None) }
+
+/// `0x3257a0` with a list (`&count, list, max`) and no excluded classes (its `param_13` null): every candidate that
+/// beat the best so far, in the target list's order (at most `max`), the best then swapped to the front.
+pub fn search_list(w: &MobyWorld, ctx: &Ctx, cone: Cone, from: V3, dir: V3, crates: bool, max: usize) -> Vec<usize> {
+    let mut list = Vec::new();
+    if let Some(b) = scan(w, ctx, cone, from, dir, crates, &[], Some((&mut list, max))) {
+        if let Some(i) = list.iter().position(|&t| t == b) { list.swap(0, i); } else if let Some(f) = list.first_mut() { *f = b; }
+    }
+    list
+}
+
+#[allow(clippy::too_many_arguments)]
+fn scan(w: &MobyWorld, ctx: &Ctx, cone: Cone, from: V3, dir: V3, crates: bool, excluded: &[i16], mut list: Option<(&mut Vec<usize>, usize)>) -> Option<usize> {
     let mut best: Option<(f32, usize)> = None;
     let dir_yaw = atan2(dir[0], dir[1]);
     let dir_pitch = atan2(len2(dir), dir[2]);
@@ -58,7 +71,7 @@ pub fn search(w: &MobyWorld, ctx: &Ctx, cone: Cone, from: V3, dir: V3, crates: b
         let Some((hp, _)) = health(w, id) else { continue };
         if !(0.0 < hp || crate_) { continue; }
         if !(t.kind == 5 || crate_) { continue; }
-        if EXCLUDED.contains(&m.o_class) { continue; }
+        if excluded.contains(&m.o_class) { continue; }
         let p = aim_point(w, id);
         let d = sub(p, from);
         let dist = len(d);
@@ -86,6 +99,9 @@ pub fn search(w: &MobyWorld, ctx: &Ctx, cone: Cone, from: V3, dir: V3, crates: b
         let blocked = ctx.coll.is_some_and(|c| crate::collision::coll_line_m(c, ctx.scene, from, p, crate::collision::QueryFlags(0x12), Some(id)).is_some());
         if blocked { continue; }
         best = Some((score, id));
+        if let Some((l, max)) = list.as_mut() {
+            if l.len() < *max { l.push(id); }
+        }
     }
     best.map(|(_, id)| id)
 }

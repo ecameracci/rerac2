@@ -28,6 +28,7 @@
 //! | 0x5b | [`cinder`] (L02 `0x3468b8`) | (L02 `0x346a30`) | the big explosion's cinders: embers that keep their size (crate::moby::classes::explosion) |
 //! | 0x42 | [`dust`] (L02 `0x342ed8`, L00 `0x33c390`) | (L02 `0x343040`) | dust puffs: drifting, growing, fading (Maktar's footsteps, crate::moby::classes::maktar::update_0a57) |
 //! | 0x19, 0x6d | [`lava`] (`0x336148`, `0x3424d0`) | (`0x3362d0`, `0x3425e8`) | the Lava Gun's sparks (falling, cooling, stopping on the world) and drops (sinking, then rising as smoke) |
+//! | 0x6e | [`plasma`] (`0x342740`) | (`0x342988`) | the upgraded Mini-Turret's plasma shots' smoke: rising, growing, fading |
 //!
 //! Any other type kills itself on its first update. The gravity direction (`0x18a0e0`) is (0, 0, −1): normal gravity.
 //! Not ported: the gravity-boots bend of the positions (`0x380e08`, `+0x1c` = 2).
@@ -35,6 +36,7 @@
 pub mod cinder;
 pub mod dust;
 pub mod lava;
+pub mod plasma;
 mod pool;
 pub mod rain;
 pub mod type23;
@@ -1118,6 +1120,7 @@ pub fn update_parts(sys: &mut Particles, mobys: &crate::moby::MobyWorld, cam: [f
             dust::DUST => dust::update(sys, i),
             lava::SPARK => lava::update_spark(sys, i, aux.coll),
             lava::DROP => lava::update_drop(sys, i),
+            plasma::PUFF => plasma::update(sys, i, rng),
             FLARE => update_flare(sys, i),
             rain::DROP => rain::update_drop(sys, i, &aux.rain),
             rain::SPLASH => rain::update_splash(sys, i),

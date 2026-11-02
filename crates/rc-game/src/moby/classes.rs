@@ -7,6 +7,7 @@ pub mod area_switch;
 pub mod beast;
 pub mod blitz;
 pub mod blitz_mega;
+pub mod bouncer;
 pub mod bolt;
 pub mod bosses;
 pub mod carriers;
@@ -31,6 +32,7 @@ pub mod keeper;
 pub mod lancer;
 pub mod lava_gun;
 pub mod pulse_rifle;
+pub mod seeker;
 pub mod leaper;
 pub mod oozla;
 pub mod light;
@@ -86,8 +88,9 @@ use super::UpdateFn;
 /// (L00 `lvl.vtbl`) has no model: its smoke and beams are its draw's.
 /// The upgraded Spiderbot 0x0e79 and its shot 0x0eaa and shell 0x0eab (L00 `lvl.vtbl`) are listed for the levels whose
 /// class list lacks them. The upgraded Blitz's tracer 0x0d9c and the beam 0x0dc1 have no model. The Synthenoids' shot
-/// 0x0cbb (L00 `lvl.vtbl`) is listed for the levels whose class list lacks it.
-pub const CREATED_LOGIC: &[i16] = &[crate::ship::LASER_CLASS, teleport::CLASS, explosion::CLASS, spiderbot::BOT_CLASS, endako_boss::BEAM, endako_boss::TRACER, endako_boss::ROCKET, blitz::TRACER, gravity_bomb::MINI_BOMB, gravity_bomb::MINI_BLAST, pulse_rifle::SHOT, spiderbot::PLUS_BOT, spiderbot_plus::SHOT, spiderbot_plus::LOB, blitz::MEGA_TRACER, beam::CLASS, synthenoid::SHOT];
+/// 0x0cbb (L00 `lvl.vtbl`) is listed for the levels whose class list lacks it. The upgraded Mini-Turret's plasma shot
+/// 0x0a82 (L00 `lvl.vtbl` `0x3cadc0`) is listed so too.
+pub const CREATED_LOGIC: &[i16] = &[crate::ship::LASER_CLASS, teleport::CLASS, explosion::CLASS, spiderbot::BOT_CLASS, endako_boss::BEAM, endako_boss::TRACER, endako_boss::ROCKET, blitz::TRACER, gravity_bomb::MINI_BOMB, gravity_bomb::MINI_BLAST, pulse_rifle::SHOT, spiderbot::PLUS_BOT, spiderbot_plus::SHOT, spiderbot_plus::LOB, blitz::MEGA_TRACER, beam::CLASS, synthenoid::SHOT, turret::PLASMA];
 
 pub fn update_for(o_class: i16) -> Option<UpdateFn> {
     match o_class {
@@ -117,11 +120,17 @@ pub fn update_for(o_class: i16) -> Option<UpdateFn> {
         beam::CLASS => Some(beam::update),
         pulse_rifle::HAND_CLASS => Some(pulse_rifle::update),
         pulse_rifle::SHOT => Some(pulse_rifle::update_shot),
+        seeker::HAND_CLASS => Some(seeker::update),
+        seeker::MISSILE => Some(seeker::update_missile),
         lava_gun::HAND_CLASS => Some(lava_gun::update),
+        bouncer::HAND_CLASS => Some(bouncer::update),
+        bouncer::BOMB => Some(bouncer::update_bomb),
+        bouncer::BOMBLET => Some(bouncer::update_bomblet),
         synthenoid::DRONE => Some(synthenoid::update),
         synthenoid::SHOT => Some(synthenoid::update_shot),
-        turret::HAND_CLASS => Some(turret::update_hand),
-        turret::TURRET => Some(turret::update),
+        turret::HAND_CLASS | turret::UP_HAND => Some(turret::update_hand),
+        turret::TURRET | turret::UP_TURRET => Some(turret::update),
+        turret::PLASMA => Some(turret::update_plasma),
         swingshot::HAND_CLASS => Some(swingshot::update),
         swingshot::HOOK_CLASS => Some(swingshot::update_hook),
         0xbfe => Some(shot::update),

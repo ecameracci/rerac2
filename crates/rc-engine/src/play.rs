@@ -465,7 +465,15 @@ fn tick(
                     if let Some(a) = p.game.ammo.get_mut(i as usize) { *a = r.max_ammo; }
                 }
             }
-            if let Some(&last) = items.last() { equip(p.game.held, &mut p.hero, last); }
+            // The last is the held item before the first hand is made (`0x2afc68` makes `0x1a7398`'s), so Ratchet
+            // starts with it and not with the save's item swapped out a few ticks later.
+            if let Some(&last) = items.last() {
+                if last != rc_game::hero::items::WRENCH && rc_game::hero::items::row(&p.game, last).is_some() {
+                    p.game.held = last;
+                    p.game.wrench_out = false;
+                }
+                equip(p.game.held, &mut p.hero, last);
+            }
         }
                 // `RC_HERO_AT=x,y,z,yaw`: Ratchet starts there (as the checkpoint, so the arrival leaves him).
         if let Some(v) = std::env::var("RC_HERO_AT").ok().filter(|_| dev).map(|v| v.split(',').filter_map(|x| x.trim().parse::<f32>().ok()).collect::<Vec<_>>()).filter(|v| v.len() == 4) {
@@ -2352,7 +2360,7 @@ fn draw_hud(
             }
             Err(e) => eprintln!("play: no HUD icons ({e:#})"),
         }
-        // The markers' FX textures (the Lancer's reticle, the Pulse Rifle's crosshair 0x27 and lock 0x20, the Blitz Guns'
+        // The markers' FX textures (the Lancer's reticle, the Pulse Rifle's and the Seeker Gun's crosshair 0x27, the Pulse Rifle's lock 0x20, the Blitz Guns'
         // crosshair 0x21), the space
         // fights' HUD's (rc_game::ship), font 3 (FX texture 3: the arena's counters,
         // rc_game::moby::classes::arena::draw_hud) and the arena wipe's edge.

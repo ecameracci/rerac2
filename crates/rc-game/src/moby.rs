@@ -39,6 +39,7 @@ pub mod aim;
 pub mod attach;
 pub mod blast;
 pub mod bolts;
+pub mod claims;
 pub mod floater;
 pub mod hits;
 pub mod platform;
@@ -565,6 +566,10 @@ pub struct MobyWorld {
     pub turret: classes::turret::Mem,
     /// The Lava Gun's stream and burning pools (classes::lava_gun).
     pub lava: classes::lava_gun::Mem,
+    /// The Bouncer's cooldown (classes::bouncer).
+    pub bouncer: classes::bouncer::Mem,
+    /// The targets' claims (`0x2312c0`, claims): the Seeker Gun's missiles' picks.
+    pub claims: claims::Claims,
     /// The hand item's glows of this tick (`0x2a7e60`'s queue `0x18bea0`, drawn by Ratchet's first-list callback
     /// `0x2a7ac8`; crate::hero::items::hand_glow fills it, crate::fx::callbacks draws it).
     pub hero_glows: Vec<crate::fx::HeroGlow>,

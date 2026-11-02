@@ -72,8 +72,40 @@
 //!
 //! Its glow in the hand (`0x2a7ed8`'s case 0x29, the Spiderbot Glove's): crate::hero::items.
 //!
-//! Not ported: the upgraded glove (rows past 0x29; its hand 0x0a65 `0x3c9c70` throws the other turret 0x1367,
-//! `0x38bb30` / `0x38a9a8`, with the shots 0x0a82 `0x3cb8f0`); the gravity frames and moving frames (`0x37f538` /
+//! **The upgraded glove** (rows 0x40, 0x59, 0x5a, crate::hero::items::UPGRADE_ROWS): its hand **0x0a65** (`0x3c9c70`,
+//! the hand above but for the turret it throws, its marker `0x3c9ea0`) throws **0x1367** (made by `0x38bb30`, updated by
+//! `0x38a9a8`): the turret above with its own ready set (`0x238d70`, `0x38bdc8`), its full size, 10 shots (not the
+//! row's `+0x48`), the sweep's sphere 0.13 lifted 0.0962, unfolded from frame 6.5, its head's sphere 0.25 and no shot
+//! records: a shot ([`fire`], `0x38b770`) is its class sound 0 and a **plasma shot 0x0a82** (`0x3cb8f0(2, 15, 0.5, 3,
+//! muzzle, way, 0x50, 200, 1, 0, 0x10e, target)`, the glove its owner), the cooldown 2/3 s (not the row's rate). Its
+//! draw (`0x38bde8`) is the muzzle flash. The original keeps its target at `+0x64` and the glove at `+0x68`; the port
+//! keeps the base turret's pvars.
+//!
+//! **The plasma shot** ([`update_plasma`], `0x3cadc0`; pvars: `+0x00` its velocity, `+0x10..+0x40` its trail's four
+//! points, `+0x50` its target, `+0x54` its turn's spring, `+0x58` / `+0x5c` its spiral's phases, `+0x60` its speed (a
+//! second; 2), `+0x64` its trail's scroll, `+0x68` its top speed (15), `+0x6c` (s16) its smoke's count, `+0x70` its
+//! speed's growth a tick (0.5), `+0x74` its damage (3), `+0x78` / `+0x79` its smoke's life (0x50..200), `+0x7a` its
+//! smoke's interval (1), `+0x7b` the wide homing (0), `+0x7c` no search (made without a target), `+0x7d` the trail's
+//! shift timer, `+0x7e` (u16) its life (270 ticks)); size 0.015, its rows kept. **0**: its trail laid behind it (0.3
+//! back along its way, three more points 0.01 on), **1**. Each tick its trail's scroll −0.1 (wrapping at −8); its
+//! target gone (state −x) or without collision is dropped and, free to search, the first moby within 15 (flags 0) of
+//! the target list, not 0x0a7e nor Ratchet, of class type 5 is taken; its rows along its way (row 1 the world's up ×
+//! it); it moves; its life out, or out of the world's 2..1021 box (put back), **2** hidden. The 0.25 sphere at it
+//! (flags 0x10, itself left out), else the step's line, meeting anything but a turret: every moby within 1 of mode
+//! 0x1000 / 0x4000 takes its damage (flags 0x210000 along its velocity, kind `0x0a82 << 16 | 0x0305`), a smoke burst
+//! (`0x3210a8(1, 13, shot, point, 0)`), **2** hidden. Its speed the least of its speed and its top (then +0.5 a tick).
+//! With a target it homes ([`home`], `0x321de8(0.03, 0.2, 0, 0.25, …)`, the spring `0x2d7f80`) on the target's aim
+//! point spiralled by its phases (`sin b · min(0.749 d, 0.749)` across, `cos b · min(0.751 d, 0.751)` back, `(sin a +
+//! 1) · min(d / 2, 0.5)` up; d its distance, 0 under 0.25). Every tick a smoke puff (crate::particles::plasma,
+//! `0x342740`) 0.3 behind it, half the step large, its ALPHA 0x48 / 0x44 in turn; the phases step (b +0.01..0.1, a
+//! −0.025..0.25); every second tick its trail shifts on, the newest its tail. **2**: gone. Its row 1's y and row 2's z
+//! are halved after the tail is taken (the model's squash). The draw ([`draw_plasma`], `0x3cbaa0` → `0x3cbad0`, state
+//! 1): the glow `0x2ed370` (crate::fx::halo) at its tail and the streak `0x2ed6d8(scroll, 0.25, tail, trail, 4)`
+//! (crate::fx::streak), both `0x103080`.
+//!
+//! Not ported (the upgraded glove): the free mobys' check of the shot's make (`0x1b1d40` below 0x11: none), the
+//! search's class list (`$gp−0x90`: {0, 0x1367}, of no class of type 5), the weapon mods on the plasma's hits
+//! (`0x4126b8`). The gravity frames and moving frames (`0x37f538` /
 //! `0x37f618` / `0x37f5f8`, `0x380e08` / `0x380e58`, the down `0x37ecc0` of the frames: the port's crate::gravity
 //! stands in for the up); the level's moving frame (`0x1adb0c`, the tables `0x238730` / `0x2388c0` by the turret's
 //! index: what it lands on carries it with its turn; null on the ported levels), the water's ripple (`0x37d5a0`, with
@@ -84,15 +116,18 @@
 
 use crate::collision::QueryFlags;
 use crate::hero::items::{row, MINI_TURRET};
-use crate::hero::physics::{add, add_rot, cross, dot, len, scale, set_len, sub, unit, V3};
+use crate::hero::physics::{add, add_rot, cross, dist, dot, len, scale, set_len, sub, unit, V3};
 use crate::moby::hits::HitTemplate;
 use crate::moby::{aim, countdown, mode, Ctx, MobyWorld};
 use rc_formats::moby_anim::JointModifier;
 
-/// The hand's and the turret's classes; the other turret (the upgraded glove's) and the class a turret flies past.
+/// The hand's and the turret's classes; the upgraded glove's hand, turret and plasma shot; the class a turret flies
+/// past.
 pub const HAND_CLASS: i16 = 0x0c5a;
 pub const TURRET: i16 = 0x1366;
-const OTHER_TURRET: i16 = 0x1367;
+pub const UP_HAND: i16 = 0x0a65;
+pub const UP_TURRET: i16 = 0x1367;
+pub const PLASMA: i16 = 0x0a82;
 const PASS_CLASS: i16 = 0x00cb;
 
 /// `0x37e328`'s arguments: the least reach (with L1), the reach ahead (in the look stance 0x1d), the speed across (a
@@ -108,6 +143,9 @@ const FALL: f32 = 11.0;
 /// normal speed (`gp−0x108`), the least up of a floor, the classes it passes (Ratchet, the glove).
 const RADIUS: f32 = 0.1;
 const LIFT: f32 = f32::from_bits(0x3d97_8d50);
+/// The upgraded turret's (`0x38a9a8`): 0.13 and 0.0962.
+const UP_RADIUS: f32 = f32::from_bits(0x3e05_1eb8);
+const UP_LIFT: f32 = f32::from_bits(0x3dc5_0481);
 const RESTITUTION: f32 = 0.45;
 const FLOOR: f32 = f32::from_bits(0x3f0e_38e4);
 const PASS: [i16; 2] = [0, HAND_CLASS];
@@ -118,8 +156,16 @@ const LIFE: i32 = 1200;
 const CONE: aim::Cone = aim::Cone { yaw: std::f32::consts::TAU, pitch: std::f32::consts::TAU, range: 15.0, near_pitch: 0.0, near_yaw: 0.0 };
 /// The turn's step a tick (`0x3cd67752`, 1.5°).
 const TURN_STEP: f32 = f32::from_bits(0x3cd6_7752);
-/// The sphere at joint 0 that blows the turret up in the world (`0x388888`).
+/// The sphere at joint 0 that blows the turret up in the world (`0x388888`; the upgraded turret's `0x38b348` 0.25).
 const HEAD: f32 = 0.2;
+const UP_HEAD: f32 = 0.25;
+/// The frame of its unfolding sequence from which it searches (the upgraded turret's 6.5).
+const UNFOLD: f32 = 6.0;
+const UP_UNFOLD: f32 = 6.5;
+/// The upgraded turret's shots (`0x38bb30`: 10, not the row's) and their cooldown (`0x38b770`: 2/3 s, not the row's
+/// rate).
+const UP_SHOTS: i32 = 10;
+const UP_COOL: f32 = f32::from_bits(0x3f2a_aaab);
 /// The table's turrets and how many are ready at most (`0x3892c0`).
 const SLOTS: usize = 64;
 const MOST_READY: usize = 5;
@@ -242,11 +288,13 @@ impl Table {
     }
 }
 
-/// The turrets' globals: the table, the shots and the frame the ready set was last made in (the port's: the original
-/// makes it in the frame's start, before the moby loop, where the first turret's update stands in).
+/// The turrets' globals: the tables (the upgraded turrets' own, `0x238d70`), the shots and the frame the ready sets were
+/// last made in (the port's: the original makes them in the frame's start, before the moby loop, `0x37fa28` →
+/// `0x389368` / `0x38bdc8`, where the first turret's update stands in).
 #[derive(Clone, Debug, Default)]
 pub struct Mem {
     pub table: Table,
+    pub table_up: Table,
     shots: Vec<Shot>,
     stamp: Option<i32>,
     /// `gp−0xf4`: the next turret's index.
@@ -298,7 +346,7 @@ pub fn update_hand(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             let mut t = w.mobys[id].pv_i(hand::TIMER);
             if countdown(&mut t) {
                 ctx.host.play_sound(&w.mobys[id], 0, 0);
-                if let Some(tur) = make(w, ctx, from, vel) { w.mobys[tur].parent = Some(id); }
+                if let Some(tur) = make(w, ctx, from, vel, w.mobys[id].o_class == UP_HAND) { w.mobys[tur].parent = Some(id); }
                 let idle = ctx.hero.idle_seq();
                 ctx.hero.items.use_end(hero_state, ctx.hero_view.seq_b, idle);
                 w.mobys[id].state = 3;
@@ -347,13 +395,15 @@ fn align_up(rows: [V3; 3], up: V3) -> [V3; 3] {
     crate::quat::turn_rows(&rows, [a[0], a[1], a[2], f32::from_bits(c)])
 }
 
-/// `0x389078(pos, vel)`: the turret (module docs), None when its class is not loaded.
-fn make(w: &mut MobyWorld, ctx: &mut Ctx, pos: V3, vel: V3) -> Option<usize> {
-    if w.class(TURRET).is_none() {
-        eprintln!("rc_game::turret: class {TURRET:#x} is not loaded: no turret");
+/// `0x389078(pos, vel)`: the turret (module docs), None when its class is not loaded; `up`: the upgraded turret
+/// (`0x38bb30`: class 0x1367, its full size, 10 shots).
+fn make(w: &mut MobyWorld, ctx: &mut Ctx, pos: V3, vel: V3, up: bool) -> Option<usize> {
+    let class = if up { UP_TURRET } else { TURRET };
+    if w.class(class).is_none() {
+        eprintln!("rc_game::turret: class {class:#x} is not loaded: no turret");
         return None;
     }
-    let id = w.create(TURRET);
+    let id = w.create(class);
     let rows = align_up(crate::hero::physics::euler_rows(ctx.hero.rot), ctx.hero.gravity.up_at(pos));
     let m = &mut w.mobys[id];
     m.update = Some(update);
@@ -362,7 +412,7 @@ fn make(w: &mut MobyWorld, ctx: &mut Ctx, pos: V3, vel: V3) -> Option<usize> {
     m.update_dist = 0xff;
     m.draw_dist = 0xff;
     m.drawn = 1;
-    m.scale *= 0.75;
+    if !up { m.scale *= 0.75; }
     m.state = 0;
     m.pos = pos;
     m.rows = rows;
@@ -372,7 +422,7 @@ fn make(w: &mut MobyWorld, ctx: &mut Ctx, pos: V3, vel: V3) -> Option<usize> {
     m.set_pv_i(pv::FLYING, 0);
     m.set_pv_i(pv::AIMED, 0);
     m.set_pv_i(pv::FLASH, 0);
-    m.set_pv_i(pv::LEFT, SHOTS_EACH);
+    m.set_pv_i(pv::LEFT, if up { UP_SHOTS } else { SHOTS_EACH });
     m.set_pv_s(pv::NEW_LOOK, 1);
     m.set_pv_i(pv::LIFE, LIFE);
     for o in [pv::FROM, pv::LOOK, pv::WANT] { m.set_pv_v(o, [1.0, 0.0, 0.0]); }
@@ -405,8 +455,9 @@ fn sweep(w: &MobyWorld, ctx: &Ctx, id: usize, from: V3, to: V3, vel: &mut V3) ->
     let none = (Swept::None, to, None, -1);
     let Some(c) = ctx.coll else { return none };
     let up = ctx.hero.gravity.up_at(w.mobys[id].pos);
-    let centre = add(to, set_len(w.mobys[id].rows[2], LIFT));
-    let hit = crate::collision::coll_sphere_m(c, ctx.scene, centre, RADIUS, QueryFlags(0), Some(id)).map(|h| (h.pushed_centre.unwrap_or(h.point), h))
+    let (radius, lift) = if is_up(w, id) { (UP_RADIUS, UP_LIFT) } else { (RADIUS, LIFT) };
+    let centre = add(to, set_len(w.mobys[id].rows[2], lift));
+    let hit = crate::collision::coll_sphere_m(c, ctx.scene, centre, radius, QueryFlags(0), Some(id)).map(|h| (h.pushed_centre.unwrap_or(h.point), h))
         .or_else(|| w.coll_line(ctx, from, to, 0, Some(id)).map(|h| (h.point, h)));
     let Some((at, h)) = hit else { return none };
     let surface = h.surface_id();
@@ -438,13 +489,22 @@ fn gone(w: &MobyWorld, t: usize) -> bool { w.mobys.get(t).is_none_or(|m| matches
 fn frame_refresh(w: &mut MobyWorld, ctx: &Ctx) {
     if w.turret.stamp == Some(ctx.game.frame) { return; }
     w.turret.stamp = Some(ctx.game.frame);
-    refresh(w, ctx);
+    refresh(w, ctx, false);
+    refresh(w, ctx, true);
 }
 
-fn refresh(w: &mut MobyWorld, ctx: &Ctx) {
+/// `0x3810f8` on the turrets' table (`0x389368`) or the upgraded turrets' (`0x38bdc8`).
+fn refresh(w: &mut MobyWorld, ctx: &Ctx, up: bool) {
     let mobys = &w.mobys;
-    w.turret.table.refresh(|t| mobys.get(t).map(|m| m.pos), ctx.hero.pos);
+    let t = if up { &mut w.turret.table_up } else { &mut w.turret.table };
+    t.refresh(|t| mobys.get(t).map(|m| m.pos), ctx.hero.pos);
 }
+
+/// The upgraded turret (0x1367, `0x38a9a8`).
+fn is_up(w: &MobyWorld, id: usize) -> bool { w.mobys[id].o_class == UP_TURRET }
+
+/// The table of turret `id`'s kind.
+fn table(w: &mut MobyWorld, id: usize) -> &mut Table { if is_up(w, id) { &mut w.turret.table_up } else { &mut w.turret.table } }
 
 /// `0x387ee8` (module docs).
 pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
@@ -464,7 +524,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             fly(w, id, ctx);
         }
         2 => {
-            if 6.0 <= ctx.host.frame_time(&w.mobys[id]) {
+            if (if is_up(w, id) { UP_UNFOLD } else { UNFOLD }) <= ctx.host.frame_time(&w.mobys[id]) {
                 set_seq(w, id, ctx, 2, 0);
                 w.mobys[id].state = 3;
             }
@@ -486,7 +546,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             }
         }
         6 => {
-            if w.turret.table.is_ready(slot(w)) {
+            if { let k = slot(w); table(w, id).is_ready(k) } {
                 w.mobys[id].state = 2;
                 ctx.host.play_sound(&w.mobys[id], 1, 0);
                 set_seq(w, id, ctx, 1, 0);
@@ -510,7 +570,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         9 => {
             if w.mobys[id].pv_i(pv::FLYING) == 0 {
                 if w.mobys[id].pv_i(pv::NODE) != -1 { w.mobys[id].joint_nodes.clear(); }
-                if let Ok(k) = usize::try_from(slot(w)) { w.turret.table.free(k); }
+                if let Ok(k) = usize::try_from(slot(w)) { table(w, id).free(k); }
                 w.delete(id);
                 return;
             }
@@ -531,7 +591,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     step_shots(w, id, ctx);
     if matches!(w.mobys[id].state, 3 | 4) {
         head_test(w, id, ctx);
-        if !w.turret.table.is_ready(slot(w)) {
+        if !{ let k = slot(w); table(w, id).is_ready(k) } {
             set_seq(w, id, ctx, 1, 9);
             let m = &mut w.mobys[id];
             m.state = 5;
@@ -576,7 +636,7 @@ fn fly(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         m.set_pv_v(pv::VEL, vel);
     }
     if s != Swept::Stop { return; }
-    if moby.is_some_and(|t| w.mobys.get(t).is_some_and(|x| matches!(x.o_class, PASS_CLASS | TURRET | OTHER_TURRET))) {
+    if moby.is_some_and(|t| w.mobys.get(t).is_some_and(|x| matches!(x.o_class, PASS_CLASS | TURRET | UP_TURRET))) {
         w.mobys[id].set_pv_v(pv::VEL, scale(vel, f32::from_bits(0x3f8c_cccd)));
         return;
     }
@@ -597,10 +657,11 @@ fn fly(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         }
         1 => w.mobys[id].state = 8,
         _ => {
-            let k = w.turret.table.take(id);
+            let k = table(w, id).take(id);
             w.mobys[id].set_pv_b(pv::SLOT, k as i8 as u8);
-            refresh(w, ctx);
-            if w.turret.table.is_ready(k) {
+            let up = is_up(w, id);
+            refresh(w, ctx, up);
+            if table(w, id).is_ready(k) {
                 w.mobys[id].state = 2;
                 ctx.host.play_sound(&w.mobys[id], 1, 0);
                 set_seq(w, id, ctx, 1, 0);
@@ -610,7 +671,7 @@ fn fly(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         }
     }
     // Its collision on (`+0x98` the class's).
-    let solid = w.class(TURRET).is_some_and(|c| c.has_collision);
+    let solid = w.class(w.mobys[id].o_class).is_some_and(|c| c.has_collision);
     w.mobys[id].has_collision = solid;
     w.changed = true;
 }
@@ -691,15 +752,24 @@ fn fire(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let p = aim::aim_point(w, t);
     let Some(r) = row(ctx.game, MINI_TURRET) else { return };
     let vel = set_len(sub(p, muzzle), r.speed * 0.016_666_668);
-    spawn_shot(w, id, muzzle, vel);
-    ctx.host.play_sound(&w.mobys[id], 0, 0);
+    let up = is_up(w, id);
+    if up {
+        // `0x38b770`: its class sound 0, then the plasma shot (`0x3cb8f0(2, 15, 0.5, 3, muzzle, vel, 0x50, 200, 1, 0,
+        // 0x10e, target)`), the glove its owner.
+        ctx.host.play_sound(&w.mobys[id], 0, 0);
+        let owner = w.mobys[id].parent;
+        if let Some(s) = spawn_plasma(w, ctx, muzzle, vel, Some(t)) { w.mobys[s].parent = owner; }
+    } else {
+        spawn_shot(w, id, muzzle, vel);
+        ctx.host.play_sound(&w.mobys[id], 0, 0);
+    }
     let m = &mut w.mobys[id];
     let left = m.pv_i(pv::LEFT) - 1;
     m.set_pv_i(pv::FLASH, 6);
     m.set_pv_i(pv::LIFE, LIFE);
     m.set_pv_i(pv::LEFT, left);
     if left < 1 { m.state = 8; }
-    m.set_pv_f(pv::COOL, 1.0 / r.rate);
+    m.set_pv_f(pv::COOL, if up { UP_COOL } else { 1.0 / r.rate });
 }
 
 /// `0x389388(turret, vel)`: a shot in the first free record from its joint 1, 120 s of life; none when all 100 fly.
@@ -736,7 +806,7 @@ fn turn(w: &mut MobyWorld, id: usize) {
 fn head_test(w: &mut MobyWorld, id: usize, ctx: &Ctx) {
     let Some(c) = ctx.coll else { return };
     let head = ctx.host.joint(&w.mobys[id], 0).unwrap_or(w.mobys[id].pos);
-    if crate::collision::coll_sphere_m(c, ctx.scene, head, HEAD, QueryFlags(2), Some(id)).is_some_and(|h| 0 < h.kind) { w.mobys[id].state = 8; }
+    if crate::collision::coll_sphere_m(c, ctx.scene, head, if is_up(w, id) { UP_HEAD } else { HEAD }, QueryFlags(2), Some(id)).is_some_and(|h| 0 < h.kind) { w.mobys[id].state = 8; }
 }
 
 /// `0x3888e8`: carried by the move of the moby under it since the last tick; on a class of type 0x12 whose pvar byte
@@ -915,4 +985,264 @@ fn flash(w: &MobyWorld, host: &dyn crate::moby::MobyHost, id: usize, rng: &mut c
     let st = if rng.rand() & 1 == 0 { [[0.0, 0.0], [0.0, 1.0], [1.0, 0.0], [1.0, 1.0]] } else { [[0.0, 1.0], [0.0, 0.0], [1.0, 1.0], [1.0, 0.0]] };
     strip(out, 0x17, muzzle, wd, far, wd * 0.15, cam, [0x7f10_3080, 0x7f10_3080, 0x10_3080, 0x10_3080], st);
     strip(out, 0x17, muzzle, wd * 2.0, far, wd * 0.15 * 2.0, cam, [0x3f10_3080, 0x3f10_3080, 0x10_3080, 0x10_3080], st);
+}
+
+/// The plasma shot's pvars (module docs).
+mod plasma {
+    pub const VEL: usize = 0x00;
+    pub const TRAIL: usize = 0x10;
+    pub const TARGET: usize = 0x50;
+    pub const TURN: usize = 0x54;
+    pub const SPIN_A: usize = 0x58;
+    pub const SPIN_B: usize = 0x5c;
+    pub const SPEED: usize = 0x60;
+    pub const SCROLL: usize = 0x64;
+    pub const MAX: usize = 0x68;
+    pub const PUFF: usize = 0x6c;
+    pub const ACCEL: usize = 0x70;
+    pub const DAMAGE: usize = 0x74;
+    pub const LO: usize = 0x78;
+    pub const HI: usize = 0x79;
+    pub const EVERY: usize = 0x7a;
+    pub const WIDE: usize = 0x7b;
+    pub const FIXED: usize = 0x7c;
+    pub const SHIFT: usize = 0x7d;
+    pub const TICKS: usize = 0x7e;
+}
+
+/// `0x1b00d8`: the smoke's ALPHA modes, in turn.
+const PLASMA_ALPHA: [u8; 2] = [0x48, 0x44];
+/// The plasma's glow and trail colour.
+const PLASMA_RGB: u32 = 0x10_3080;
+
+/// `0x3cb8f0(2, 15, 0.5, 3, at, dir, 0x50, 200, 1, 0, 0x10e, target)`: the plasma shot (module docs).
+fn spawn_plasma(w: &mut MobyWorld, ctx: &mut Ctx, at: V3, dir: V3, target: Option<usize>) -> Option<usize> {
+    if w.class(PLASMA).is_none() { return None; }
+    let id = w.create(PLASMA);
+    let _ = ctx;
+    let m = &mut w.mobys[id];
+    m.pvars.resize(crate::moby::PVAR_BYTES, 0);
+    m.pos = at;
+    m.set_pv_v(plasma::VEL, set_len(dir, 2.0 * 0.016_666_668));
+    m.state = 0;
+    m.drawn = 1;
+    m.draw_dist = 0xff;
+    m.update_dist = 0xff;
+    m.set_pv_i(plasma::TARGET, target.map_or(-1, |t| t as i32));
+    m.set_pv_f(plasma::TURN, 0.0);
+    m.scale = f32::from_bits(0x3c75_c28f);
+    m.mode |= mode::KEEP_ROWS;
+    m.set_pv_f(plasma::SPEED, 2.0);
+    m.set_pv_f(plasma::MAX, 15.0);
+    m.set_pv_f(plasma::ACCEL, 0.5);
+    m.set_pv_b(plasma::LO, 0x50);
+    m.set_pv_b(plasma::HI, 200);
+    m.set_pv_b(plasma::EVERY, 1);
+    m.set_pv_b(plasma::WIDE, 0);
+    m.set_pv_f(plasma::DAMAGE, 3.0);
+    m.set_pv_f(plasma::SPIN_B, 0.0);
+    m.set_pv_s(plasma::TICKS, 0x10e);
+    m.set_pv_f(plasma::SPIN_A, 0.0);
+    m.set_pv_b(plasma::FIXED, target.is_none() as u8);
+    Some(id)
+}
+
+/// The plasma's rows along its velocity, row 1 the world's up × it.
+fn plasma_rows(v: V3) -> [V3; 3] {
+    let r0 = unit(v);
+    let r1 = unit(cross([0.0, 0.0, 1.0], r0));
+    [r0, r1, cross(r0, r1)]
+}
+
+/// `0x321de8(k, d, max, near, pos, vel, aim, &turn, side, 0)`: the velocity turned about `vel × (aim − pos)` (past
+/// 165° off, about `vel × (side × vel)`) by the spring `0x2d7f80(0, angle, k, d, max, &turn)` on the angle (within
+/// `near` and under 90°: k 0.5, d 1).
+#[allow(clippy::too_many_arguments)]
+fn home(k: f32, d: f32, max: f32, near: f32, pos: V3, vel: V3, aim: V3, turn: &mut f32, side: V3) -> V3 {
+    let to = sub(aim, pos);
+    let l = len(to);
+    if l == 0.0 { return vel; }
+    let mut axis = cross(vel, to);
+    let lv = len(vel) * l;
+    if lv == 0.0 { return vel; }
+    let angle = f32::from_bits(0x3fc9_0fdb) - (dot(vel, to) / lv).clamp(-1.0, 1.0).asin();
+    let (mut k, mut d) = (k, d);
+    if f32::from_bits(0x4038_4e8a) < angle {
+        axis = cross(vel, cross(side, vel));
+    } else if l < near && angle < f32::from_bits(0x3fc9_0fdc) {
+        (k, d) = (0.5, 1.0);
+    }
+    // `0x2d7f80`: the spring on the angle, held within ±max and ±the angle.
+    let mut v = *turn + (k * angle - d * *turn);
+    if max != 0.0 { v = v.clamp(-max, max); }
+    v = v.clamp(-angle.abs(), angle.abs());
+    *turn = v;
+    if len(axis) == 0.0 { return vel; }
+    crate::gravity::rotate(vel, unit(axis), add_rot(0.0, v))
+}
+
+/// `0x3cadc0` (module docs).
+pub fn update_plasma(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    w.mobys[id].pvars.resize(crate::moby::PVAR_BYTES, 0);
+    match w.mobys[id].state {
+        2 => {
+            w.delete(id);
+            return;
+        }
+        0 => {
+            let roll = (ctx.game.rng.rand() & 1) as i16;
+            let m = &mut w.mobys[id];
+            m.state = 1;
+            m.set_pv_f(plasma::SCROLL, 0.0);
+            m.set_pv_s(plasma::PUFF, roll);
+            m.rows = plasma_rows(m.pv_v(plasma::VEL));
+            let c = add(scale(m.rows[0], -0.3), m.pos);
+            let step = set_len(c, 0.01);
+            m.set_pv_v(plasma::TRAIL, c);
+            for k in 0..3 {
+                let p = add(m.pv_v(plasma::TRAIL + 0x10 * k), step);
+                m.set_pv_v(plasma::TRAIL + 0x10 * (k + 1), p);
+            }
+            m.set_pv_b(plasma::SHIFT, 2);
+        }
+        1 => {}
+        _ => {
+            w.register_draw(id);
+            return;
+        }
+    }
+    {
+        let m = &mut w.mobys[id];
+        let mut s = m.pv_f(plasma::SCROLL) - 0.1;
+        if s <= -8.0 { s += 8.0; }
+        m.set_pv_f(plasma::SCROLL, s);
+    }
+    // The target: gone (state −x) or without collision, none; none and free to, the first moby within 15 of the
+    // target list (not 0x0a7e, not Ratchet) of class type 5.
+    if w.mobys[id].pv_b(plasma::FIXED) == 0 {
+        let t = usize::try_from(w.mobys[id].pv_i(plasma::TARGET)).ok();
+        if t.is_some_and(|t| w.mobys.get(t).is_none_or(|x| 0x80 <= x.state || !x.has_collision)) { w.mobys[id].set_pv_i(plasma::TARGET, -1); }
+        if w.mobys[id].pv_i(plasma::TARGET) == -1 {
+            let pos = w.mobys[id].pos;
+            let near = ctx.scene.map(|sc| crate::collision::coll_sphere_mobys(sc, pos, 15.0, QueryFlags(0), Some(id))).unwrap_or_default();
+            let pick = near.into_iter().find(|&c| {
+                let x = &w.mobys[c];
+                x.mode & mode::TARGET != 0 && x.o_class != 0x0a7e && Some(c) != ctx.hero_moby && w.class(x.o_class).is_some_and(|k| k.kind == 5)
+            });
+            if let Some(t) = pick { w.mobys[id].set_pv_i(plasma::TARGET, t as i32); }
+        }
+    }
+    let start = w.mobys[id].pos;
+    {
+        let m = &mut w.mobys[id];
+        m.rows = plasma_rows(m.pv_v(plasma::VEL));
+        m.pos = add(m.pos, m.pv_v(plasma::VEL));
+        let mut n = m.pv_s(plasma::TICKS) as u16 as i32;
+        if countdown(&mut n) {
+            m.state = 2;
+            m.mode |= 0x41;
+        }
+        m.set_pv_s(plasma::TICKS, n as u16 as i16);
+        if !m.pos.iter().all(|c| WORLD.contains(c)) {
+            m.pos = start;
+            m.state = 2;
+            m.mode |= 0x41;
+        }
+    }
+    let tail = { let m = &w.mobys[id]; add(scale(m.rows[0], -0.3), m.pos) };
+    {
+        let m = &mut w.mobys[id];
+        m.rows[1][1] *= 0.5;
+        m.rows[2][2] *= 0.5;
+    }
+    // The hit: the 0.25 sphere (flags 0x10), else the step's line; not on a turret.
+    let pos = w.mobys[id].pos;
+    let hit = ctx.coll.and_then(|c| {
+        crate::collision::coll_sphere_m(c, ctx.scene, pos, 0.25, QueryFlags(0x10), Some(id)).map(|o| (o.moby, o.pushed_centre.unwrap_or(o.point)))
+            .or_else(|| crate::collision::coll_line_m(c, ctx.scene, start, pos, QueryFlags(0x10), Some(id)).map(|o| (o.moby, o.point)))
+    });
+    if let Some((met, at)) = hit {
+        if !met.is_some_and(|t| w.mobys.get(t).is_some_and(|x| matches!(x.o_class, TURRET | UP_TURRET))) {
+            let v = w.mobys[id].pv_v(plasma::VEL);
+            let mut tm = HitTemplate::new(w.mobys[id].pv_f(plasma::DAMAGE), Some(id), 0x0021_0000, [v[0], v[1], v[2], 0.0]);
+            tm.kind = (PLASMA as u16 as u32) << 16 | 0x0305;
+            let near = ctx.scene.map(|sc| crate::collision::coll_sphere_mobys(sc, pos, 1.0, QueryFlags(0), Some(id))).unwrap_or_default();
+            for t in near {
+                if w.mobys[t].mode & 0x5000 != 0 { w.deliver_hit_any(t, &tm, [0.0; 4]); }
+            }
+            crate::moby::blast::smoke_burst(w, ctx, 1.0, 13.0, Some(id), at, 0);
+            let m = &mut w.mobys[id];
+            m.state = 2;
+            m.mode |= 0x41;
+        }
+    }
+    {
+        let m = &mut w.mobys[id];
+        let s = m.pv_f(plasma::SPEED);
+        let v = set_len(m.pv_v(plasma::VEL), s.min(m.pv_f(plasma::MAX)) * 0.016_666_668);
+        m.set_pv_v(plasma::VEL, v);
+        m.set_pv_f(plasma::SPEED, s + m.pv_f(plasma::ACCEL));
+    }
+    // The homing: on the target's aim point, spiralled about it (`+0x5c` / `+0x58`) within 0.75 / 0.5 of it.
+    if let Some(t) = usize::try_from(w.mobys[id].pv_i(plasma::TARGET)).ok().filter(|&t| w.mobys.get(t).is_some()) {
+        let side = ctx.hero.gravity.up_at(w.mobys[t].pos);
+        let mut aim = aim::aim_point(w, t);
+        let m = &w.mobys[id];
+        let wide = m.pv_b(plasma::WIDE) != 0;
+        let mut d = dist(m.pos, aim);
+        if d < if wide { 1.5 } else { 0.25 } { d = 0.0; }
+        let (a, b) = (m.pv_f(plasma::SPIN_A), m.pv_f(plasma::SPIN_B));
+        aim[1] += b.sin() * (d * 0.749).min(f32::from_bits(0x3f3f_be77));
+        aim[0] -= b.cos() * (d * 0.751).min(f32::from_bits(0x3f40_4189));
+        aim[2] += (a.sin() + 1.0) * (d * 0.5).min(0.5);
+        let mut turn = m.pv_f(plasma::TURN);
+        let v = home(f32::from_bits(0x3cf5_c28f), 0.2, 0.0, if wide { 1.0 } else { 0.25 }, m.pos, m.pv_v(plasma::VEL), aim, &mut turn, side);
+        let m = &mut w.mobys[id];
+        m.set_pv_f(plasma::TURN, turn);
+        m.set_pv_v(plasma::VEL, v);
+    }
+    // Its smoke every `+0x7a` ticks (1: each), half the step's length large.
+    let moved = dist(w.mobys[id].pos, start);
+    let mut every = w.mobys[id].pv_b(plasma::EVERY) as i32;
+    let due = countdown(&mut every) || w.mobys[id].pv_b(plasma::EVERY) == 0;
+    if due {
+        let m = &w.mobys[id];
+        let (at, up) = (add(scale(m.rows[0], -0.3), m.pos), ctx.hero.gravity.up_at(m.pos));
+        let k = m.pv_s(plasma::PUFF);
+        let (lo, hi) = (m.pv_b(plasma::LO) as i32, m.pv_b(plasma::HI) as i32);
+        if let Some(sys) = ctx.parts.as_deref_mut() { crate::particles::plasma::puff(sys, &mut ctx.game.rng, moved * 0.5, at, up, PLASMA_ALPHA[(k % 2).unsigned_abs() as usize], lo, hi); }
+        w.mobys[id].set_pv_s(plasma::PUFF, k.wrapping_add(1));
+    }
+    w.mobys[id].set_pv_b(plasma::EVERY, every as u8);
+    {
+        let g = &mut ctx.game.rng;
+        let (sa, sb) = (g.randf(0.01, 0.1), g.randf(0.025, 0.25));
+        let m = &mut w.mobys[id];
+        m.set_pv_f(plasma::SPIN_B, add_rot(m.pv_f(plasma::SPIN_B), sa));
+        m.set_pv_f(plasma::SPIN_A, crate::hero::physics::sub_rot(m.pv_f(plasma::SPIN_A), sb));
+    }
+    // Its trail's four points shift every second tick, the newest its tail.
+    let m = &mut w.mobys[id];
+    let mut n = m.pv_b(plasma::SHIFT) as i32;
+    if countdown(&mut n) {
+        for k in (1..4).rev() {
+            let p = m.pv_v(plasma::TRAIL + 0x10 * (k - 1));
+            m.set_pv_v(plasma::TRAIL + 0x10 * k, p);
+        }
+        m.set_pv_v(plasma::TRAIL, tail);
+        n = 2;
+    }
+    m.set_pv_b(plasma::SHIFT, n as u8);
+    w.register_draw(id);
+}
+
+/// `0x3cbaa0` → `0x3cbad0`: in state 1 the glow (`0x2ed370`, crate::fx::halo) 0.3 behind it and its streak through its
+/// trail (`0x2ed6d8(scroll, 0.25, …, 4)`, crate::fx::streak), both `0x103080`.
+pub fn draw_plasma(w: &MobyWorld, id: usize, rng: &mut crate::rng::Rng, cam: V3, out: &mut Vec<crate::fx::FxQuad>) {
+    let m = &w.mobys[id];
+    if m.state != 1 { return; }
+    let head = add(scale(m.rows[0], -0.3), m.pos);
+    crate::fx::halo(out, rng, head, PLASMA_RGB, cam);
+    let points: Vec<V3> = (0..4).map(|k| m.pv_v(plasma::TRAIL + 0x10 * k)).collect();
+    crate::fx::streak(out, rng, m.pv_f(plasma::SCROLL), 0.25, head, &points, PLASMA_RGB, cam);
 }
