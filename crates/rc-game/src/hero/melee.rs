@@ -9,10 +9,12 @@
 //! sequence. Rows 0..2 the combo's swings (sequences 0x17..0x19), 3 the throw (0x1a), 4 the jump attack (0x2b), 5 / 6
 //! R&C1's Magneboots rows, 7 / 8 the underwater swings 0x4d (sequences 0xf / 0x10).
 //!
+//! On ice (`0x18b2b2`) the swing 0x13 only slides and the glove punch 0x1f pushes and slides (`0x2b96a0`).
+//!
 //! Not ported: the stats counters the entries bump (`0x18c3d8`, `0x18c750`, `0x18c75c`, `0x18c600`), the sounds
-//! (`0x2b9c90`, `0x2d6cc8`), the strafe and the gravity frames (`0x18c0e3` ≠ 0), the sliding floors (`0x18b2b2`:
-//! `0x2b96a0`), the jump attack's ground sparks and wall hit (`0x2e14b0` with flag 0x10), the comet aim `0x41fe58`'s
-//! own search (`0x3257a0`: the plain aim is used), 0x1f (the glove swing, needs a glove) and 0x4d (the swim family).
+//! (`0x2b9c90`, `0x2d6cc8`), the strafe and the gravity frames (`0x18c0e3` ≠ 0), the jump attack's ground sparks
+//! and wall hit (`0x2e14b0` with flag 0x10), the comet aim `0x41fe58`'s own search (`0x3257a0`: the plain aim is
+//! used) and 0x4d (the swim family).
 
 use super::physics::*;
 use super::states::Entry;
@@ -183,8 +185,20 @@ impl Hero {
             self.turn_to(0.05, 0.2, 0.283_121_5, 0);
         }
         self.target_speed = if 10 < self.timer && self.timer < 0x12 { 0.3 } else { 0.0 };
-        if 10 < self.timer { self.speed_step(0.052_777_78, 0.025); }
-        if self.melee.aim == 0 { self.set_planar_vel(f32::MAX) } else { self.set_planar_vel(self.melee.aim_yaw) }
+        if self.surf.ice {
+            // On ice: a push of 0.02 along the facing from tick 11 to 16 while slower than 0.1417, then the slide.
+            if 10 < self.timer && self.timer < 0x11 && self.fwd_speed < f32::from_bits(0x3e11_1112) {
+                let (s, c) = self.rot[2].sin_cos();
+                let k = f32::from_bits(0x3ca3_d70b);
+                self.vel[0] += c * k;
+                self.vel[1] += s * k;
+                self.eff_h = self.vel;
+            }
+            self.ice_move(env);
+        } else {
+            if 10 < self.timer { self.speed_step(0.052_777_78, 0.025); }
+            if self.melee.aim == 0 { self.set_planar_vel(f32::MAX) } else { self.set_planar_vel(self.melee.aim_yaw) }
+        }
         if 10 < self.timer && self.timer < 0x16 && self.items.hand.is_some() {
             let (s, c) = self.rot[2].sin_cos();
             let dir = [c * 2.0, s * 2.0, 1.3];
@@ -277,6 +291,8 @@ impl Hero {
         match self.state {
             0x13 => {
                 if v.blending() || frame < sw[HIT_TO] as f32 { self.items.use_state = 2; }
+                // On ice the swing only slides (`0x2b96a0`, then the switch's tail).
+                if self.surf.ice { return self.ice_move(env); }
                 self.target_speed = 0.0;
                 let mut lunge = self.melee.lunge;
                 if let (Some(_), true) = (self.melee.target, self.timer <= 3) {

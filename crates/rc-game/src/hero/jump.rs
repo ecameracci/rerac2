@@ -29,7 +29,7 @@
 //! the descent's local speed, crate::hero::frame); the flip's, the wall jump's and the climbs' frame branches are not
 //! ported.
 //!
-//! Not ported: the ice's air control (`0x2b96a0`), the splash and sounds, the landing
+//! Not ported: the splash and sounds, the landing
 //! effects and camera jolt, the body lean `0x2b7c88`, the vehicle (`0x18c0d4` = 1) and the scripted timers
 //! `0x18a012` (→ 0x82) / `0x18a032` (the state refused).
 
@@ -344,7 +344,9 @@ impl Hero {
                 if env.line(a, self.along_facing(a, 0.95), 4).is_some() { self.jump.blocked = 1; }
             }
         } else {
-            // On ice (`0x2b96a0`): the slide keeps the speed; the Heli-Pack windup's push.
+            // Keeping the ground speed (`0x18a348`, a take-off from ice): the ice slide (`0x2b96a0`); the Heli-Pack
+            // windup's push.
+            self.ice_move(env);
             if self.state == 10 && self.timer < 10 && self.fwd_speed < 0.116_666_675 {
                 let (s, c) = self.rot[2].sin_cos();
                 self.vel[0] += c * 0.011_666_667;
