@@ -682,7 +682,10 @@ fn hand_pass(world: &mut MobyWorld, ctx: &mut Ctx) {
         }
         _ => {}
     }
-    if world.mobys[id].state < 0xfe {
+    // With the first-person weapon on (`0x18b320`) the hand's update waits for its placement in the view
+    // ([`view_model`]); the wrench's runs here.
+    let fp_weapon = ctx.hero.items.fp.on && ctx.hero.items.item != WRENCH;
+    if world.mobys[id].state < 0xfe && !fp_weapon {
         if let Some(f) = world.mobys[id].update { f(world, id, ctx); }
     }
     let it = &mut ctx.hero.items;
@@ -1168,7 +1171,8 @@ pub fn first_person_weapon(world: &mut MobyWorld, ctx: &mut Ctx) {
 /// weapon's sphere behind its centre (along −row 1) finds the world in the way: the pull back's target is how far it
 /// would go in (at most 1.5), eased toward (1/240, 1/240, at most 1/12).
 ///
-/// Not ported: the call of the item's `+0x64` hook after the placement.
+/// Then the item's update (its `+0x64`, which the item pass skipped) with the view's frame as Ratchet's
+/// (`0x18a550` / `0x18a580`).
 fn view_model(world: &mut MobyWorld, ctx: &mut Ctx) {
     use crate::hero::physics::{add, add_rot, approach, dist, ease, euler_rows, scale, set_len, sub};
     let Some(id) = ctx.hero.items.hand else { return };
@@ -1181,6 +1185,7 @@ fn view_model(world: &mut MobyWorld, ctx: &mut Ctx) {
     let item = ctx.hero.items.item;
     if matches!(item, 0xc | 0x11) && ctx.hero.items.ready == 2 {
         world.mobys[id].mode |= 1;
+        if let Some(f) = world.mobys[id].update { f(world, id, ctx); }
         world.rebuild(id, &*ctx.host);
         return;
     }
@@ -1236,4 +1241,12 @@ fn view_model(world: &mut MobyWorld, ctx: &mut Ctx) {
     let (mut p, mut v) = (fp.pull, fp.pull_v);
     ease(fp.pull_to, 1.0 / 240.0, 1.0 / 240.0, 1.0 / 12.0, &mut p, &mut v);
     (fp.pull, fp.pull_v) = (p, v);
+    // `0x18a550..`: the frame the weapons shoot by is the view's while its update runs here (his rows, `0x2af8d8`'s
+    // copy, otherwise): it fires from where it sits on screen toward the view's middle.
+    let rows = ctx.hero.rows;
+    ctx.hero.rows = cam_rows;
+    if world.mobys[id].state < 0xfe {
+        if let Some(f) = world.mobys[id].update { f(world, id, ctx); }
+    }
+    ctx.hero.rows = rows;
 }
