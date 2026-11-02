@@ -52,6 +52,15 @@ pub const BLITZ_CLASS: i16 = crate::moby::classes::blitz::HAND_CLASS;
 /// The Pulse Rifle: item 0x17, class 0x5cb (L00 row `0x263920`; crate::moby::classes::pulse_rifle).
 pub const PULSE: i32 = 0x17;
 pub const PULSE_CLASS: i16 = crate::moby::classes::pulse_rifle::HAND_CLASS;
+/// The Mini-Turret Glove: item 0x29, class 0xc5a (L00 row `0x2648e0`; crate::moby::classes::turret).
+pub const MINI_TURRET: i32 = 0x29;
+pub const MINI_TURRET_CLASS: i16 = crate::moby::classes::turret::HAND_CLASS;
+/// The Synthenoids: item 0x1f, class 0xcb2 (L00 row `0x264020`; not held: asked for, they are sent out,
+/// crate::moby::classes::synthenoid).
+pub const SYNTHENOID: i32 = 0x1f;
+/// The Lava Gun: item 0x1d, class 0x5c9 (L00 row `0x263e60`; crate::moby::classes::lava_gun).
+pub const LAVA: i32 = 0x1d;
+pub const LAVA_CLASS: i16 = crate::moby::classes::lava_gun::HAND_CLASS;
 
 /// An item record (`0x262500 + 0xe0·row`, row `0x139568[item]`: crate::upgrades): the fields the port reads.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -82,8 +91,9 @@ pub struct ItemRow {
 
 /// The rows the port has (L00 `0x262dc0`, `0x263f40`, `0x2649c0`; the Dynamo's from Oozla's live table; the
 /// Electrolyzer's and the Spiderbot Glove's from L02's; the Swingshot's from L03's; the Chopper's L00 `0x263840`; the
-/// Blitz Gun's L00 `0x263bc0`; the Pulse Rifle's L00 `0x263920`).
-pub const ROWS: [ItemRow; 11] = [
+/// Blitz Gun's L00 `0x263bc0`; the Pulse Rifle's L00 `0x263920`; the Mini-Turret Glove's L00 `0x2648e0`; the
+/// Synthenoids' L00 `0x264020`; the Lava Gun's L00 `0x263e60`).
+pub const ROWS: [ItemRow; 14] = [
     ItemRow { item: WRENCH, attach: 0, class: WRENCH_CLASS, stance: 0, icon: 0, use_seq: 0, keep: false, fire_seq: [0, 0], speed: 0.0, rate: 0.0, damage: 1.0, ammo: false, max_ammo: 0, start_ammo: 0 },
     ItemRow { item: LANCER, attach: 0, class: LANCER_CLASS, stance: 1, icon: 0xea64, use_seq: 0x38, keep: true, fire_seq: [-1, 0x3e], speed: 60.0, rate: 7.0, damage: 0.5, ammo: true, max_ammo: 200, start_ammo: 200 },
     ItemRow { item: DYNAMO, attach: 1, class: DYNAMO_CLASS, stance: 1, icon: 0xea7f, use_seq: 0x8d, keep: false, fire_seq: [0x8e, 0x8d], speed: 0.0, rate: 0.0, damage: 0.0, ammo: false, max_ammo: 0, start_ammo: 0 },
@@ -95,6 +105,9 @@ pub const ROWS: [ItemRow; 11] = [
     ItemRow { item: CHOPPER, attach: 6, class: CHOPPER_CLASS, stance: 0, icon: 0xea66, use_seq: 0x8f, keep: false, fire_seq: [0x8f, 0x8f], speed: 30.0, rate: 1.8, damage: 1.0, ammo: true, max_ammo: 35, start_ammo: 35 },
     ItemRow { item: BLITZ, attach: 0, class: BLITZ_CLASS, stance: 2, icon: 0xea67, use_seq: 0x89, keep: false, fire_seq: [0x8a, -1], speed: 0.0, rate: 2.0, damage: 3.0, ammo: true, max_ammo: 40, start_ammo: 40 },
     ItemRow { item: PULSE, attach: 0, class: PULSE_CLASS, stance: 2, icon: 0xea68, use_seq: 0x36, keep: false, fire_seq: [-1, 0x46], speed: 400.0, rate: 1.0, damage: 10.0, ammo: true, max_ammo: 8, start_ammo: 8 },
+    ItemRow { item: MINI_TURRET, attach: 6, class: MINI_TURRET_CLASS, stance: 0, icon: 0xea6a, use_seq: 0x2c, keep: false, fire_seq: [0x42, 0x2c], speed: 30.0, rate: 6.0, damage: 0.7, ammo: true, max_ammo: 20, start_ammo: 20 },
+    ItemRow { item: SYNTHENOID, attach: 6, class: crate::moby::classes::synthenoid::DRONE, stance: 0, icon: 0xea6d, use_seq: 0x2c, keep: false, fire_seq: [0x42, 0x2c], speed: 60.0, rate: 2.0, damage: 0.75, ammo: true, max_ammo: 12, start_ammo: 12 },
+    ItemRow { item: LAVA, attach: 0, class: LAVA_CLASS, stance: 2, icon: 0xea69, use_seq: 0x36, keep: true, fire_seq: [-1, 0x46], speed: 0.0, rate: 0.0, damage: 6.0, ammo: true, max_ammo: 200, start_ammo: 200 },
 ];
 
 /// The upgraded rows the port has (L00 `0x262500 + 0xe0·row`; their item in brackets): the Heavy Lancer 0x3c and the
@@ -582,7 +595,10 @@ fn hand_pass(world: &mut MobyWorld, ctx: &mut Ctx) {
 ///
 /// The Blitz Gun (0x1a) only pulses. The Pulse Rifle (0x17) queues two glows at its joints 2 and 3 (crate::fx::HeroGlow).
 ///
-/// Not ported: the other items' cases (0xe, 0x10, 0x12, 0x18, 0x19, 0x1b..0x1d, 0x29, 0x2b, 0x2c: their weapons are
+/// The Lava Gun (0x1d) pulses `0xff00ffff` .. `0xff104080` and sheds a sprite at (0.06, −0.509, 0): 73500, capped
+/// 0x30, in use faster (0.1076) at 57750 capped 0x28.
+///
+/// Not ported: the other items' cases (0xe, 0x10, 0x12, 0x18, 0x19, 0x1b, 0x1c, 0x2b, 0x2c: their weapons are
 /// not ported), the upgraded Pulse Rifle's (its joint 1, `0x7f1010ff`, and a sprite: its hand is not ported).
 fn hand_glow(world: &mut MobyWorld, ctx: &mut Ctx, id: usize) {
     let it = &mut ctx.hero.items;
@@ -618,7 +634,8 @@ fn hand_glow(world: &mut MobyWorld, ctx: &mut Ctx, id: usize) {
             let (step, keys) = if up { (0.040_724_356, [0xffff_20bf, 0xffff_2070]) } else { (0.058_177_65, [0xffff_20ff, 0xffff_2090]) };
             world.mobys[id].glow = pulse(&mut it.glow_phase, step, keys);
         }
-        SPIDERBOT => {
+        // The Mini-Turret Glove's case 0x29 is the Spiderbot Glove's.
+        SPIDERBOT | MINI_TURRET => {
             let step = if up { 0.040_724_356 } else { 0.049_451_005 };
             world.mobys[id].glow = pulse(&mut it.glow_phase, step, [0xff50_5050, 0xffef_efef]);
         }
@@ -639,6 +656,13 @@ fn hand_glow(world: &mut MobyWorld, ctx: &mut Ctx, id: usize) {
         }
         // The Pulse Rifle (case 0x17): two green glows at its joints 2 and 3 (`0x2a7e60(0.1, 0.03, joint, 0x3500ff10)`),
         // no word.
+        // The Lava Gun (case 0x1d).
+        LAVA if !up => {
+            let (step, size, c) = if using { (0.107_628_65, 57_750.0, 0x28ff_ffffu32) } else { (0.058_177_65, 73_500.0, 0x30ff_ffff) };
+            let g = pulse(&mut it.glow_phase, step, [0xff00_ffff, 0xff10_4080]);
+            world.mobys[id].glow = g;
+            sprites.push((size, 0.1, [0.06, -0.509, 0.0], g & cap(c)));
+        }
         PULSE if !up => {
             for j in [2, 3] {
                 if let Some(point) = ctx.host.joint(&world.mobys[id], j) { world.hero_glows.push(crate::fx::HeroGlow { size: 0.1, push: 0.03, point, rgba: 0x3500_ff10 }); }
@@ -706,10 +730,24 @@ fn switch(world: &mut MobyWorld, ctx: &mut Ctx) {
     let idle = h.idle_seq();
     let it = &mut h.items;
     if h.no_menu != 0 && it.item != WRENCH { it.wrench_req = true; }
+    // The Synthenoids asked for (0x1f; 0x3d the upgraded, not ported) are sent out, not held (`0x3ee110`): locked
+    // away with the wrench in the hand here, else past the items' lock below.
+    if h.no_menu != 0 && it.item == WRENCH && matches!(it.request, SYNTHENOID | 0x3d) {
+        it.request = 0;
+        crate::moby::classes::synthenoid::deploy(world, ctx);
+    }
+    let h = &mut *ctx.hero;
+    let it = &mut h.items;
     if it.no_use != 0 && (!it.wrench_req || it.item == WRENCH) {
         it.wrench_req = false;
         return;
     }
+    if matches!(it.request, SYNTHENOID | 0x3d) {
+        it.request = 0;
+        crate::moby::classes::synthenoid::deploy(world, ctx);
+    }
+    let h = &mut *ctx.hero;
+    let it = &mut h.items;
     let mut changed = false;
     if (it.square_recent || it.wrench_req) && it.item != WRENCH {
         it.selected = WRENCH;

@@ -18,6 +18,10 @@
 //! | `0x3feba0` | the beam 0x0dc1 (the upgrade screen's lightning) | its bolt ([`crate::moby::classes::beam::draw`]) |
 //! | `0x3d4320` / `0x3fe250` | the upgraded Blitz Gun 0x0af1 after a shot / its tracer 0x0d9c | its arcs, ring and glare ([`crate::moby::classes::blitz_mega::draw`]); the beam |
 //! | `0x3a9a48` | the Pulse Rifle's shot 0x05d6 with smoke or a beam | its slot's smoke and beams ([`crate::moby::classes::pulse_rifle::draw`]) |
+//! | `0x3eecd0` | the Synthenoids' shot 0x0cbb | its streaks ([`crate::moby::classes::synthenoid::draw`]) |
+//! | `0x41c328` | the Lava Gun in the hand 0x05c9 drawn | its stream, muzzle glows and burning pools ([`crate::moby::classes::lava_gun::draw`]) |
+//! | `0x3ec108` | the Mini-Turret Glove in the hand 0x0c5a | where its throw lands ([`crate::moby::classes::turret::draw_marker`]) |
+//! | `0x389818` | the Mini-Turret 0x1366 | its muzzle flash and its shots ([`crate::moby::classes::turret::draw`]) |
 //! | `0x2a7ac8` (first list) | Ratchet | the hand item's glows ([`HeroGlow`]; its other glows are not ported) |
 //! | `0x3c6eb8` (L02) | the Spiderbot Glove in the hand 0x0907 | where its throw lands ([`crate::moby::classes::spiderbot::draw_marker`]) |
 //! | `0x3cac30` | Oozla's conveyor 0x0a7b out | its belt of light ([`crate::moby::classes::oozla::draw_0a7b`]) |
@@ -337,6 +341,10 @@ fn one(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut crate::ga
         crate::moby::classes::blitz_mega::HAND_CLASS => crate::moby::classes::blitz_mega::draw(w, id, &mut game.rng, cam, out),
         crate::moby::classes::beam::CLASS => crate::moby::classes::beam::draw(w, id, cam, out),
         crate::moby::classes::pulse_rifle::SHOT => crate::moby::classes::pulse_rifle::draw(w, id, hero_state, cam, out),
+        crate::moby::classes::synthenoid::SHOT => crate::moby::classes::synthenoid::draw(w, id, cam, out),
+        crate::moby::classes::lava_gun::HAND_CLASS => crate::moby::classes::lava_gun::draw(w, id, &mut game.rng, cam, out),
+        crate::moby::classes::turret::HAND_CLASS => crate::moby::classes::turret::draw_marker(w, id, hero_state, game.scenes.mode, game.frame, out),
+        crate::moby::classes::turret::TURRET => crate::moby::classes::turret::draw(w, host, id, &mut game.rng, cam, out),
         crate::moby::classes::spiderbot::HAND_CLASS | crate::moby::classes::spiderbot::PLUS_HAND => crate::moby::classes::spiderbot::draw_marker(w, id, hero_state, game.scenes.mode, game.frame, out),
         0x0a7b => crate::moby::classes::oozla::draw_0a7b(w, id, out),
         0x0a9d => crate::moby::classes::oozla::draw_0a9d(w, id, out),

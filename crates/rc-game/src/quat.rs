@@ -72,6 +72,19 @@ pub fn nlerp(a: Q, b: Q, t: f32) -> Q {
     normalize(std::array::from_fn(|i| a[i] * (1.0 - t) + b[i] * k))
 }
 
+/// `0x321ca8(t, out, v, to, 0)`: `v` turned toward `to` by `t` of the angle between them (`v` as it is when either is
+/// 0): the half angle `(π/2 − asin(cos)) · t / 2` about `unit(v × to)`, as `q · v · q̄` (users: the Mini-Turret's look,
+/// crate::moby::classes::turret; the upgraded Spiderbot's keeps its own copy).
+pub fn turn_toward(t: f32, v: V3, to: V3) -> V3 {
+    let (lv, lt) = (crate::hero::physics::len(v), crate::hero::physics::len(to));
+    if lv * lt == 0.0 { return v; }
+    let axis = crate::hero::physics::unit(cross(v, to));
+    let a = (std::f32::consts::FRAC_PI_2 - (dot(v, to) / (lv * lt)).clamp(-1.0, 1.0).asin()) * t * 0.5;
+    let (s, c) = a.sin_cos();
+    // `q · v · q̄` with q = (axis·sin, cos); [`rotate`] turns by the conjugate.
+    rotate([-axis[0] * s, -axis[1] * s, -axis[2] * s, c], v)
+}
+
 fn normalize(q: Q) -> Q {
     let l = q.iter().map(|x| x * x).sum::<f32>().sqrt();
     if 0.0 < l { q.map(|x| x / l) } else { IDENTITY }

@@ -43,6 +43,7 @@ pub mod floater;
 pub mod hits;
 pub mod platform;
 pub mod shards;
+pub mod slide;
 
 use crate::hero::physics::{add, scale, V3};
 use crate::hero::Hero;
@@ -560,6 +561,10 @@ pub struct MobyWorld {
     pub chopper: classes::chopper::Pool,
     /// The Pulse Rifle's records in the trail slots' memory and its beams' next (classes::pulse_rifle).
     pub pulse: classes::pulse_rifle::Mem,
+    /// The Mini-Turret Glove's turrets' table and shots (classes::turret).
+    pub turret: classes::turret::Mem,
+    /// The Lava Gun's stream and burning pools (classes::lava_gun).
+    pub lava: classes::lava_gun::Mem,
     /// The hand item's glows of this tick (`0x2a7e60`'s queue `0x18bea0`, drawn by Ratchet's first-list callback
     /// `0x2a7ac8`; crate::hero::items::hand_glow fills it, crate::fx::callbacks draws it).
     pub hero_glows: Vec<crate::fx::HeroGlow>,

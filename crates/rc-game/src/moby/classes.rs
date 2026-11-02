@@ -29,6 +29,7 @@ pub mod gate;
 pub mod gravity_bomb;
 pub mod keeper;
 pub mod lancer;
+pub mod lava_gun;
 pub mod pulse_rifle;
 pub mod leaper;
 pub mod oozla;
@@ -46,6 +47,7 @@ pub mod spawn_point;
 pub mod spiderbot;
 pub mod spiderbot_plus;
 pub mod swingshot;
+pub mod synthenoid;
 pub mod teleport;
 pub mod tie_lights;
 pub mod telepad;
@@ -54,6 +56,7 @@ pub mod maktar_hints;
 pub mod maktar_pads;
 pub mod swamp_monster;
 pub mod tractor;
+pub mod turret;
 pub mod vendor;
 pub mod weather;
 pub mod wrench;
@@ -82,8 +85,9 @@ use super::UpdateFn;
 /// (L00 `0x2a3450` / `0x2a3444`) are listed for the levels whose class list lacks them. The Pulse Rifle's shot 0x05d6
 /// (L00 `lvl.vtbl`) has no model: its smoke and beams are its draw's.
 /// The upgraded Spiderbot 0x0e79 and its shot 0x0eaa and shell 0x0eab (L00 `lvl.vtbl`) are listed for the levels whose
-/// class list lacks them. The upgraded Blitz's tracer 0x0d9c and the beam 0x0dc1 have no model.
-pub const CREATED_LOGIC: &[i16] = &[crate::ship::LASER_CLASS, teleport::CLASS, explosion::CLASS, spiderbot::BOT_CLASS, endako_boss::BEAM, endako_boss::TRACER, endako_boss::ROCKET, blitz::TRACER, gravity_bomb::MINI_BOMB, gravity_bomb::MINI_BLAST, pulse_rifle::SHOT, spiderbot::PLUS_BOT, spiderbot_plus::SHOT, spiderbot_plus::LOB, blitz::MEGA_TRACER, beam::CLASS];
+/// class list lacks them. The upgraded Blitz's tracer 0x0d9c and the beam 0x0dc1 have no model. The Synthenoids' shot
+/// 0x0cbb (L00 `lvl.vtbl`) is listed for the levels whose class list lacks it.
+pub const CREATED_LOGIC: &[i16] = &[crate::ship::LASER_CLASS, teleport::CLASS, explosion::CLASS, spiderbot::BOT_CLASS, endako_boss::BEAM, endako_boss::TRACER, endako_boss::ROCKET, blitz::TRACER, gravity_bomb::MINI_BOMB, gravity_bomb::MINI_BLAST, pulse_rifle::SHOT, spiderbot::PLUS_BOT, spiderbot_plus::SHOT, spiderbot_plus::LOB, blitz::MEGA_TRACER, beam::CLASS, synthenoid::SHOT];
 
 pub fn update_for(o_class: i16) -> Option<UpdateFn> {
     match o_class {
@@ -113,6 +117,11 @@ pub fn update_for(o_class: i16) -> Option<UpdateFn> {
         beam::CLASS => Some(beam::update),
         pulse_rifle::HAND_CLASS => Some(pulse_rifle::update),
         pulse_rifle::SHOT => Some(pulse_rifle::update_shot),
+        lava_gun::HAND_CLASS => Some(lava_gun::update),
+        synthenoid::DRONE => Some(synthenoid::update),
+        synthenoid::SHOT => Some(synthenoid::update_shot),
+        turret::HAND_CLASS => Some(turret::update_hand),
+        turret::TURRET => Some(turret::update),
         swingshot::HAND_CLASS => Some(swingshot::update),
         swingshot::HOOK_CLASS => Some(swingshot::update_hook),
         0xbfe => Some(shot::update),

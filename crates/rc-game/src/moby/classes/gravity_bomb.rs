@@ -5,7 +5,7 @@
 //! landing found): each tick the aim — out of the look stance, the cone search (crate::moby::aim, π/8 × π/4 to 11.1
 //! from the hand along Ratchet's facing, no crates) — and the throw that reaches it ([`launch`], `0x37e328`: 15 a
 //! second across, the rise worked out for the gravity 12 a second²; with nothing aimed at, 12 ahead, or with L1
-//! held the camera's look as far as it meets the ground under Ratchet, [`look_aim`]), then the arc
+//! held the camera's look as far as it meets the ground under Ratchet, [`look_aim_with`]), then the arc
 //! followed to where it lands ([`landing`], `0x37e988`) for the marker ([`draw_marker`], `0x37dfc0`). Its sequence 2
 //! run out: back to 1. In hand 23 ticks, the cooldown out and ○ held (in the look stance after its wait): one bomb
 //! (`0x2d42d0`), the use stance (crate::hero::items::ItemBlock::use_start: Ratchet's sequence 0x36, both hands),
@@ -132,18 +132,23 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 /// `0x37e328(least, reach, speed, gravity, out, from, target, 0)` under plain gravity (down `(0, 0, −1)`,
 /// `0x326448`): the throw from `from` that comes down on `target` (a moby's place), or ahead of Ratchet — `reach`
 /// along his facing, or with L1 held (`0x138320 & 4`) and the item not kept away (`0x18c0dc`) along the camera's
-/// look ([`look_aim`]); `speed` across, the rise for the fall.
-fn launch(ctx: &Ctx, from: V3, target: Option<V3>) -> V3 {
+/// look ([`look_aim_with`]); `speed` across, the rise for the fall.
+fn launch(ctx: &Ctx, from: V3, target: Option<V3>) -> V3 { launch_with(ctx, LEAST, REACH, SPEED, GRAVITY, from, target) }
+
+/// [`launch`] with the throw's own arguments (`0x37e328(least, reach, speed a tick, gravity a tick², ..)`: the same code
+/// for the Mini-Turret Glove's `(1.5, 4.5 or 11, 0.25, 11 a second²)`, crate::moby::classes::turret). Ratchet's look
+/// stance 1 going to 0x1d when there is no target is the caller's.
+pub fn launch_with(ctx: &Ctx, least: f32, reach: f32, speed: f32, gravity: f32, from: V3, target: Option<V3>) -> V3 {
     let to = target.unwrap_or_else(|| {
         let it = ctx.hero.items;
-        let (way, reach) = if it.held & crate::pad::button::L1 != 0 && it.no_use == 0 { look_aim(ctx) } else { (ctx.hero.rows[0], REACH) };
+        let (way, reach) = if it.held & crate::pad::button::L1 != 0 && it.no_use == 0 { look_aim_with(ctx, least, reach) } else { (ctx.hero.rows[0], reach) };
         add(ctx.hero.pos, set_len(way, reach))
     });
     let d = sub(to, from);
     let across = [d[0], d[1], 0.0];
-    let mut v = set_len(across, SPEED);
-    let t = len(across) / SPEED;
-    if 0.0 < t { v[2] = (d[2] + GRAVITY * t * t * 0.5) / t; }
+    let mut v = set_len(across, speed);
+    let t = len(across) / speed;
+    if 0.0 < t { v[2] = (d[2] + gravity * t * t * 0.5) / t; }
     v
 }
 
@@ -153,11 +158,9 @@ fn launch(ctx: &Ctx, from: V3, target: Option<V3>) -> V3 {
 /// turns the camera's rows (`0x2efc20` its matrix, `0x2efa00` row by row) and the first row is the way. The
 /// reach: where the camera's forward ray reaches the level of Ratchet's feet (when it looks down at all), its
 /// distance across from the camera held to `least`..`reach`, else `reach`; then eased by `1 − (1 − x)²`
-/// (`0x31b918`).
-fn look_aim(ctx: &Ctx) -> (V3, f32) { look_aim_with(ctx, LEAST, REACH) }
-
-/// [`look_aim`] with the throw's own least and reach (the same code with other arguments: the Spiderbot Glove's
-/// `0x385b58`, crate::moby::classes::spiderbot).
+/// (`0x31b918`). The bomb's throw passes `least` 1e-5 and `reach` 12 ([`launch`]); the same code with other
+/// arguments: the Spiderbot Glove's `0x385b58` (crate::moby::classes::spiderbot), the Mini-Turret Glove's
+/// ([`launch_with`]).
 pub fn look_aim_with(ctx: &Ctx, least: f32, max: f32) -> (V3, f32) { look_aim_from(ctx, least, max, ctx.hero.pos) }
 
 /// [`look_aim_with`] from the place `feet` (`0x37e328`'s moby: Ratchet, or the upgraded Spiderbot's own place,
@@ -838,7 +841,7 @@ fn effect_tick(w: &mut MobyWorld, id: usize) {
 }
 
 /// `0x321c00(angle, out, v, axis)`: `v` turned `angle` about `axis`.
-fn rotate(v: V3, angle: f32, axis: V3) -> V3 {
+pub(crate) fn rotate(v: V3, angle: f32, axis: V3) -> V3 {
     if angle.abs() < 1e-5 { return v; }
     turn(v, crate::hero::physics::unit(axis), angle)
 }
