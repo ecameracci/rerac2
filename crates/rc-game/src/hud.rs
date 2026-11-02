@@ -509,9 +509,8 @@ impl WeaponPanel {
         let frame = (text.len() as f32 - 3.0).clamp(0.0, 5.0);
         out.push(Draw::Sprite { id: 1, pos: self.back.pos(), scale: self.back.size(), frame, colour: self.back.colour() });
         out.push(Draw::Sprite { id: 2, pos: self.outline.pos(), scale: self.outline.size(), frame, colour: self.outline.colour() });
-        // The experience bar (sprite 5, a bone chain posed by its frame) is held back: the port's sprite poser draws it
-        // as a jagged line across the icon, not the game's bar along the box's edge.
-        let _ = (self.xp_bar, self.bar.sample());
+        // The experience bar: sprite 5, a bone chain along the box's edge that its frame stretches (0..30).
+        out.push(Draw::Sprite { id: 5, pos: [10.0, 18.5], scale: [1.0, 1.0], frame: self.xp_bar, colour: self.bar.sample().1 });
         if self.icon_id != 0 { out.push(Draw::Icon { id: self.icon_id, frame: 0, pos: self.icon.pos(), size: self.icon.size(), colour: self.icon.colour() }); }
         out.push(Draw::Text { text, pos: self.text.pos(), scale: self.text.size()[0], colour: self.text.colour(), align: Align::Left });
     }

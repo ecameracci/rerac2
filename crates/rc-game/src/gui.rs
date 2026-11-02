@@ -80,13 +80,15 @@ type Mat = [[f32; 3]; 4];
 
 fn apply(m: &Mat, v: [f32; 3]) -> [f32; 3] { std::array::from_fn(|j| v[0] * m[0][j] + v[1] * m[1][j] + v[2] * m[2][j] + m[3][j]) }
 
-/// `FUN_00284408`: rotation (quaternion) × scale, then the translation.
+/// `FUN_00284408`: rotation (quaternion) × scale, then the translation. The rows are the quaternion's matrix's
+/// columns: the weapon panel's experience bar (sprite 5, authored in x–y, its root turned into the x–z plane the
+/// sprites are drawn in) lies flat only so; every other sprite's keys hold no turn.
 fn key_matrix(k: &BoneKey) -> Mat {
     let [x, y, z, w] = k.rotation;
     let r = [
-        [1.0 - 2.0 * (y * y + z * z), 2.0 * (x * y + z * w), 2.0 * (x * z - y * w)],
-        [2.0 * (x * y - z * w), 1.0 - 2.0 * (x * x + z * z), 2.0 * (y * z + x * w)],
-        [2.0 * (x * z + y * w), 2.0 * (y * z - x * w), 1.0 - 2.0 * (x * x + y * y)],
+        [1.0 - 2.0 * (y * y + z * z), 2.0 * (x * y - z * w), 2.0 * (x * z + y * w)],
+        [2.0 * (x * y + z * w), 1.0 - 2.0 * (x * x + z * z), 2.0 * (y * z - x * w)],
+        [2.0 * (x * z - y * w), 2.0 * (y * z + x * w), 1.0 - 2.0 * (x * x + y * y)],
     ];
     let s = k.scale;
     [r[0].map(|c| c * s[0]), r[1].map(|c| c * s[1]), r[2].map(|c| c * s[2]), k.translation]
