@@ -290,7 +290,8 @@ pub fn update_lift(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let m = &mut w.mobys[id];
     let (pos, rot) = (m.pos, m.rot);
     crate::moby::platform::write(m, 0x20, sub(pos, old), rot, rot);
-    crate::moby::carry_hero(ctx, id, old, old_rot[2], pos, rot[2]);
+    let flags = m.pv_i(0x20 + 0x3c) as u32;
+    crate::moby::carry_hero_with(ctx, id, flags, old, old_rot[2], pos, rot[2]);
 }
 
 fn lift_tick(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {

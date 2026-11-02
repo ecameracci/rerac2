@@ -298,12 +298,18 @@ impl SpawnRules<'_> {
 /// A mover's step for Ratchet: grounded on moby `id`, or climbing (0x1b) or in the ledge group 3 with the ledge on it
 /// (`0x18a3a8`), he is carried by its move from `old` (and turned by its yaw's change about its new place); the ledge's
 /// hang point, edge and yaw follow too. It stands in for his own read of the mover's platform block (`0x2d44e0`
-/// through `0x322028`, crate::moby::platform), which turns him about every axis.
-pub fn carry_hero(ctx: &mut Ctx, id: usize, old: V3, old_yaw: f32, new: V3, yaw: f32) {
+/// through `0x322028`, crate::moby::platform), which turns him about every axis. `flags`: its platform block's `+0x3c`
+/// (0 without one): kept with its step for the air after it ([`crate::hero::physics::Plat`]); a flag-2 mover carries
+/// him in the air too ([`carry_hero_with`]; this is flags 0).
+pub fn carry_hero(ctx: &mut Ctx, id: usize, old: V3, old_yaw: f32, new: V3, yaw: f32) { carry_hero_with(ctx, id, 0, old, old_yaw, new, yaw) }
+
+/// [`carry_hero`] by a mover with its platform block's flags.
+pub fn carry_hero_with(ctx: &mut Ctx, id: usize, flags: u32, old: V3, old_yaw: f32, new: V3, yaw: f32) {
     let h = &mut *ctx.hero;
     let ground = h.ground_moby == Some(id) && h.air_ticks == 0;
     let ledge = h.air_ticks != 0 && (h.state == 0x1b || h.group == 3) && h.ledge.moby == Some(id);
-    if !ground && !ledge { return; }
+    let air = h.air_ticks != 0 && !ledge && flags & 2 != 0 && h.plat.is_some_and(|p| p.moby == id);
+    if !ground && !ledge && !air { return; }
     let dy = crate::hero::physics::sub_rot(yaw, old_yaw);
     let (s, c) = dy.sin_cos();
     let follow = |p: V3| {
@@ -318,7 +324,9 @@ pub fn carry_hero(ctx: &mut Ctx, id: usize, old: V3, old_yaw: f32, new: V3, yaw:
         h.ledge.yaw = crate::hero::physics::add_rot(h.ledge.yaw, dy);
     }
     h.rot[2] = crate::hero::physics::add_rot(h.rot[2], dy);
-    h.carry = crate::hero::physics::add(h.carry, crate::hero::physics::sub(h.pos, was));
+    let step = crate::hero::physics::sub(h.pos, was);
+    h.plat = Some(crate::hero::physics::Plat { moby: id, step, flags });
+    h.carry = crate::hero::physics::add(h.carry, step);
     h.carry_yaw = crate::hero::physics::add_rot(h.carry_yaw, dy);
 }
 

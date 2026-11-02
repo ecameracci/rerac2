@@ -730,8 +730,9 @@ impl Hero {
     /// not below the ground; group 0xf: xy), integrate velocity and drag, the capsule, the ground probe, the snap; the
     /// effective velocity `0x189f40` (vertical `0x189f50`, horizontal `0x189f60`), its lengths `0x189f90/94`, the
     /// forward speed `0x189f98`, the slope ratio `0x189f9c` (±0.5) and the displacement `0x189f30`, capped at 52 / 60.
-    /// The platform step (`0x189f20`) is not ported.
+    /// First `0x2d44e0`'s air half ([`Hero::platform_air`]).
     pub fn move_collide(&mut self, env: &Env) {
+        self.platform_air();
         let old = self.pos;
         let lim = self.cap_radius - 0.02;
         if matches!(self.state, 0x14 | 0x5b | 0x58 | 0x81) && self.gravity.mode != 0 {
@@ -797,6 +798,40 @@ impl Hero {
             self.disp = scale(self.disp, cap / self.eff_len);
             self.eff_len = cap;
         }
+    }
+}
+
+/// The mover Ratchet last rode (`0x18a1c0`), its last step under him (`0x18a1b0`) and its platform block's flags
+/// (`+0x3c`: 2 followed exactly even in the air, 0x10 its step fades fast).
+#[derive(Clone, Copy, Debug)]
+pub struct Plat {
+    pub moby: usize,
+    pub step: V3,
+    pub flags: u32,
+}
+
+impl Hero {
+    /// `0x2d44e0` before the move: on the ground off a mover, none is kept (on another than the kept one, none until it
+    /// carries him); in the air, not climbing (0x1b) or on a ledge of a mover, the kept mover's last step joins the push
+    /// `0x189f20`, its height by 1/144 a tick in the air less, its xy length by 2/3600 (0x10: 20/3600) — a flag-2 mover
+    /// keeps carrying him instead (crate::moby::carry_hero).
+    fn platform_air(&mut self) {
+        if self.air_ticks == 0 {
+            if self.plat.is_some_and(|p| Some(p.moby) != self.ground_moby) { self.plat = None; }
+            return;
+        }
+        if (self.state == 0x1b || self.group == 3) && self.ledge.moby.is_some() { return; }
+        let Some(p) = self.plat else { return };
+        if p.flags & 2 != 0 { return; }
+        let t = self.air_ticks as f32;
+        let k = if p.flags & 0x10 != 0 { 20.0 } else { 2.0 };
+        let mut z = p.step[2];
+        approach(0.0, t * 0.006_944_444_5, &mut z);
+        let mut l = len2(p.step);
+        approach(0.0, k * 0.000_277_777_78 * t, &mut l);
+        let mut s = set_len2(p.step, l);
+        s[2] = z;
+        self.push = add(self.push, s);
     }
 }
 
