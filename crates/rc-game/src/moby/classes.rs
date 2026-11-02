@@ -383,6 +383,7 @@ pub fn update_for(o_class: i16) -> Option<UpdateFn> {
         0x0982 | 0x0983 | 0x0bf5 => Some(endako_b::update_lift),
         0x0e87 | 0x0961 => Some(endako_b::update_0e87),
         0x097a => Some(endako_b::update_097a),
+        0x097b => Some(endako_b::update_097b),
         0x0ef9 => Some(endako_b::update_0ef9),
         0x099d => Some(endako_b::update_099d),
         0x094e => Some(endako_b::update_empty),

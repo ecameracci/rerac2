@@ -25,8 +25,7 @@
 //! * The robots **0x093c / 0x0940** (`0x3c31f8`, 49 functions: they walk the network of **0x0f2d** (`0x41b0b0`, built
 //!   by `0x32b318` from its list of paths) and raise 0x0e87 and stand on 0x097a): too large for this pass. The boss
 //!   **0x0c8a** (`0x3f5c78`) is crate::moby::classes::endako_boss.
-//! * **0x0cfc / 0x094c** (`0x3c9430`: Ghidra has no function there), **0x097b** (`0x3cc2b0`: a scrolling-texture draw
-//!   `0x3cc380` through the first draw list, G-REN-003), **0x0f16** (`0x41af70`: the colour flash of scene 7's actor
+//! * **0x0cfc / 0x094c** (`0x3c9430`: Ghidra has no function there), **0x0f16** (`0x41af70`: the colour flash of scene 7's actor
 //!   `0x1bd810` and a pose word of scene 5's `0x1bd814`, the scene actors the port does not hand to classes).
 
 use crate::hero::physics::{add, add_rot, dist, dist2, len, len2, scale, sub, turn_ease, ease, ease_speed, V3};
@@ -733,4 +732,44 @@ pub fn update_12ea(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         }
         _ => {}
     }
+}
+
+/// 0x097b (`0x3cc2b0`, one placed): a beam of light. **0**: at any distance (`+0x30` 0xff), `+0x68`[3] = 1, 1. **1**:
+/// its three texture scrolls (`+0x68`[0..3]) run back by `$gp+0x1320` (0.5, 1, 2) a second, wrapped at −1; its draw
+/// ([`draw_097b`]) on the frame's first list (`0x2e8310`, L00 `0x2e7718`).
+pub fn update_097b(w: &mut MobyWorld, id: usize, _ctx: &mut Ctx) {
+    let m = &mut w.mobys[id];
+    match m.state {
+        0 => {
+            m.update_dist = 0xff;
+            m.set_state(1, -1);
+            m.set_pv_i(0xc, 1);
+        }
+        1 => {
+            for (k, rate) in [0.5f32, 1.0, 2.0].into_iter().enumerate() {
+                let s = m.pv_f(4 * k) - rate * 0.016_666_668;
+                m.set_pv_f(4 * k, if s < -1.0 { s + 1.0 } else { s });
+            }
+            w.register_draw_first(id);
+        }
+        _ => {}
+    }
+}
+
+/// `0x3cc380`: 0x097b's beam, one quad through `0x2ec4f0` turned about z to face the camera: 4 across (±2) and 100
+/// up from its place (`$gp+0x1360`), FX 0xe (`$gp+0x132c`) added (ALPHA `Cs·As + Cd`), `0x70804030` at its foot to
+/// `0x00800000` at its top (`$gp+0x13a0`), the texture's s (`$gp+0x1338`: 1 below, 0 above) moved by the first scroll.
+pub fn draw_097b(w: &MobyWorld, id: usize, cam: V3, out: &mut Vec<crate::fx::FxQuad>) {
+    let m = &w.mobys[id];
+    let yaw = crate::hero::physics::atan2(cam[0] - m.pos[0], cam[1] - m.pos[1]);
+    let r = crate::hero::physics::euler_rows([0.0, 0.0, yaw]);
+    let at = |v: V3| add(m.pos, add(add(scale(r[0], v[0]), scale(r[1], v[1])), scale(r[2], v[2])));
+    let s = m.pv_f(0);
+    out.push(crate::fx::FxQuad {
+        fx: 0xe,
+        additive: true,
+        corners: [at([0.0, 2.0, 0.0]), at([0.0, -2.0, 0.0]), at([0.0, 2.0, 100.0]), at([0.0, -2.0, 100.0])],
+        st: [[1.0 + s, 0.0], [1.0 + s, 1.0], [s, 0.0], [s, 1.0]],
+        rgba: [0x7080_4030, 0x7080_4030, 0x0080_0000, 0x0080_0000],
+    });
 }
