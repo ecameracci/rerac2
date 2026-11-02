@@ -7,378 +7,397 @@ L00:0031b8d0	FUN_0031b8d0	moby	has	cite
 L00:00311688	delete_moby	moby	has	L
 L00:002eee70	FUN_002eee70	math	trivial	range
 L00:0031ba38	FUN_0031ba38	rng	has	cite
-L00:0031b9a0	FUN_0031b9a0	rng	has	cite
+L00:0031b9a0	FUN_0031b9a0	moby	has	cite
 L00:002effb8	FUN_002effb8	math	trivial	range
-L00:002ef138	FUN_002ef138	math	trivial	range
+L00:002eeab0	FUN_002eeab0	math	trivial	range
 L00:002eeea0	FUN_002eeea0	math	trivial	range
 L00:002efe60	FUN_002efe60	math	trivial	range
-L00:002eeab0	FUN_002eeab0	math	trivial	range
-L00:0031b9e0	FUN_0031b9e0	rng	has	cite
+L00:002ef138	FUN_002ef138	math	trivial	range
+L00:0031b9e0	FUN_0031b9e0	hero	has	cite
 L00:002ef050	FUN_002ef050	math	trivial	range
-L00:002ef510	FUN_002ef510	math	trivial	range
 L00:002eeee0	FUN_002eeee0	math	trivial	range
+L00:002ef510	FUN_002ef510	math	trivial	range
 L00:0031dce8	FUN_0031dce8	moby	has	cite
-L00:003605f0	FUN_003605f0	moby	has	cite
 L00:002ef460	FUN_002ef460	math	trivial	range
+L00:003605f0	FUN_003605f0	moby	has	cite
 L00:002ef448	FUN_002ef448	math	trivial	range
 L00:0031b5f0	FUN_0031b5f0	moby	has	cite
-L00:002ef318	FUN_002ef318	math	trivial	range
 L00:00327e38	FUN_00327e38	enemy	has	cite
-L00:0031bb00	FUN_0031bb00	rng	has	cite
-L00:002ef018	FUN_002ef018	math	trivial	range
-L00:0031ce20	FUN_0031ce20	other	has	cite
+L00:0031bb00	FUN_0031bb00	particles	has	cite
+L00:0031ce20	FUN_0031ce20	moby	has	cite
 L00:00328b80	FUN_00328b80	enemy	has	cite
-L00:0031adc0	FUN_0031adc0	bolts	has	cite
-L00:0032a7c8	FUN_0032a7c8	moby	has	cite
+L00:002ef018	FUN_002ef018	math	trivial	range
+L00:0031adc0	FUN_0031adc0	other	has	cite
+L00:002ef318	FUN_002ef318	math	trivial	range
 L00:003127c8	FUN_003127c8	moby	has	cite
+L00:0032a7c8	FUN_0032a7c8	moby	has	cite
 L00:0031d180	FUN_0031d180	enemy	has	cite
 L00:002eeae0	FUN_002eeae0	math	trivial	range
 L00:0032ad38	FUN_0032ad38	enemy	has	cite
-L00:002eefa0	FUN_002eefa0	math	trivial	range
-L00:002effa8	FUN_002effa8	math	trivial	range
 L00:002eff48	FUN_002eff48	math	trivial	range
-L00:0031ba98	FUN_0031ba98	rng	has	cite
+L00:002effa8	FUN_002effa8	math	trivial	range
+L00:002eefa0	FUN_002eefa0	math	trivial	range
 L00:00311880	FUN_00311880	moby	has	cite
+L00:0031ba98	FUN_0031ba98	moby	has	cite
 L00:002f0000	FUN_002f0000	math	trivial	range
 L00:0031da58	shadow	shadow	has	L
-L00:002ef6b8	FUN_002ef6b8	math	trivial	range
 L00:0032dcf0	FUN_0032dcf0	enemy	has	cite
+L00:002ef6b8	FUN_002ef6b8	math	trivial	range
 L00:00311320	FUN_00311320	moby	has	cite
 L00:002de878	FUN_002de878	moby	has	cite
 L00:002a48f0	stub	trivial	trivial	L
 L00:002eef60	FUN_002eef60	math	trivial	range
-L00:00327308	FUN_00327308	enemy	has	cite
-L00:0032a7f0	FUN_0032a7f0	moby	has	cite
-L00:0031f230	spring	math	trivial	L
-L00:002df8d8	FUN_002df8d8	camera	has	cite
 L00:0032cc30	FUN_0032cc30	enemy	has	cite
+L00:00327308	FUN_00327308	enemy	has	cite
+L00:0031f230	spring	math	trivial	L
+L00:0032a7f0	FUN_0032a7f0	moby	has	cite
 L00:00320538	explosion	breakfx	has	L
-L00:003f8348	FUN_003f8348	moby	has	cite
 L00:002eefd0	FUN_002eefd0	math	trivial	range
+H:c0a367fb31d59c29	death_fade	moby	has	L
+L00:002df8d8	FUN_002df8d8	moby	has	cite
+L00:00323bf8	seq_reached	anim	has	L
 L00:0032cd20	FUN_0032cd20	enemy	has	cite
 H:582266980bbdcff0	draw_list_first	fxdraw	has	L
-L00:00323bf8	seq_reached	anim	has	L
-H:c0a367fb31d59c29	death_fade	moby	has	L
+L00:003f8348	FUN_003f8348	moby	has	cite
 L00:002efea8	FUN_002efea8	math	trivial	range
-L00:003602f0	FUN_003602f0	moby	has	cite
 boot:001163b0	FUN_001163b0	rng	has	cite
-L00:0031bbc0	FUN_0031bbc0	rng	has	cite
+L00:003602f0	FUN_003602f0	moby	has	cite
 L00:00360698	FUN_00360698	moby	has	cite
+L00:0031bbc0	FUN_0031bbc0	rng	has	cite
 L00:00324208	FUN_00324208	enemy	has	cite
-L00:00313dc0	FUN_00313dc0	moby	has	cite
 L00:00325100	FUN_00325100	moby	has	cite
+L00:00313dc0	FUN_00313dc0	moby	has	cite
 L00:00321a78	in_variant	level	has	L
 L00:003217d8	FUN_003217d8	other	has	cite
 L00:003327e8	staged	particles	has	L
 L00:0031c8e0	FUN_0031c8e0	moby	has	cite
-L00:00321858	FUN_00321858	moby	has	cite
-L00:002ef960	FUN_002ef960	math	trivial	range
-L00:0032a838	FUN_0032a838	moby	has	cite
-L00:0031eb18	FUN_0031eb18	other	has	cite
 L00:00312728	FUN_00312728	moby	has	cite
+L00:002ef960	FUN_002ef960	math	trivial	range
+L00:00321858	FUN_00321858	moby	has	cite
 L00:003201e8	FUN_003201e8	enemy	has	cite
-L00:00320000	FUN_00320000	hero	has	cite
-L00:002ef340	FUN_002ef340	math	trivial	range
+L00:0031eb18	FUN_0031eb18	other	has	cite
 L00:0031ed78	FUN_0031ed78	other	has	cite
+L00:00320000	FUN_00320000	moby	has	cite
 L00:002eef88	FUN_002eef88	math	trivial	range
-L00:00313330	get_moby_colour	moby	trivial	L
+L00:0032a838	FUN_0032a838	moby	has	cite
 L00:0032a848	FUN_0032a848	formats	has	cite
-L00:0032a818	FUN_0032a818	moby	has	cite
 L00:00330df0	FUN_00330df0	particles	has	cite
-L00:0033f550	FUN_0033f550	particles	has	cite
-L00:00322058	FUN_00322058	moby	has	cite
+L00:002ef340	FUN_002ef340	math	trivial	range
 L00:00320440	wrap_angle	math	trivial	L
-L00:00343678	FUN_00343678	enemy	has	cite
-L00:0031cf68	FUN_0031cf68	moby	has	cite
+L00:00322058	FUN_00322058	moby	has	cite
+L00:00313330	get_moby_colour	moby	trivial	L
 L00:00322668	FUN_00322668	moby	has	cite
-L00:002e71b8	FUN_002e71b8	other	has	cite
 L00:00313420	FUN_00313420	moby	has	cite
-L00:002eed78	FUN_002eed78	math	trivial	range
+L00:002e71b8	FUN_002e71b8	other	has	cite
 H:55c6aaae9bdd29ad	shards	breakfx	has	L
-L00:00327498	FUN_00327498	breakfx	has	cite
-L00:002efa00	FUN_002efa00	math	trivial	range
-H:a054c90325f108e8	teleport_in	teleport	has	L
+L00:00343678	FUN_00343678	other	has	cite
+L00:0031cf68	FUN_0031cf68	moby	has	cite
+L00:0032a818	FUN_0032a818	moby	has	cite
 L00:00326820	hero_distance	hero	partly	L
-L00:002eb998	FUN_002eb998	fxdraw	has	cite
-L00:002ef6d8	FUN_002ef6d8	math	trivial	range
+L00:002eed78	FUN_002eed78	math	trivial	range
 L00:0031c970	poke_group	group	has	L
 L00:002ef2a8	FUN_002ef2a8	math	trivial	range
-L00:00326248	moby_matrix_point	math	trivial	L
+L00:0033f550	FUN_0033f550	particles	has	cite
+L00:002ef6d8	FUN_002ef6d8	math	trivial	range
+L00:002eb998	FUN_002eb998	fxdraw	has	cite
 L00:00321c00	FUN_00321c00	moby	has	cite
-L00:00313300	set_moby_colour	moby	trivial	L
+L00:002efa00	FUN_002efa00	math	trivial	range
+L00:00326248	moby_matrix_point	math	trivial	L
 L00:002ef920	FUN_002ef920	math	trivial	range
-L00:00321688	clamp_length	math	trivial	L
-L00:0031d158	FUN_0031d158	hits	has	cite
-L00:0032ce98	FUN_0032ce98	enemy	has	cite
 L00:002ef940	FUN_002ef940	math	trivial	range
 L00:0031c618	line_collide	collision	partly	L
-L00:002e14b0	FUN_002e14b0	hero	has	cite
+L00:0032ce98	FUN_0032ce98	enemy	has	cite
+L00:0031d158	FUN_0031d158	hits	has	cite
+L00:00321688	clamp_length	math	trivial	L
+L00:002e14b0	FUN_002e14b0	moby	has	cite
 L00:002ef188	FUN_002ef188	math	trivial	range
-L00:00327388	drop_bolts_scaled	bolts	has	L
-L00:00327448	FUN_00327448	other	has	cite
-L00:002f0080	FUN_002f0080	math	trivial	range
+L00:00327498	FUN_00327498	moby	has	cite
+L00:00326448	hero_direction	hero	partly	L
+L00:00313300	set_moby_colour	moby	trivial	L
 L00:004287b8	script_cam_pos	camera	has	L
 L00:00428810	script_cam_look	camera	has	L
 L00:00428880	script_cam_start	camera	has	L
-L00:00360750	play_level_sound	sound	partly	L
-L00:00326448	hero_direction	hero	partly	L
-L00:004289f0	script_cam_update	camera	has	L
-B:1	sound bank 1	level chunks	has	L
-L00:003210a8	smoke_burst	breakfx	has	L
-L00:002e23e0	FUN_002e23e0	other	has	cite
 L00:0031d4c8	FUN_0031d4c8	hero	has	cite
-L00:0032a748	FUN_0032a748	enemy	has	cite
-L00:0031f4b0	FUN_0031f4b0	enemy	has	cite
+L00:002f0080	FUN_002f0080	math	trivial	range
+L00:004289f0	script_cam_update	camera	has	L
 L00:003261f8	moby_space_point	math	trivial	L
-L00:0031f030	FUN_0031f030	hero	has	cite
-L00:0033a6a0	FUN_0033a6a0	particles	has	cite
+B:1	sound bank 1	level chunks	has	L
+L00:002e23e0	FUN_002e23e0	moby	has	cite
+L00:0031f4b0	FUN_0031f4b0	enemy	has	cite
+L00:00327388	drop_bolts_scaled	bolts	has	L
+L00:0033a6a0	FUN_0033a6a0	moby	has	cite
+H:a054c90325f108e8	teleport_in	teleport	has	L
 L00:003132a8	FUN_003132a8	moby	has	cite
-L00:0031e8d8	FUN_0031e8d8	hero	has	cite
-L00:00371ba8	FUN_00371ba8	moby	has	cite
 L00:002eeff8	FUN_002eeff8	math	trivial	range
+L00:00371ba8	FUN_00371ba8	moby	has	cite
 boot:00115484	memset	libc	trivial	L
-L00:002b9e68	FUN_002b9e68	moby	has	cite
-L00:0031b518	anim_state_helper	anim	has	L
 L00:002d7508	FUN_002d7508	camera	has	cite
+L00:002b9e68	FUN_002b9e68	moby	has	cite
 L00:0032de68	FUN_0032de68	enemy	has	cite
+L00:0031e8d8	FUN_0031e8d8	moby	has	cite
+L00:0032a748	FUN_0032a748	moby	has	cite
 L00:002d7468	FUN_002d7468	camera	has	cite
 L00:00359b20	FUN_00359b20	game	has	cite
 L00:00343fb8	steer_maths	math	trivial	L
 L00:0031c9d8	FUN_0031c9d8	moby	has	cite
 L00:002b31f0	FUN_002b31f0	game	has	cite
+L00:0031f030	FUN_0031f030	hero	has	cite
+L00:003210a8	smoke_burst	breakfx	has	L
+L00:00360750	play_level_sound	sound	partly	L
+L00:0031cac0	next_in_group	group	has	L
+L00:00327448	FUN_00327448	other	has	cite
 L00:002eee88	FUN_002eee88	math	trivial	range
-L00:0031d2c8	FUN_0031d2c8	enemy	has	cite
+L00:0030d658	FUN_0030d658	game	has	cite
+L00:0031b518	anim_state_helper	anim	has	L
+L00:00320128	moby_colour_lerp	moby	trivial	L
 L00:002f4ee8	FUN_002f4ee8	game	has	cite
 L00:002f5030	FUN_002f5030	game	has	cite
-L00:0031cac0	next_in_group	group	has	L
-L00:0030d658	FUN_0030d658	game	has	cite
-L00:00320128	moby_colour_lerp	moby	trivial	L
 L00:002ef9b0	FUN_002ef9b0	math	trivial	range
-L00:0031c078	FUN_0031c078	enemy	has	cite
-L00:00322028	FUN_00322028	moby	has	cite
+L00:0031c078	FUN_0031c078	moby	has	cite
+L00:0031d2c8	FUN_0031d2c8	enemy	has	cite
 L00:002f46e0	FUN_002f46e0	other	has	cite
 L00:003253f0	FUN_003253f0	enemy	has	cite
 L00:0031fa50	react_block	enemy	has	L
-L00:003227d8	FUN_003227d8	moby	has	cite
-L00:002dbdb0	FUN_002dbdb0	breakfx	has	cite
 L00:0031e980	vec_helper	math	trivial	L
+L00:003227d8	FUN_003227d8	moby	has	cite
 L00:002da530	vec_to_angles	math	trivial	L
+L00:00336148	FUN_00336148	particles	has	cite
 L00:003282b0	FUN_003282b0	enemy	has	cite
-L00:00336148	FUN_00336148	hero	has	cite
 L00:002eef10	FUN_002eef10	math	trivial	range
+L00:00322028	FUN_00322028	moby	has	cite
 L00:0031dd48	FUN_0031dd48	enemy	has	cite
-L00:00327898	FUN_00327898	moby	has	cite
+L00:002dbdb0	FUN_002dbdb0	breakfx	has	cite
 L00:002eecb8	FUN_002eecb8	math	trivial	range
 L00:002e7c90	FUN_002e7c90	game	has	cite
-L00:0033b5e0	glint	particles	has	L
 L00:003246c0	FUN_003246c0	group	has	cite
 L00:00324bd0	FUN_00324bd0	group	has	cite
-L00:0031c278	FUN_0031c278	enemy	has	cite
 L00:00324430	FUN_00324430	group	has	cite
+L00:0031c278	FUN_0031c278	moby	has	cite
 L00:0032dd60	FUN_0032dd60	enemy	has	cite
 L00:002eee58	FUN_002eee58	math	trivial	range
-L00:00326190	FUN_00326190	particles	has	cite
-L00:00327648	throw_chunks	breakfx	has	L
+L00:0031f858	FUN_0031f858	hero	has	cite
 L00:00326328	FUN_00326328	moby	has	cite
-L00:0031ec88	FUN_0031ec88	hero	has	cite
+L00:0031ec88	FUN_0031ec88	moby	has	cite
 L00:00332c10	FUN_00332c10	particles	has	cite
 L00:002ef650	FUN_002ef650	math	trivial	range
-L00:002f5270	FUN_002f5270	game	has	cite
+L00:00327898	FUN_00327898	moby	has	cite
 L00:0031e048	ballistic	math	trivial	L
+L00:00326190	FUN_00326190	particles	has	cite
 B:2	sound bank 2	level chunks	missing	L
+L00:0033b5e0	glint	particles	has	L
 L00:002efa50	FUN_002efa50	math	trivial	range
+L00:002f5270	FUN_002f5270	game	has	cite
 L00:0031ebd8	FUN_0031ebd8	hero	has	cite
-L00:002eeeb8	FUN_002eeeb8	math	trivial	range
-L00:0032b580	shards	breakfx	has	L
-L00:00327a28	message_slot	ui	has	L
+L00:00327648	throw_chunks	breakfx	has	L
 L00:002eeb10	FUN_002eeb10	math	trivial	range
+L00:003244e8	FUN_003244e8	moby	has	cite
 L00:002eebf0	FUN_002eebf0	math	trivial	range
-L00:00335bb8	FUN_00335bb8	particles	has	cite
-L00:003244e8	FUN_003244e8	group	has	cite
+L00:00335bb8	FUN_00335bb8	moby	has	cite
+L00:00327a28	message_slot	ui	has	L
 L00:002eebc8	FUN_002eebc8	math	trivial	range
 L00:0031cd18	FUN_0031cd18	enemy	has	cite
-L00:003237c8	FUN_003237c8	particles	has	cite
 L00:0033d400	exhaust	particles	has	L
 L00:002edf78	FUN_002edf78	fxdraw	has	cite
-L00:002ef478	FUN_002ef478	math	trivial	range
 L00:00330f40	FUN_00330f40	particles	has	cite
 L00:003602a8	FUN_003602a8	moby	has	cite
-L00:002ef1d0	FUN_002ef1d0	math	trivial	range
 L00:0032d800	FUN_0032d800	enemy	has	cite
 L00:002ecfb0	staged_burst	particles	has	L
+L00:002ef1d0	FUN_002ef1d0	math	trivial	range
 B:3	sound bank 3	level chunks	missing	L
-L00:0037c948	hw_timer	game	trivial	L
 L00:00323958	FUN_00323958	enemy	has	cite
 L00:00312480	FUN_00312480	moby	has	cite
-L00:0033b468	FUN_0033b468	particles	has	cite
+L00:0037c948	hw_timer	game	trivial	L
 boot:00115da8	sprintf	libc	trivial	L
-L00:0033ef78	FUN_0033ef78	particles	has	cite
-L00:00381900	FUN_00381900	ui	has	cite
+L00:0033ef78	FUN_0033ef78	moby	has	cite
+L00:0033b468	FUN_0033b468	particles	has	cite
 L00:0039c4a8	FUN_0039c4a8	breakfx	has	cite
+L00:00381900	FUN_00381900	ui	has	cite
 L00:002e94a8	FUN_002e94a8	other	has	cite
-L00:002fdc48	FUN_002fdc48	weapons	has	cite
+L00:002fdc48	FUN_002fdc48	moby	has	cite
+L00:003237c8	FUN_003237c8	particles	has	cite
+L00:002eeeb8	FUN_002eeeb8	math	trivial	range
 L00:0031b918	FUN_0031b918	moby	has	cite
-L00:00339848	FUN_00339848	particles	has	cite
-L00:00371b60	FUN_00371b60	moby	has	cite
 L00:003223e8	FUN_003223e8	moby	has	cite
 L00:00322570	FUN_00322570	moby	has	cite
 L00:002ea068	FUN_002ea068	ui	has	cite
 L00:003607e8	FUN_003607e8	hero	has	cite
-L00:002ecef8	fx_texture_set	fxdraw	partly	L
+L00:00371b60	FUN_00371b60	moby	has	cite
 L00:00425f18	FUN_00425f18	camera	has	cite
 L00:00425f60	FUN_00425f60	camera	has	cite
+L00:002ef478	FUN_002ef478	math	trivial	range
+L00:0033fbb8	FUN_0033fbb8	moby	has	cite
 L00:002efb60	FUN_002efb60	math	trivial	range
-L00:0031e100	random_points	moby	has	L
 L00:0031d898	FUN_0031d898	other	has	cite
-L00:002c4560	FUN_002c4560	hero	has	cite
-L00:002dc1f0	FUN_002dc1f0	breakfx	has	cite
 boot:001234f0	softfloat	libc	trivial	L
-L00:0031ef68	FUN_0031ef68	hero	has	cite
-L00:002d2508	FUN_002d2508	hero	has	cite
+L00:0031e100	random_points	moby	has	L
+L00:003fabe8	FUN_003fabe8	moby	has	cite
+L00:0031bb48	FUN_0031bb48	moby	has	cite
 L00:0031f0c8	FUN_0031f0c8	hero	has	cite
 L00:003dbed0	FUN_003dbed0	enemy	has	cite
 L00:003dbfb0	FUN_003dbfb0	enemy	has	cite
 L00:003dc100	FUN_003dc100	enemy	has	cite
+L00:002dc1f0	FUN_002dc1f0	breakfx	has	cite
 L00:0037d5a0	splash	particles	missing	cite
-L00:002eed98	FUN_002eed98	math	trivial	range
-L00:0031d378	FUN_0031d378	moby	has	cite
+L00:002c4560	FUN_002c4560	hero	has	cite
 L00:002fda20	point_light	light	has	L
 boot:00122b00	softfloat	libc	trivial	L
 boot:00123298	softfloat	libc	trivial	L
+L00:002ecef8	fx_texture_set	fxdraw	partly	L
+L00:002d2508	FUN_002d2508	hero	has	cite
 L00:002effc8	FUN_002effc8	math	trivial	range
 L00:003222a8	platform_velocity	platform	has	L
+L00:00339848	FUN_00339848	moby	has	cite
+L00:003cd478	FUN_003cd478	moby	has	cite
 L00:002efef0	FUN_002efef0	math	trivial	range
-L00:002ef628	FUN_002ef628	math	trivial	range
-L00:00340830	FUN_00340830	particles	has	cite
-L00:0031a8e4	FUN_0031a8e4	light	has	cite
-L00:00327ae0	FUN_00327ae0	other	has	cite
+L00:0031d038	FUN_0031d038	moby	has	cite
 L00:002fdb60	FUN_002fdb60	moby	has	cite
+L00:0032b580	shards	breakfx	has	L
 L00:0032d2b8	FUN_0032d2b8	enemy	has	cite
 L00:003dc090	FUN_003dc090	enemy	has	cite
 L00:002eff90	FUN_002eff90	math	trivial	range
 L00:003701d0	FUN_003701d0	moby	has	cite
-L00:002f5460	help_text	ui	has	L
-L00:003116e0	FUN_003116e0	moby	has	cite
+L00:002eed98	FUN_002eed98	math	trivial	range
 L00:002edd50	fx_beam	fxdraw	has	L
-L00:0031fa20	FUN_0031fa20	enemy	has	cite
-L00:002d4440	FUN_002d4440	hero	has	cite
+L00:002f5460	help_text	ui	has	L
+L00:002ef628	FUN_002ef628	math	trivial	range
+L00:0031fa20	FUN_0031fa20	moby	has	cite
+L00:00340830	FUN_00340830	particles	has	cite
 L00:003175f8	FUN_003175f8	moby	has	cite
-L00:0042b9f0	FUN_0042b9f0	camera	has	cite
+L00:00326d60	FUN_00326d60	fxdraw	has	cite
 boot:001163a0	FUN_001163a0	rng	has	cite
+L00:00327ae0	FUN_00327ae0	other	has	cite
+L00:0031d378	FUN_0031d378	moby	has	cite
 L00:0033f940	FUN_0033f940	particles	has	cite
 L00:002d6cc8	FUN_002d6cc8	hero	has	cite
-L00:00304200	level_streaming	level	partly	L
-L00:0032c5f0	FUN_0032c5f0	other	has	cite
 L00:002ee160	FUN_002ee160	math	trivial	range
-L00:0032ea38	speech	dialogue	missing	cite
-L00:002c8e30	FUN_002c8e30	scene	has	cite
+L00:0031a8e4	FUN_0031a8e4	light	has	cite
+L00:00304200	level_streaming	level	partly	L
 L00:002efc20	FUN_002efc20	math	trivial	range
 L00:003204e8	FUN_003204e8	hero	has	cite
 L00:0039f938	FUN_0039f938	particles	has	cite
 L00:00323c90	trail	fxdraw	missing	cite
-L00:002db498	FUN_002db498	ui	has	cite
-L00:0031d930	FUN_0031d930	other	has	cite
+L00:002db498	FUN_002db498	moby	has	cite
+L00:003116e0	FUN_003116e0	moby	has	cite
 L00:003432d8	FUN_003432d8	path	has	cite
 L00:003241d8	set_ambient_word	moby	has	L
 L00:0031ce98	FUN_0031ce98	enemy	has	cite
-L00:002eee48	FUN_002eee48	math	trivial	range
+L00:0032ea38	speech	dialogue	missing	cite
 L00:0042a4e0	FUN_0042a4e0	camera	has	cite
-L00:00322730	FUN_00322730	game	has	cite
-L00:0031d128	FUN_0031d128	moby	has	cite
 boot:001153d4	memcpy	libc	trivial	L
 L00:002efad8	FUN_002efad8	math	trivial	range
+L00:00322730	FUN_00322730	game	has	cite
 boot:001157ac	strlen	libc	trivial	L
+L00:0042b9f0	FUN_0042b9f0	camera	has	cite
 L00:002eff80	FUN_002eff80	math	trivial	range
 L00:0030d9f8	FUN_0030d9f8	hero	has	cite
 L00:002eed48	FUN_002eed48	math	trivial	range
 L00:002ef680	FUN_002ef680	math	trivial	range
-L00:0032bd98	FUN_0032bd98	moby	has	cite
-L00:0032c0b0	FUN_0032c0b0	moby	has	cite
 L00:002a4ef8	FUN_002a4ef8	hero	has	cite
+L00:0031b760	FUN_0031b760	moby	has	cite
 L00:002e9f68	FUN_002e9f68	other	has	cite
 L00:002faa98	FUN_002faa98	other	has	cite
 L00:002faf68	FUN_002faf68	other	has	cite
 L00:00337cc0	FUN_00337cc0	particles	has	cite
+L00:0031d128	FUN_0031d128	moby	has	cite
 L00:00342b50	FUN_00342b50	path	has	cite
+L00:002d4440	FUN_002d4440	moby	has	cite
 L00:002eef40	FUN_002eef40	math	trivial	range
-L00:002d7a60	FUN_002d7a60	camera	has	cite
-L00:00305ab0	FUN_00305ab0	items	has	cite
-L00:00305cc0	FUN_00305cc0	items	has	cite
 L00:0036c068	FUN_0036c068	group	has	cite
 boot:00115ac0	strcmp	libc	trivial	L
 L00:0032a2e0	FUN_0032a2e0	docs	missing	cite
 L00:00330240	FUN_00330240	other	has	cite
+L00:0032bd98	FUN_0032bd98	moby	has	cite
+L00:0032c0b0	FUN_0032c0b0	moby	has	cite
 L00:00339e10	FUN_00339e10	particles	has	cite
-L00:002ea608	FUN_002ea608	other	has	cite
 L00:002eec18	FUN_002eec18	math	trivial	range
 L00:002f50f8	FUN_002f50f8	game	has	cite
 L00:00339b60	FUN_00339b60	particles	has	cite
+L00:0032c5f0	FUN_0032c5f0	other	has	cite
 L00:002f51a0	item_18	items	missing	cite
-L00:00325270	new_planet_banner	items	has	L
-L00:002dbff8	FUN_002dbff8	breakfx	has	cite
-L00:00321bb8	FUN_00321bb8	other	has	cite
+L00:0031d930	FUN_0031d930	other	has	cite
+L00:002ea608	FUN_002ea608	other	has	cite
 L00:003219e8	FUN_003219e8	level	has	cite
+L00:002eee48	FUN_002eee48	math	trivial	range
 L00:002ec618	FUN_002ec618	moby	has	cite
+L00:00325270	new_planet_banner	items	has	L
 L00:002eeb40	FUN_002eeb40	math	trivial	range
 L00:002b3af8	FUN_002b3af8	hero	has	cite
 L00:002e89d8	FUN_002e89d8	other	has	cite
 L00:002e5df8	FUN_002e5df8	game	has	cite
 L00:0031d7a0	FUN_0031d7a0	other	has	cite
 L00:0038e5a8	FUN_0038e5a8	moby	has	cite
-L00:002b2b48	FUN_002b2b48	game	has	cite
 L00:002eb050	FUN_002eb050	ui	has	cite
 L00:0031bc68	FUN_0031bc68	other	has	cite
 L00:00425f98	FUN_00425f98	camera	has	cite
-L00:00426058	FUN_00426058	camera	has	cite
 L00:002ea570	FUN_002ea570	other	has	cite
-L00:0031fe98	FUN_0031fe98	other	has	cite
+L00:0031fe98	FUN_0031fe98	moby	has	cite
 L00:00321b28	FUN_00321b28	moby	has	cite
-L00:0039e530	FUN_0039e530	moby	has	cite
-L00:0039ff50	FUN_0039ff50	moby	has	cite
 L00:002d7e50	FUN_002d7e50	other	has	cite
 L00:00426030	FUN_00426030	camera	has	cite
 L00:00426080	FUN_00426080	camera	has	cite
 L00:004260c8	FUN_004260c8	camera	has	cite
 L00:00426110	FUN_00426110	camera	has	cite
-L00:002af848	FUN_002af848	items	has	cite
+L00:002af848	FUN_002af848	moby	has	cite
+L00:002c8e30	FUN_002c8e30	scene	has	cite
+L00:002dbff8	FUN_002dbff8	breakfx	has	cite
 L00:002e46d8	FUN_002e46d8	ui	has	cite
 L00:002ef080	FUN_002ef080	math	trivial	range
+L00:002f43d0	FUN_002f43d0	other	has	cite
 L00:002fed18	FUN_002fed18	formats	has	cite
+L00:00321bb8	FUN_00321bb8	other	has	cite
+L00:0039e530	FUN_0039e530	moby	has	cite
+L00:0039ff50	FUN_0039ff50	moby	has	cite
 L00:002a9db0	FUN_002a9db0	hero	has	cite
 L00:002d9d68	FUN_002d9d68	scene	has	cite
 L00:002e9548	FUN_002e9548	ui	has	cite
 L00:002eaf70	FUN_002eaf70	other	has	cite
 L00:0030d8d0	FUN_0030d8d0	ui	has	cite
 L00:00323d10	clank_anim	clank	missing	cite
+L00:00323d38	FUN_00323d38	moby	has	cite
 L00:00323e58	clank_anim2	clank	missing	cite
+L00:00324140	FUN_00324140	moby	has	cite
 L00:00327b60	FUN_00327b60	other	has	cite
 L00:00330368	FUN_00330368	hero	has	cite
+L00:00360a10	FUN_00360a10	moby	has	cite
 L00:00390888	FUN_00390888	moby	has	cite
+L00:002b2b48	FUN_002b2b48	game	has	cite
+L00:002d7a60	FUN_002d7a60	camera	has	cite
 L00:002e05c8	FUN_002e05c8	hero	has	cite
-L00:002e4450	FUN_002e4450	moby	has	cite
+L00:002e8810	FUN_002e8810	moby	has	cite
 L00:002ee190	FUN_002ee190	math	trivial	range
 L00:002eeef8	FUN_002eeef8	math	trivial	range
 L00:002ef6f8	FUN_002ef6f8	math	trivial	range
+L00:002f48e0	FUN_002f48e0	other	has	cite
+L00:00305ab0	FUN_00305ab0	items	has	cite
+L00:00305cc0	FUN_00305cc0	items	has	cite
 L00:00321930	FUN_00321930	level	has	cite
 L00:00333a70	FUN_00333a70	particles	has	cite
-L00:00383380	FUN_00383380	bolts	has	cite
+L00:00335a90	FUN_00335a90	particles	has	cite
+L00:0037fa58	FUN_0037fa58	moby	has	cite
 L00:0039e7f0	FUN_0039e7f0	moby	has	cite
+L00:00404df0	FUN_00404df0	moby	has	cite
+L00:00409ef0	FUN_00409ef0	moby	has	cite
 H:4b834f7216002e92	group_wake	moby	has	L
 H:8eedb32af261910a	group_waiting	moby	has	L
+L00:002a4e48	FUN_002a4e48	hero	has	cite
 L00:002a6708	FUN_002a6708	hero	has	cite
-L00:002af5e0	FUN_002af5e0	items	has	cite
+L00:002ae900	FUN_002ae900	moby	has	cite
+L00:002af5e0	FUN_002af5e0	moby	has	cite
 L00:002b3aa0	FUN_002b3aa0	hero	has	cite
 L00:002b9c90	FUN_002b9c90	hero	has	cite
 L00:002d2870	FUN_002d2870	hero	has	cite
 L00:002d3b18	FUN_002d3b18	hero	has	cite
 L00:002d42d0	FUN_002d42d0	moby	has	cite
 L00:002d4358	FUN_002d4358	other	has	cite
-L00:002d43e0	FUN_002d43e0	items	has	cite
+L00:002d43e0	FUN_002d43e0	moby	has	cite
 L00:002d6d60	rumble	rumble	missing	cite
 L00:002d6f38	FUN_002d6f38	moby	has	cite
-L00:002d7f80	FUN_002d7f80	other	has	cite
+L00:002d7f80	FUN_002d7f80	moby	has	cite
+L00:002e4450	FUN_002e4450	moby	has	cite
 L00:002e7718	draw_list_first	fxdraw	has	L
 L00:002e7920	FUN_002e7920	moby	has	cite
+L00:002ed370	FUN_002ed370	moby	has	cite
+L00:002ed6d8	FUN_002ed6d8	moby	has	cite
 L00:002eeb90	FUN_002eeb90	math	trivial	range
 L00:002eedb0	FUN_002eedb0	math	trivial	range
 L00:002eedc0	FUN_002eedc0	math	trivial	range
@@ -393,53 +412,105 @@ L00:002f0048	FUN_002f0048	math	trivial	range
 L00:002f79d8	FUN_002f79d8	other	has	cite
 L00:002f8498	FUN_002f8498	other	has	cite
 L00:002f84e8	FUN_002f84e8	other	has	cite
+L00:002fc520	FUN_002fc520	ui	has	cite
 L00:0030d910	FUN_0030d910	ui	has	cite
 L00:00311b50	FUN_00311b50	breakfx	has	cite
 L00:00311cf0	FUN_00311cf0	breakfx	has	cite
+L00:003122c8	FUN_003122c8	anim	has	cite
 L00:003132e0	FUN_003132e0	moby	has	cite
 L00:003167f8	FUN_003167f8	moby	has	cite
 L00:0031aa10	FUN_0031aa10	moby	has	cite
-L00:0031d100	FUN_0031d100	camera	missing	cite
+L00:0031bca0	FUN_0031bca0	moby	has	cite
+L00:0031bdc0	FUN_0031bdc0	other	has	cite
+L00:0031bed8	FUN_0031bed8	other	has	cite
+L00:0031d100	FUN_0031d100	moby	has	cite
 L00:0031d648	FUN_0031d648	weapons	has	cite
 L00:0031def8	FUN_0031def8	moby	has	cite
+L00:0031ef68	FUN_0031ef68	hero	has	cite
+L00:0031f6c8	FUN_0031f6c8	particles	has	cite
 L00:0031f7d0	FUN_0031f7d0	moby	has	cite
+L00:0031fe30	FUN_0031fe30	moby	has	cite
+L00:003216e0	FUN_003216e0	moby	has	cite
+L00:00321760	FUN_00321760	moby	has	cite
+L00:00321ca8	FUN_00321ca8	moby	has	cite
+L00:00321de8	FUN_00321de8	moby	has	cite
 L00:00322af0	FUN_00322af0	bolts	has	cite
 L00:003238d0	FUN_003238d0	particles	has	cite
 L00:00323b78	FUN_00323b78	enemy	has	cite
 L00:003245b0	FUN_003245b0	group	missing	cite
-L00:003257a0	FUN_003257a0	enemy	has	cite
+L00:00325508	FUN_00325508	moby	has	cite
+L00:00325680	FUN_00325680	moby	has	cite
+L00:003257a0	FUN_003257a0	moby	has	cite
 L00:00325f90	FUN_00325f90	enemy	has	cite
+L00:003260c0	FUN_003260c0	moby	has	cite
+L00:00326520	FUN_00326520	moby	has	cite
 L00:003269e0	rain_top	weather	has	L
 L00:00326b28	rain_land	weather	has	L
 L00:00326f38	FUN_00326f38	moby	has	cite
+L00:00327240	FUN_00327240	moby	has	cite
 L00:00327478	FUN_00327478	other	has	cite
-L00:0032b3b0	FUN_0032b3b0	weapons	has	cite
+L00:0032b1b8	FUN_0032b1b8	moby	has	cite
+L00:0032b318	FUN_0032b318	moby	has	cite
+L00:0032b388	FUN_0032b388	moby	has	cite
+L00:0032b3b0	FUN_0032b3b0	moby	has	cite
+L00:0032b3e0	FUN_0032b3e0	moby	has	cite
+L00:0032b4d0	FUN_0032b4d0	moby	has	cite
 L00:0032b858	FUN_0032b858	group	has	cite
 L00:0032c780	FUN_0032c780	scene	has	cite
 L00:0032df58	mark_fence	enemy	has	L
 L00:00334528	FUN_00334528	moby	missing	cite
 L00:003348c0	FUN_003348c0	particles	has	cite
+L00:003352c0	FUN_003352c0	particles	has	cite
+L00:003378b0	FUN_003378b0	particles	has	cite
 L00:0033a1c0	FUN_0033a1c0	particles	has	cite
 L00:0033bb60	FUN_0033bb60	particles	has	cite
 L00:0033c390	FUN_0033c390	particles	has	cite
+L00:0033d968	FUN_0033d968	particles	has	cite
+L00:0033ff78	FUN_0033ff78	moby	missing	cite
+L00:00340ce8	FUN_00340ce8	particles	has	cite
+L00:003412e8	FUN_003412e8	particles	has	cite
+L00:00341890	FUN_00341890	particles	has	cite
+L00:00341bc8	FUN_00341bc8	particles	has	cite
+L00:00342028	FUN_00342028	particles	has	cite
+L00:003424d0	FUN_003424d0	particles	has	cite
+L00:00342740	FUN_00342740	particles	has	cite
 L00:00342ae8	FUN_00342ae8	path	has	cite
 L00:00342db8	FUN_00342db8	path	has	cite
 L00:00343038	FUN_00343038	path	has	cite
 L00:00360d28	FUN_00360d28	moby	has	cite
 L00:00368258	FUN_00368258	other	has	cite
+L00:0036a1c0	FUN_0036a1c0	moby	has	cite
 L00:0037dfc0	FUN_0037dfc0	moby	has	cite
 L00:0037e328	FUN_0037e328	moby	has	cite
 L00:0037e988	FUN_0037e988	moby	has	cite
+L00:0037ec68	FUN_0037ec68	moby	has	cite
+L00:0037ecc0	FUN_0037ecc0	moby	has	cite
 L00:0037edb8	FUN_0037edb8	moby	has	cite
-L00:0037f538	FUN_0037f538	weapons	has	cite
-L00:0037f618	FUN_0037f618	weapons	has	cite
+L00:0037f060	FUN_0037f060	moby	has	cite
+L00:0037f110	FUN_0037f110	moby	has	cite
+L00:0037f158	FUN_0037f158	moby	has	cite
+L00:0037f1c0	FUN_0037f1c0	moby	has	cite
+L00:0037f338	FUN_0037f338	moby	has	cite
+L00:0037f440	FUN_0037f440	moby	has	cite
+L00:0037f500	FUN_0037f500	moby	has	cite
+L00:0037f538	FUN_0037f538	moby	has	cite
+L00:0037f5f8	FUN_0037f5f8	moby	has	cite
+L00:0037f618	FUN_0037f618	moby	has	cite
+L00:0037faa8	FUN_0037faa8	moby	has	cite
+L00:0037fad0	FUN_0037fad0	hero	has	cite
+L00:0037fb00	FUN_0037fb00	moby	has	cite
 L00:00380e08	FUN_00380e08	moby	has	cite
+L00:00380e58	FUN_00380e58	moby	has	cite
 L00:00380ec0	FUN_00380ec0	moby	has	cite
-L00:00380ef8	FUN_00380ef8	weapons	has	cite
+L00:00380ef8	FUN_00380ef8	moby	has	cite
+L00:00381048	FUN_00381048	moby	has	cite
+L00:003810c8	FUN_003810c8	moby	has	cite
+L00:003813b0	FUN_003813b0	moby	has	cite
 L00:00381e60	FUN_00381e60	moby	has	cite
 L00:00382c18	FUN_00382c18	moby	has	cite
 L00:00382e20	FUN_00382e20	moby	has	cite
 L00:003831a8	FUN_003831a8	moby	has	cite
+L00:00383380	FUN_00383380	bolts	has	cite
 L00:00383758	FUN_00383758	moby	has	cite
 L00:00383b90	FUN_00383b90	moby	has	cite
 L00:00383bb0	FUN_00383bb0	moby	has	cite
@@ -447,6 +518,34 @@ L00:00383ce0	FUN_00383ce0	moby	has	cite
 L00:00383eb8	FUN_00383eb8	moby	has	cite
 L00:003846d0	FUN_003846d0	game	has	cite
 L00:00384d28	FUN_00384d28	moby	has	cite
+L00:00387ee8		moby	has	cite
+L00:00388740	FUN_00388740	moby	has	cite
+L00:003887d8	FUN_003887d8	moby	has	cite
+L00:00388888	FUN_00388888	moby	has	cite
+L00:003888e8	FUN_003888e8	moby	has	cite
+L00:003889a8	FUN_003889a8	moby	has	cite
+L00:00388b98	FUN_00388b98	moby	has	cite
+L00:00388cc8	FUN_00388cc8	moby	has	cite
+L00:00388e98	FUN_00388e98	moby	has	cite
+L00:00388f80	FUN_00388f80	moby	has	cite
+L00:00389078	FUN_00389078	moby	has	cite
+L00:00389368	FUN_00389368	moby	has	cite
+L00:00389388	FUN_00389388	moby	has	cite
+L00:00389438	FUN_00389438	moby	has	cite
+L00:003896e8	FUN_003896e8	moby	has	cite
+L00:00389788	FUN_00389788	moby	has	cite
+L00:00389818	FUN_00389818	moby	has	cite
+L00:00389860	FUN_00389860	moby	has	cite
+L00:00389b60	FUN_00389b60	moby	has	cite
+L00:00389f90	FUN_00389f90	moby	has	cite
+L00:0038a268	FUN_0038a268	moby	has	cite
+L00:0038a5d0	FUN_0038a5d0	moby	has	cite
+L00:0038a9a8	FUN_0038a9a8	moby	has	cite
+L00:0038b348	FUN_0038b348	moby	has	cite
+L00:0038b770	FUN_0038b770	moby	has	cite
+L00:0038bb30	FUN_0038bb30	moby	has	cite
+L00:0038bdc8	FUN_0038bdc8	moby	has	cite
+L00:0038bde8	FUN_0038bde8	fxdraw	has	cite
 L00:0038cbf8	FUN_0038cbf8	weapons	has	cite
 L00:0038cc48	FUN_0038cc48	weapons	has	cite
 L00:0038cc88	FUN_0038cc88	hero	missing	cite
@@ -455,6 +554,7 @@ L00:0038d270	FUN_0038d270	weapons	has	cite
 L00:0038d318	FUN_0038d318	weapons	has	cite
 L00:0038e768	FUN_0038e768	moby	has	cite
 L00:00392728	FUN_00392728	moby	missing	cite
+L00:0039afd0	FUN_0039afd0	moby	has	cite
 L00:0039c6b8	FUN_0039c6b8	breakfx	has	cite
 L00:0039c870	FUN_0039c870	moby	has	cite
 L00:0039d0c0	FUN_0039d0c0	moby	has	cite
@@ -473,18 +573,119 @@ L00:003a0800	FUN_003a0800	moby	has	cite
 L00:003a17f0	FUN_003a17f0	moby	has	cite
 L00:003a1e28	FUN_003a1e28	moby	has	cite
 L00:003a2030	FUN_003a2030	moby	has	cite
+L00:003a2360	FUN_003a2360	moby	has	cite
+L00:003a29b0	FUN_003a29b0	moby	has	cite
+L00:003a3568	FUN_003a3568	moby	has	cite
+L00:003a3838	FUN_003a3838	moby	has	cite
+L00:003a3fe8	FUN_003a3fe8	moby	has	cite
+L00:003a4310	FUN_003a4310	moby	has	cite
+L00:003a4f88	FUN_003a4f88	moby	has	cite
+L00:003a5360	FUN_003a5360	moby	has	cite
+L00:003a5620	FUN_003a5620	moby	has	cite
+L00:003a58b0	FUN_003a58b0	moby	has	cite
+L00:003a5d00	FUN_003a5d00	moby	has	cite
+L00:003a67a0	FUN_003a67a0	moby	has	cite
+L00:003a6818	FUN_003a6818	moby	has	cite
+L00:003a71f0	FUN_003a71f0	moby	has	cite
+L00:003a73f0	FUN_003a73f0	moby	has	cite
 L00:003a8060	FUN_003a8060	weapons	has	cite
 L00:003a8ce0	FUN_003a8ce0	weapons	has	cite
 L00:003a8f20	FUN_003a8f20	weapons	has	cite
+L00:003a9060	FUN_003a9060	moby	has	cite
+L00:003a92a8	FUN_003a92a8	moby	has	cite
+L00:003a9490	FUN_003a9490	moby	has	cite
+L00:003a9528	FUN_003a9528	moby	has	cite
+L00:003a9938	FUN_003a9938	moby	has	cite
+L00:003a99d0	FUN_003a99d0	moby	has	cite
+L00:003a9aa0	FUN_003a9aa0	moby	has	cite
+L00:003a9c08	FUN_003a9c08	moby	has	cite
+L00:003aa258	FUN_003aa258	moby	has	cite
+L00:003aa430	FUN_003aa430	moby	has	cite
+L00:003aabc8	FUN_003aabc8	moby	has	cite
+L00:003aad18	FUN_003aad18	moby	has	cite
+L00:003ab088	FUN_003ab088	moby	has	cite
+L00:003ab8f8	FUN_003ab8f8	moby	has	cite
+L00:003abb40	FUN_003abb40	moby	has	cite
+L00:003ac7c0	FUN_003ac7c0	moby	has	cite
+L00:003aca50	FUN_003aca50	moby	has	cite
+L00:003acb28	FUN_003acb28	moby	has	cite
+L00:003accf0	FUN_003accf0	moby	has	cite
+L00:003ace00	FUN_003ace00	moby	has	cite
+L00:003ad308		moby	has	cite
+L00:003add28	FUN_003add28	moby	has	cite
+L00:003adea0	FUN_003adea0	moby	has	cite
+L00:003ae0c8	FUN_003ae0c8	moby	has	cite
+L00:003ae138	FUN_003ae138	moby	has	cite
+L00:003b7038	FUN_003b7038	moby	has	cite
+L00:003b7528	FUN_003b7528	moby	has	cite
+L00:003b7598	FUN_003b7598	moby	has	cite
 L00:003b9618	FUN_003b9618	moby	has	cite
 L00:003b9868	FUN_003b9868	moby	has	cite
 L00:003bb120	FUN_003bb120	enemy	has	cite
 L00:003bbab0	FUN_003bbab0	enemy	has	cite
 L00:003bbf38	FUN_003bbf38	enemy	has	cite
 L00:003bbff8	FUN_003bbff8	enemy	has	cite
+L00:003bc078	FUN_003bc078	moby	has	cite
+L00:003bc4c8	FUN_003bc4c8	moby	has	cite
+L00:003bc640	FUN_003bc640	moby	has	cite
+L00:003bca38	FUN_003bca38	moby	has	cite
+L00:003bcd00	FUN_003bcd00	moby	has	cite
+L00:003bcfb0	FUN_003bcfb0	moby	has	cite
+L00:003bdde0	FUN_003bdde0	moby	has	cite
+L00:003be058	FUN_003be058	moby	has	cite
+L00:003be958	FUN_003be958	moby	has	cite
 L00:003c3be8	FUN_003c3be8	group	has	cite
 L00:003c4230	FUN_003c4230	group	has	cite
 L00:003c4358	FUN_003c4358	group	has	cite
+L00:003c4410	FUN_003c4410	moby	has	cite
+L00:003c4828	FUN_003c4828	moby	has	cite
+L00:003c4860	FUN_003c4860	moby	has	cite
+L00:003c4be8	FUN_003c4be8	moby	has	cite
+L00:003c4c10	FUN_003c4c10	moby	has	cite
+L00:003c4d68	FUN_003c4d68	moby	has	cite
+L00:003c4eb8	FUN_003c4eb8	moby	has	cite
+L00:003c51d8	FUN_003c51d8	moby	has	cite
+L00:003c5c98	FUN_003c5c98	moby	has	cite
+L00:003c5d18	FUN_003c5d18	moby	has	cite
+L00:003c5fe0	FUN_003c5fe0	moby	has	cite
+L00:003c63c0	FUN_003c63c0	moby	has	cite
+L00:003c6758	FUN_003c6758	moby	has	cite
+L00:003c6d30	FUN_003c6d30	moby	has	cite
+L00:003c6f60	FUN_003c6f60	moby	has	cite
+L00:003c6fd0	FUN_003c6fd0	moby	has	cite
+L00:003c76e0	FUN_003c76e0	moby	has	cite
+L00:003c7ed0	FUN_003c7ed0	moby	has	cite
+L00:003c7fe0	FUN_003c7fe0	moby	has	cite
+L00:003c8e40		moby	has	cite
+L00:003c9238	FUN_003c9238	moby	has	cite
+L00:003c9828	FUN_003c9828	moby	has	cite
+L00:003c9a50	FUN_003c9a50	moby	has	cite
+L00:003c9c70	FUN_003c9c70	moby	has	cite
+L00:003c9ea0	FUN_003c9ea0	fxdraw	has	cite
+L00:003c9ed8	FUN_003c9ed8	moby	has	cite
+L00:003ca920	FUN_003ca920	moby	has	cite
+L00:003cadc0	FUN_003cadc0	moby	has	cite
+L00:003cb8f0	FUN_003cb8f0	moby	has	cite
+L00:003cbaa0		moby	has	cite
+L00:003cbad0	FUN_003cbad0	moby	has	cite
+L00:003cbb78	FUN_003cbb78	moby	has	cite
+L00:003cc1f0	FUN_003cc1f0	moby	has	cite
+L00:003cc4c0	FUN_003cc4c0	moby	has	cite
+L00:003cc878	FUN_003cc878	moby	has	cite
+L00:003cc980	FUN_003cc980	moby	has	cite
+L00:003cca98	FUN_003cca98	moby	has	cite
+L00:003ccc18	FUN_003ccc18	moby	has	cite
+L00:003ccc50	FUN_003ccc50	moby	has	cite
+L00:003ccdc8	FUN_003ccdc8	moby	has	cite
+L00:003cd018	FUN_003cd018	moby	has	cite
+L00:003cd028		moby	has	cite
+L00:003cd060	FUN_003cd060	moby	has	cite
+L00:003cd150	FUN_003cd150	moby	has	cite
+L00:003cd2d8	FUN_003cd2d8	moby	has	cite
+L00:003cd940	FUN_003cd940	moby	has	cite
+L00:003cdb20	FUN_003cdb20	moby	has	cite
+L00:003cdb88	FUN_003cdb88	moby	has	cite
+L00:003ce060	FUN_003ce060	moby	has	cite
 L00:003ce5b0	FUN_003ce5b0	moby	has	cite
 L00:003ced30	FUN_003ced30	moby	has	cite
 L00:003cf6c8	FUN_003cf6c8	moby	has	cite
@@ -499,6 +700,19 @@ L00:003d1458	FUN_003d1458	moby	has	cite
 L00:003d1d60	FUN_003d1d60	moby	has	cite
 L00:003d26a8	FUN_003d26a8	moby	has	cite
 L00:003d2d30	FUN_003d2d30	moby	has	cite
+L00:003d3178	FUN_003d3178	moby	has	cite
+L00:003d3e50	FUN_003d3e50	moby	has	cite
+L00:003d4050	FUN_003d4050	moby	has	cite
+L00:003d4320	FUN_003d4320	moby	has	cite
+L00:003d47d8	FUN_003d47d8	moby	has	cite
+L00:003d4c38	FUN_003d4c38	moby	has	cite
+L00:003d5230	FUN_003d5230	moby	has	cite
+L00:003d5400	FUN_003d5400	moby	has	cite
+L00:003d5528	FUN_003d5528	moby	has	cite
+L00:003d5998	FUN_003d5998	moby	has	cite
+L00:003d5da8	FUN_003d5da8	moby	has	cite
+L00:003d5e70	FUN_003d5e70	moby	has	cite
+L00:003d67a8	FUN_003d67a8	moby	has	cite
 L00:003d6900		enemy	has	cite
 L00:003d7a48	FUN_003d7a48	enemy	has	cite
 L00:003d8188	FUN_003d8188	enemy	has	cite
@@ -514,6 +728,18 @@ L00:003db680	FUN_003db680	enemy	has	cite
 L00:003db790	FUN_003db790	fxdraw	has	cite
 L00:003dbc20	FUN_003dbc20	enemy	has	cite
 L00:003dbde8	FUN_003dbde8	enemy	has	cite
+L00:003dc4f8	FUN_003dc4f8	moby	has	cite
+L00:003dc568	FUN_003dc568	moby	has	cite
+L00:003dd3a0	FUN_003dd3a0	moby	has	cite
+L00:003dd610	FUN_003dd610	moby	has	cite
+L00:003dd720	FUN_003dd720	moby	has	cite
+L00:003dd7a0	FUN_003dd7a0	moby	has	cite
+L00:003dd830	FUN_003dd830	moby	has	cite
+L00:003ddaa8		moby	has	cite
+L00:003ddc70	FUN_003ddc70	moby	has	cite
+L00:003ddd60	FUN_003ddd60	moby	has	cite
+L00:003ddf18	FUN_003ddf18	moby	has	cite
+L00:003de098	FUN_003de098	moby	has	cite
 L00:003deaf8	FUN_003deaf8	other	has	cite
 L00:003df6d8	FUN_003df6d8	other	has	cite
 L00:003e3600	FUN_003e3600	weapons	has	cite
@@ -521,13 +747,60 @@ L00:003e3990	FUN_003e3990	weapons	has	cite
 L00:003e46d8	FUN_003e46d8	weapons	has	cite
 L00:003e4ae8	FUN_003e4ae8	weapons	has	cite
 L00:003e4d10	FUN_003e4d10	weapons	has	cite
+L00:003e4e98	FUN_003e4e98	moby	has	cite
+L00:003e5988	FUN_003e5988	moby	has	cite
+L00:003e5dc8	FUN_003e5dc8	weapons	has	cite
+L00:003e6070	FUN_003e6070	moby	has	cite
+L00:003e6640	FUN_003e6640	moby	has	cite
+L00:003e67b0	FUN_003e67b0	moby	has	cite
+L00:003e67c0	FUN_003e67c0	moby	has	cite
+L00:003e6a30	FUN_003e6a30	moby	has	cite
+L00:003e6ad0	FUN_003e6ad0	moby	has	cite
+L00:003e6b90	FUN_003e6b90	moby	has	cite
+L00:003e6df8	FUN_003e6df8	moby	has	cite
+L00:003e7058	FUN_003e7058	moby	has	cite
+L00:003e74b0	FUN_003e74b0	moby	has	cite
+L00:003e7978	FUN_003e7978	moby	has	cite
+L00:003e7aa8	FUN_003e7aa8	moby	has	cite
+L00:003e7bf8	FUN_003e7bf8	moby	has	cite
+L00:003e8090	FUN_003e8090	moby	has	cite
+L00:003e83c8	FUN_003e83c8	moby	has	cite
+L00:003e8538	FUN_003e8538	moby	has	cite
+L00:003e86f0	FUN_003e86f0	other	has	cite
+L00:003e8ad0	FUN_003e8ad0	moby	has	cite
 L00:003e8be8	FUN_003e8be8	moby	has	cite
+L00:003e9608		moby	has	cite
+L00:003e9f18	FUN_003e9f18	moby	has	cite
+L00:003ea9c0	FUN_003ea9c0	moby	has	cite
+L00:003eaae0	FUN_003eaae0	moby	has	cite
+L00:003eac00	FUN_003eac00	moby	has	cite
+L00:003eadb0	FUN_003eadb0	moby	has	cite
+L00:003eaf80	FUN_003eaf80	moby	has	cite
+L00:003eb010	FUN_003eb010	moby	has	cite
+L00:003eb560	FUN_003eb560	moby	has	cite
+L00:003eb608	FUN_003eb608	moby	has	cite
 L00:003eb888	FUN_003eb888	moby	has	cite
+L00:003eb9c0	FUN_003eb9c0	moby	has	cite
+L00:003ebc50	FUN_003ebc50	moby	missing	cite
+L00:003ebed8	FUN_003ebed8	moby	has	cite
 L00:003ec140	FUN_003ec140	moby	has	cite
 L00:003ec378	FUN_003ec378	moby	has	cite
 L00:003ec540	FUN_003ec540	group	has	cite
 L00:003ec838	FUN_003ec838	moby	has	cite
 L00:003ec880	FUN_003ec880	moby	has	cite
+L00:003ecc40	FUN_003ecc40	moby	has	cite
+L00:003ecd68	FUN_003ecd68	moby	has	cite
+L00:003ed0e8	FUN_003ed0e8	moby	has	cite
+L00:003ed4f8	FUN_003ed4f8	moby	has	cite
+L00:003ed5c0	FUN_003ed5c0	moby	has	cite
+L00:003edfb8	FUN_003edfb8	moby	has	cite
+L00:003ee200	FUN_003ee200	moby	has	cite
+L00:003ee618	FUN_003ee618	moby	has	cite
+L00:003eecd0	FUN_003eecd0	moby	has	cite
+L00:003ef018	FUN_003ef018	moby	has	cite
+L00:003ef360	FUN_003ef360	moby	has	cite
+L00:003ef580	FUN_003ef580	moby	has	cite
+L00:003ef6a8	FUN_003ef6a8	moby	has	cite
 L00:003ef708	FUN_003ef708	moby	has	cite
 L00:003ef940	FUN_003ef940	moby	has	cite
 L00:003efda0	FUN_003efda0	moby	has	cite
@@ -541,15 +814,149 @@ L00:003f1618	FUN_003f1618	moby	has	cite
 L00:003f1b00	FUN_003f1b00	moby	has	cite
 L00:003f45e0	FUN_003f45e0	moby	has	cite
 L00:003f4998	FUN_003f4998	moby	has	cite
+L00:003f51f0	FUN_003f51f0	moby	has	cite
+L00:003f56b0	FUN_003f56b0	moby	has	cite
+L00:003f6008	FUN_003f6008	moby	has	cite
+L00:003f6108	FUN_003f6108	moby	has	cite
+L00:003f6368	FUN_003f6368	moby	has	cite
+L00:003f66d8	FUN_003f66d8	moby	has	cite
+L00:003f6830	FUN_003f6830	moby	has	cite
+L00:003f6b00	FUN_003f6b00	moby	has	cite
+L00:003f6b90	FUN_003f6b90	moby	has	cite
+L00:003f6bf0	FUN_003f6bf0	moby	has	cite
+L00:003f6d10	FUN_003f6d10	moby	has	cite
+L00:003f6e90	FUN_003f6e90	moby	has	cite
+L00:003f6fb0	FUN_003f6fb0	moby	has	cite
+L00:003f7430	FUN_003f7430	moby	has	cite
+L00:003f7608	FUN_003f7608	moby	has	cite
+L00:003f77a8	FUN_003f77a8	moby	has	cite
+L00:003f7da0	FUN_003f7da0	moby	has	cite
+L00:003f7ef8	FUN_003f7ef8	moby	has	cite
+L00:003f7fb0	FUN_003f7fb0	moby	has	cite
 L00:003f9f70	FUN_003f9f70	moby	has	cite
 L00:003fa808	FUN_003fa808	moby	has	cite
+L00:003fd5a8	FUN_003fd5a8	moby	has	cite
+L00:003fd6c8	FUN_003fd6c8	moby	has	cite
+L00:003fdcc0	FUN_003fdcc0	moby	has	cite
+L00:003fdee0	FUN_003fdee0	moby	has	cite
+L00:003fe010	FUN_003fe010	moby	has	cite
+L00:003fe618	FUN_003fe618	moby	has	cite
+L00:003feb50	FUN_003feb50	moby	has	cite
 L00:003fefc0	FUN_003fefc0	moby	has	cite
+L00:003ff2e8	FUN_003ff2e8	moby	has	cite
+L00:003ff780	FUN_003ff780	moby	has	cite
+L00:003ff7d0	FUN_003ff7d0	moby	has	cite
+L00:003ff810	FUN_003ff810	moby	has	cite
+L00:003ff990	FUN_003ff990	moby	has	cite
+L00:003ff9c8	FUN_003ff9c8	moby	has	cite
+L00:003ffe20	FUN_003ffe20	moby	has	cite
+L00:003fffc8	FUN_003fffc8	moby	has	cite
+L00:004000a0	FUN_004000a0	moby	has	cite
+L00:00400260	FUN_00400260	moby	has	cite
+L00:004003a0	FUN_004003a0	moby	has	cite
+L00:00400a30	FUN_00400a30	moby	has	cite
+L00:004010a0	FUN_004010a0	moby	has	cite
+L00:00401ab0	FUN_00401ab0	moby	has	cite
+L00:00401c08	FUN_00401c08	moby	has	cite
+L00:00402450	FUN_00402450	moby	has	cite
+L00:00403320	FUN_00403320	moby	has	cite
+L00:004038b8	FUN_004038b8	moby	has	cite
+L00:00403a60	FUN_00403a60	moby	has	cite
+L00:00403c00	FUN_00403c00	moby	has	cite
+L00:00403ec8	FUN_00403ec8	moby	has	cite
+L00:00404040		moby	has	cite
+L00:00404298	FUN_00404298	moby	has	cite
+L00:004042b8	FUN_004042b8	moby	has	cite
+L00:00404338	FUN_00404338	moby	has	cite
+L00:00404c18	FUN_00404c18	moby	has	cite
+L00:00405120	FUN_00405120	moby	has	cite
+L00:00405158	FUN_00405158	moby	has	cite
+L00:004051a8	FUN_004051a8	moby	has	cite
+L00:00405248	FUN_00405248	moby	has	cite
+L00:00405338	FUN_00405338	moby	has	cite
+L00:00405480	FUN_00405480	moby	has	cite
+L00:00405658	FUN_00405658	moby	has	cite
+L00:00405858	FUN_00405858	moby	missing	cite
+L00:00405ad8	FUN_00405ad8	moby	has	cite
+L00:00405f70	FUN_00405f70	moby	has	cite
+L00:004062c8	FUN_004062c8	moby	has	cite
+L00:004063c8	FUN_004063c8	moby	has	cite
+L00:004066b8	FUN_004066b8	moby	has	cite
+L00:00406cf8	FUN_00406cf8	moby	has	cite
+L00:00407640	FUN_00407640	moby	has	cite
+L00:00408080		moby	has	cite
+L00:004084a0		moby	has	cite
+L00:00409328	FUN_00409328	moby	has	cite
+L00:00409cf0	FUN_00409cf0	moby	has	cite
+L00:0040a358	FUN_0040a358	moby	has	cite
+L00:0040a920	FUN_0040a920	moby	has	cite
+L00:0040a980	FUN_0040a980	moby	has	cite
+L00:0040aa58	FUN_0040aa58	moby	has	cite
+L00:0040abb0	FUN_0040abb0	moby	has	cite
+L00:0040b348	FUN_0040b348	moby	has	cite
+L00:0040b9b0		moby	has	cite
+L00:0040c4b8	FUN_0040c4b8	moby	has	cite
+L00:0040c598	FUN_0040c598	moby	has	cite
+L00:0040c7c0	FUN_0040c7c0	moby	has	cite
+L00:0040c830	FUN_0040c830	moby	has	cite
+L00:0040c898	FUN_0040c898	moby	has	cite
+L00:0040cf30	FUN_0040cf30	moby	has	cite
+L00:0040dcd8	FUN_0040dcd8	moby	has	cite
+L00:0040e1a0	FUN_0040e1a0	moby	has	cite
+L00:0040e558	FUN_0040e558	moby	has	cite
 L00:0040eb48	FUN_0040eb48	moby	has	cite
+L00:0040f108	FUN_0040f108	moby	missing	cite
+L00:0040f458	FUN_0040f458	moby	missing	cite
 L00:0040ffa0		moby	has	cite
-L00:004126b8	FUN_004126b8	weapons	missing	cite
+L00:00410ba0	FUN_00410ba0	moby	has	cite
+L00:00411678	FUN_00411678	moby	has	cite
+L00:00411930	FUN_00411930	moby	has	cite
+L00:00411a08	FUN_00411a08	moby	has	cite
+L00:00411b90	FUN_00411b90	moby	has	cite
+L00:00411d40	FUN_00411d40	moby	has	cite
+L00:00411d88	FUN_00411d88	moby	has	cite
+L00:004126b8	FUN_004126b8	moby	has	cite
 L00:00414368	FUN_00414368	moby	has	cite
+L00:004144f8	FUN_004144f8	moby	has	cite
+L00:00414628	FUN_00414628	moby	has	cite
+L00:00414798	FUN_00414798	moby	has	cite
+L00:00414858	FUN_00414858	moby	has	cite
+L00:00414d70	FUN_00414d70	moby	has	cite
+L00:00414e18	FUN_00414e18	moby	has	cite
+L00:00415518	FUN_00415518	moby	has	cite
+L00:00415520	FUN_00415520	moby	has	cite
+L00:00415a40	FUN_00415a40	moby	has	cite
+L00:00416c40	FUN_00416c40	moby	missing	cite
+L00:00418468	FUN_00418468	moby	has	cite
+L00:004185a8	FUN_004185a8	moby	has	cite
+L00:00418718	FUN_00418718	moby	has	cite
+L00:004188b0	FUN_004188b0	moby	has	cite
+L00:00418c00	FUN_00418c00	moby	has	cite
+L00:00418d68	FUN_00418d68	moby	has	cite
+L00:00418f40	FUN_00418f40	moby	has	cite
+L00:00419270	FUN_00419270	moby	has	cite
+L00:00419640	FUN_00419640	moby	has	cite
+L00:00419730	FUN_00419730	moby	has	cite
 L00:0041b058		moby	missing	cite
+L00:0041b120		moby	has	cite
 L00:0041b170		moby	missing	cite
+L00:0041b198	FUN_0041b198	moby	has	cite
+L00:0041ba00	FUN_0041ba00	moby	has	cite
+L00:0041bac0	FUN_0041bac0	moby	has	cite
+L00:0041c0b8	FUN_0041c0b8	moby	has	cite
+L00:0041c1a0	FUN_0041c1a0	moby	has	cite
+L00:0041c240	FUN_0041c240	moby	has	cite
+L00:0041c460	FUN_0041c460	moby	has	cite
+L00:0041cd40	FUN_0041cd40	moby	has	cite
+L00:0041cfe8	FUN_0041cfe8	moby	has	cite
+L00:0041d7d0	FUN_0041d7d0	moby	has	cite
+L00:0041e080	FUN_0041e080	moby	has	cite
+L00:0041f3f0	FUN_0041f3f0	moby	has	cite
+L00:0041f668	FUN_0041f668	moby	has	cite
+L00:0041f9a8	FUN_0041f9a8	moby	has	cite
+L00:0041fb48	FUN_0041fb48	moby	has	cite
+L00:00426058	FUN_00426058	camera	has	cite
+L00:00428588	FUN_00428588	moby	has	cite
 L00:0042a508	FUN_0042a508	moby	has	cite
 B:4	sound bank 4	gadget banks	has	L
 L00:00304058	variant_of	level	has	L
@@ -557,22 +964,22 @@ H:4f75811bc46e3aab		trivial	trivial	leaf
 H:c03a5511ef01f8b8		enemy	has	calls
 H:3ee41218b715c799		trivial	trivial	leaf
 H:dadd29b35001fbea		trivial	trivial	leaf
-H:e09c40414108eca7		math	trivial	calls
 H:62d5a953ce6b612f		enemy	has	near
-H:dacafa0e572851e2		breakfx	has	near
+H:dacafa0e572851e2		moby	has	near
+H:e09c40414108eca7		math	trivial	calls
 L00:0032ceb8	FUN_0032ceb8	enemy	has	wrap
 H:3264b18aeb9576ee		enemy	has	calls
 H:faad2ad731c269f3		moby	has	calls
 L00:0031fe80	FUN_0031fe80	trivial	trivial	leaf
 L00:0031d620	FUN_0031d620	hero	has	wrap
-H:13f2d249cf66bf79		math	trivial	calls
-H:2df3b1856eecbb19		enemy	has	near
+H:2df3b1856eecbb19		moby	has	near
 H:75d44116251e1d3a		trivial	trivial	leaf
 H:f6c2162195566679		breakfx	has	near
+H:13f2d249cf66bf79		math	trivial	calls
 H:eeee8445d055c904		hero	has	near
-H:50049e46a17ea479		math	trivial	calls
 H:b213a991c39c640a		trivial	trivial	leaf
 H:72414252929eee3f		enemy	has	calls
+H:50049e46a17ea479		math	trivial	calls
 L00:003269a0	FUN_003269a0	math	trivial	calls
 H:8ef8b216b7f0fe7b		trivial	trivial	leaf
 H:30e8b17608820ca8		docs	missing	near
@@ -585,16 +992,15 @@ H:bb690ee0d3c671e4		enemy	has	near
 H:6dfc6ef1b99e48d2		trivial	trivial	leaf
 H:ae839b9a15b732b6		trivial	trivial	leaf
 H:699556095593bd28		breakfx	has	near
-H:c2e79ad6eb86ef03		math	trivial	calls
 H:398291f14bffba90		moby	has	calls
 H:9b79028d7fdf1201		math	trivial	calls
-L00:0031c1e0	FUN_0031c1e0	enemy	has	calls
+L00:0031c1e0	FUN_0031c1e0	moby	has	calls
 H:8811f8f784fd380c		trivial	trivial	leaf
 H:650646a3d744d34d		trivial	trivial	leaf
 H:e0a3d4a077088882		enemy	has	near
 H:c01e62d57d8edd90		trivial	trivial	leaf
 H:587c8952e7c78d1b		math	trivial	calls
-H:238538f4b7b36ea9		bolts	has	wrap
+H:238538f4b7b36ea9		other	has	wrap
 H:886d02382b6fc222		moby	has	calls
 H:91e31346e413c054		math	trivial	calls
 L00:0030da30	FUN_0030da30	trivial	trivial	leaf
@@ -602,55 +1008,60 @@ H:b341aedfdaf73b1b		enemy	has	near
 H:fd59028b805ee1c6		level	has	wrap
 H:66a9da336def0ec9		trivial	trivial	leaf
 H:c52f0b35d64140bd		enemy	has	calls
-H:2bfe420e7ba37c93		hero	partly	wrap
 H:a80bf6e3cc1facb2		moby	has	calls
 H:6ecaf6f69da9aa94		moby	has	near
 H:9fd4c1db17d4f76a		bolts	has	near
+H:2bfe420e7ba37c93		moby	has	near
 L00:003263a8	FUN_003263a8	math	trivial	wrap
 H:4364524ef981fcad		math	trivial	calls
 L00:0032d918	FUN_0032d918	moby	has	calls
-H:c55e53efc314cec4		group	has	near
+H:c2e79ad6eb86ef03		math	trivial	calls
+H:c55e53efc314cec4		moby	has	near
 H:a22ec907aba3e58c		math	trivial	calls
 H:509d8cdf4ba64c38		trivial	trivial	leaf
 H:fcae8e5f9ff56e0a		trivial	trivial	leaf
 H:34d774c91b645b44		moby	has	calls
-H:8250b8eb866ba390		moby	has	calls
 H:e9ffc8c22b38591f		moby	has	calls
 H:62afe4e47d9f1761		trivial	trivial	leaf
 H:8ea7870662b39e1c		trivial	trivial	leaf
 H:d5b038f309d6f896		trivial	trivial	leaf
-H:85590e4ca46752b5		trivial	trivial	leaf
 H:2fd6d4db0450c17a		enemy	has	near
-L00:0031eb70	FUN_0031eb70	math	trivial	calls
+H:2756621b98c383f5		moby	has	near
 H:f0ad907c0732653b		breakfx	has	near
-H:5ca533ae8b99502e		trivial	trivial	leaf
 H:b5eb4532bb9eeae7		fxdraw	partly	near
+H:5ca533ae8b99502e		trivial	trivial	leaf
 H:f56b73ac3dedc764		moby	has	near
 H:2c34bd8ad2fa0f3e		moby	has	calls
-H:8a7cc6140c555660		fxdraw	partly	calls
+H:8250b8eb866ba390		moby	has	calls
 H:4ac33dd3bd0c69f2		trivial	trivial	leaf
 H:3aa49f6ce4da87fe		math	trivial	calls
 H:a66bf9cfabec89cd		moby	has	calls
 H:f4c2332215424b83		trivial	trivial	leaf
 L00:003124f8	FUN_003124f8	math	trivial	calls
-L00:0031e8e8	FUN_0031e8e8	hero	has	calls
+L00:0031e8e8	FUN_0031e8e8	moby	has	calls
 H:92f6695f3a60a19a		trivial	trivial	leaf
 H:c362447033d172db		ui	has	near
 L00:00369790	FUN_00369790	trivial	trivial	wrap
+H:8a7cc6140c555660		fxdraw	partly	calls
 H:6894fcd323d0bc8c		moby	has	calls
 H:8bb9dbba00e69ab8		trivial	trivial	leaf
-H:a688e0c884be50e0		group	has	near
+H:a688e0c884be50e0		moby	has	near
 H:f33752c72ba2ef70		bolts	has	near
-H:b6a9f51ffd895499		trivial	trivial	leaf
 H:325903f48a088a72		moby	has	calls
 H:b527e90914c5220f		trivial	trivial	leaf
+H:2babc72b43bd0ec4		moby	missing	near
+H:6728a2dea42035fb		moby	has	near
 L00:0032f030	FUN_0032f030	trivial	trivial	leaf
 H:6392fcaf71a5591a		math	trivial	calls
 H:91dbf43d1f56e5d2		trivial	trivial	near
 H:9316a6e9af2f5e18		hero	has	near
+H:85590e4ca46752b5		trivial	trivial	leaf
 H:8dbe3bc8256388d8		math	trivial	calls
+H:b6a9f51ffd895499		trivial	trivial	leaf
 H:cd35c1d4fa65eb86		trivial	trivial	leaf
+L00:0031eb70	FUN_0031eb70	math	trivial	calls
 H:970b6a3e0ce4c41b		moby	has	near
+H:3b9a12747aa11dda		moby	missing	near
 H:5458b13c2c78ad5c		group	has	near
 H:7a59921704183b4d		enemy	has	near
 H:07b87afe9dca9e32		trivial	trivial	leaf
@@ -658,9 +1069,9 @@ H:4c76bf8e5f83e753		trivial	trivial	leaf
 H:b52cb4c6ae0685cf		trivial	trivial	leaf
 H:b7f87b32b3acf0e9		trivial	trivial	leaf
 L00:002f1c10	FUN_002f1c10	trivial	trivial	leaf
-L00:00371b50	FUN_00371b50	trivial	trivial	leaf
 H:7bb943cd028db352		trivial	trivial	leaf
 L00:00330228	FUN_00330228	trivial	trivial	leaf
+L00:003272c0	FUN_003272c0	moby	has	calls
 H:41e63a0d4fdb2b6f		math	trivial	calls
 H:4c4861af28367464		moby	has	calls
 H:785b7e7f93e2133c		trivial	trivial	leaf
@@ -669,55 +1080,55 @@ L00:002f1b88	FUN_002f1b88	trivial	trivial	leaf
 L00:0030f1d0	FUN_0030f1d0	game	has	calls
 H:8db06f390854b4c3		trivial	trivial	leaf
 H:e4fe842725c28320		moby	has	calls
-L00:00324140	FUN_00324140	moby	has	calls
-L00:00360a10	FUN_00360a10	trivial	trivial	leaf
+H:117bfe3725f9e3db		moby	has	calls
 H:25eae62100706a3c		math	trivial	calls
 H:3a095f20b7045e1b		trivial	trivial	leaf
 H:5b19eeb41edcd5ea		trivial	trivial	leaf
 H:8354ca0acf6ac003		trivial	trivial	leaf
 H:9d2b75bd9e713c1f		moby	has	calls
-H:b2efbcb1dddc3efe		trivial	trivial	leaf
 H:c1d7e334dcee7e95		moby	has	calls
 H:e0e66b373d532413		trivial	trivial	leaf
 L00:0030df70	FUN_0030df70	trivial	trivial	leaf
 L00:0032c7f8	FUN_0032c7f8	trivial	trivial	leaf
+L00:00371b50	FUN_00371b50	trivial	trivial	leaf
 H:09e7d4c1e18c6bcd		math	trivial	calls
 H:0b5c5518112cbd2b		enemy	has	near
 H:14bad108f02be236		trivial	trivial	leaf
 H:1ae3bac824213e24		particles	has	calls
 H:205ad60d079e2aa3		trivial	trivial	wrap
+H:303867c5c4d81355		moby	has	near
 H:35ac7d0e0a887f27		trivial	trivial	leaf
 H:39cab23ebd065777		trivial	trivial	leaf
 H:413b4f4d07c01a45		moby	has	near
 H:4710c82993985451		math	trivial	near
 H:4b36db93d79d60bc		hero	has	near
 H:5df9dceb93b71e3e		bolts	has	near
+H:680fd7001a0d04c0		hero	has	near
 H:688f6a98b84c9959		trivial	trivial	leaf
 H:72de4ac0e43d25d4		trivial	trivial	wrap
 H:799d146eea27131f		trivial	trivial	leaf
 H:7c03c26e91f83eef		bolts	has	near
-H:880c51a83267abbf		math	trivial	calls
+H:880c51a83267abbf		moby	has	near
 H:8a2fa9b81b27445d		trivial	trivial	near
 H:9580148d0c9c9d7c		bolts	has	near
 H:a5a27edd53f9d05b		trivial	trivial	leaf
 H:acfb1b6b74dd0bfc		trivial	trivial	leaf
 H:af7f6c377b740a36		weapons	has	near
+H:b2efbcb1dddc3efe		trivial	trivial	leaf
 H:c4c6315ca89ba90c		particles	has	near
 H:d26181ac6a59988c		bolts	has	near
+H:dffb7cafe5cb94dc		hero	has	near
 H:ef3724bc786d5533		trivial	trivial	leaf
 L00:002d2858	FUN_002d2858	trivial	trivial	leaf
 L00:002d4350	FUN_002d4350	trivial	trivial	leaf
 L00:0031b910	FUN_0031b910	trivial	trivial	leaf
 L00:0031dc10	FUN_0031dc10	math	trivial	wrap
 L00:003251a0	FUN_003251a0	moby	has	calls
-L00:00326520	FUN_00326520	hero	partly	wrap
+L00:00326540	FUN_00326540	hero	partly	calls
 L00:00326598	FUN_00326598	hero	partly	calls
-L00:0032b318	FUN_0032b318	math	trivial	calls
-L00:0032b388	FUN_0032b388	trivial	trivial	leaf
 L00:0032d968	FUN_0032d968	trivial	trivial	leaf
 L00:003697c0	FUN_003697c0	trivial	trivial	wrap
-L00:0037f5f8	FUN_0037f5f8	trivial	trivial	leaf
-L00:00380e58	FUN_00380e58	platform	has	calls
+L00:0037f038	FUN_0037f038	trivial	trivial	leaf
 L00:00383350	FUN_00383350	moby	has	wrap
 L00:00397d00	FUN_00397d00	trivial	trivial	leaf
 L00:0039ff40	FUN_0039ff40	trivial	trivial	leaf

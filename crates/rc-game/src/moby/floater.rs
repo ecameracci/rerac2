@@ -16,7 +16,7 @@
 
 use crate::hero::physics::{add_rot, dot, sub, V3};
 use crate::moby::attach::rows_of;
-use crate::moby::{carry_hero, countdown, mode, Ctx, MobyWorld};
+use crate::moby::{countdown, mode, Ctx, MobyWorld};
 
 /// The set-up's tunables per axis (x, y tilts; z sink); [`Params::default`] is the table at L01 `0x1aa360`.
 #[derive(Clone, Copy, Debug)]

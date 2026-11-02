@@ -216,7 +216,7 @@ impl FootDust {
     }
 }
 
-/// `0x2a61c8`'s footprints, on Siberius (level 7) on a floor of footstep class 0 and Grelbin (0x13) of class 2: at
+/// `0x2a61c8`'s footprints, on level 7 on a floor of footstep class 0 and Grelbin (0x13) of class 2: at
 /// the foot's joint (0x16 + foot) 0.05 ahead, 0.057 over the ground under it (`0x31ce20(0.5, ..)`), along his yaw;
 /// standing or in the jump group the left one 25° out to the left and 0.037 left of the foot, the right one so to the
 /// right (crate::particles::foot_dust::footprint).

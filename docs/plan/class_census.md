@@ -135,6 +135,12 @@ it):
 | reward items | partly | 14 | 20 | 3279 (3), 3425 (3) | G-WPN-002 |
 | Clank's animation | missing | 1 | 2 | 3004 (2) | G-HERO-004 |
 
+**Re-run 2026-11-02 (after the Endako batch, R&C2's weapons and the moveset pass).** **660 unported class-levels,
+8,389 placed / 8,347 created** instances in **486 units**; 800 shared functions (1,134 tags); 357 ported units.
+Verdicts: cheap 246 units / 4,337, missing 49 / 665, partly 44 / 1,671, unknown 147 / 1,674. Levels 0..2 (Aranos,
+Oozla, Maktar) have none left; Endako (3) has 4 (56 at 2026-11-01). The most left, by level (decimal): 6 57, 11 55,
+13 52, 12 50, 17 45, 4 41, 19 40; 14, 20, 9, 18 and 16 35..38.
+
 The 2026-10-22 tables below are kept as they were read then; `work/census/` holds this run's.
 
 ## Method (to regenerate)
