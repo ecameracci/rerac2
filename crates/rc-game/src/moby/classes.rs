@@ -2,6 +2,9 @@
 //! update, 0x2a3978}` up to o_class −1, written to the slot table `0x1da240` by `0x32e1f8`) as Rust ports.
 
 pub mod arena;
+pub mod level04;
+pub mod level06;
+pub mod level11;
 pub mod beam;
 pub mod area_switch;
 pub mod beast;
@@ -417,7 +420,8 @@ pub fn update_for(o_class: i16) -> Option<UpdateFn> {
         endako_d::CAGE => Some(endako_d::update_cage),
         0x0972 => Some(endako_d::update_0972),
         endako_d::NETWORK => Some(endako_d::update_0f2d),
-        _ => None,
+        // The levels' own (their modules' lists).
+        _ => level04::update_for(o_class).or_else(|| level06::update_for(o_class)).or_else(|| level11::update_for(o_class)),
     }
 }
 

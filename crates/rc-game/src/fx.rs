@@ -416,6 +416,12 @@ fn one(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut crate::ga
         crate::moby::classes::swingshot::HAND_CLASS => crate::moby::classes::swingshot::draw_line(w, host, id, cam, out),
         crate::ship::LASER_CLASS => crate::ship::draw_laser(w, id, cam, out),
         crate::moby::classes::endako_c::SENTRY => crate::moby::classes::endako_c::draw_beam(w, id, game.frame, cam, out),
-        _ => {}
+        // The levels' own (their modules' draws).
+        _ => {
+            use crate::moby::classes::{level04, level06, level11};
+            let _ = level04::draw(w, host, game, hero_state, view, cam, id, first, out, frame)
+                || level06::draw(w, host, game, hero_state, view, cam, id, first, out, frame)
+                || level11::draw(w, host, game, hero_state, view, cam, id, first, out, frame);
+        }
     }
 }
