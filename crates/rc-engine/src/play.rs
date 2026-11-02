@@ -886,6 +886,11 @@ fn tick(
         // His animation's advance (`0x313420`): the first trigger whose time it passed plays its class sound on his
         // moby (`0x3605f0`), as R&C1's `RatchetAnimAdvance` does.
         let after = rc_game::hero::anim::AnimCtl::view(&p.anim.ctl(class));
+        // `0x2a61c8`'s feet of this tick: the states' (the landing's, the take-off's) and the walk's footsteps
+        // (`0x2a6420`, with their sound at 0x1e); all of them for the footprints (rc_game::hero::posture).
+        let mut steps = std::mem::take(&mut p.hero.steps);
+        steps.extend(p.hero.footsteps(&after).into_iter().map(|f| (f, true, 0x1e)));
+        p.hero.prints = steps.iter().map(|s| s.0).collect();
         if let (Some(out), Some(h)) = (audio.as_deref_mut(), mobys.hero_moby) {
             let sys = out.system();
             let mut rng = sys.rng;
@@ -917,22 +922,14 @@ fn tick(
                 let ev = rc_game::audio::SoundEvent { index, flags: 4, moby: h, o_class: 0, sound_class: 0, pos: p.hero.pos, tick: p.ticks };
                 p.hero_loops[k] = sys.play_class_sound(&ev, Some(h), &listener(&p.camera), &mut rng);
             }
-            // `0x2a6420`: the footsteps, `0x360920`: level def `class·4 + foot·2 + variant` past the level's
-            // footstep base, on his moby. Not ported: the boots' variant (0x18b0b8).
-            for foot in p.hero.footsteps(&after) {
+            // `0x2a61c8` → `0x360920`: level def `class·4 + foot·2 + variant` past the level's footstep base, on his
+            // moby, at `(volume << 10) / 0x1e`. Not ported: the boots' variant (0x18b0b8).
+            for &(foot, _, volume) in steps.iter().filter(|s| s.1) {
                 let i = mobys.footstep_base + p.hero.footstep as usize * 4 + foot as usize * 2;
                 let Some(def) = sys.data.sounds.level_defs.get(i).copied() else { continue };
                 let owner = rc_game::audio::voices::Owner { id: h as u32, privileged: true };
-                let k = sys.slots.play(&def, 0, Some(owner), Some(p.hero.pos), None, 0x400, &listener(&p.camera), &mut rng);
+                let k = sys.slots.play(&def, 0, Some(owner), Some(p.hero.pos), None, (volume << 10) / 0x1e, &listener(&p.camera), &mut rng);
                 if let Some(log) = sys.play_log.as_mut() { log.push((p.ticks, rc_game::audio::class_sounds::FOOTSTEP_LOG_CLASS, i as i32, 0, k)); }
-            }
-            // `0x2a6188`: the landing's footstep, the left foot's at 0x32 (`(0x32 << 10) / 0x1e`, the walk's 0x1e).
-            if std::mem::take(&mut p.hero.land_step) {
-                let i = mobys.footstep_base + p.hero.footstep as usize * 4;
-                if let Some(def) = sys.data.sounds.level_defs.get(i).copied() {
-                    let owner = rc_game::audio::voices::Owner { id: h as u32, privileged: true };
-                    sys.slots.play(&def, 0, Some(owner), Some(p.hero.pos), None, (0x32 << 10) / 0x1e, &listener(&p.camera), &mut rng);
-                }
             }
             sys.rng = rng;
         }

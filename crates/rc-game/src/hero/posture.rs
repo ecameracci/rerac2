@@ -216,9 +216,37 @@ impl FootDust {
     }
 }
 
+/// `0x2a61c8`'s footprints, on Siberius (level 7) on a floor of footstep class 0 and Grelbin (0x13) of class 2: at
+/// the foot's joint (0x16 + foot) 0.05 ahead, 0.057 over the ground under it (`0x31ce20(0.5, ..)`), along his yaw;
+/// standing or in the jump group the left one 25° out to the left and 0.037 left of the foot, the right one so to the
+/// right (crate::particles::foot_dust::footprint).
+fn footprints(world: &crate::moby::MobyWorld, ctx: &mut crate::moby::Ctx) {
+    let prints = std::mem::take(&mut ctx.hero.prints);
+    let h = &*ctx.hero;
+    let snow = (ctx.game.level == 7 && h.footstep == 0) || (ctx.game.level == 0x13 && h.footstep == 2);
+    if prints.is_empty() || !snow { return; }
+    let Some(m) = ctx.hero_moby.and_then(|i| world.mobys.get(i)) else { return };
+    let (yaw, left, spread) = (h.rot[2], h.rows[1], h.state == 0 || h.group == 4);
+    for foot in prints {
+        let Some(mut p) = ctx.host.joint(m, 0x16 + foot as usize) else { continue };
+        p[0] += yaw.cos() * 0.05;
+        p[1] += yaw.sin() * 0.05;
+        p[2] = crate::moby::ground_under(ctx, p).unwrap_or(p[2]) + 0.057;
+        let mut a = yaw;
+        if spread {
+            let (turn, side) = if foot == 0 { (0.436_332_3, 0.037) } else { (-0.436_332_3, -0.037) };
+            a = add_rot(yaw, turn);
+            p = [p[0] + left[0] * side, p[1] + left[1] * side, p[2] + left[2] * side];
+        }
+        let Some(sys) = ctx.parts.as_deref_mut() else { return };
+        crate::particles::foot_dust::footprint(sys, a, p, foot == 0);
+    }
+}
+
 /// `0x2ac218`'s puffs, after the hero's update (with the swim's effects): each foot (joints 0x16 / 0x17) gets the
 /// tick's puffs (crate::particles::foot_dust), each of the size ± its spread, along his rows with flag 1.
 pub fn dust_pass(world: &crate::moby::MobyWorld, ctx: &mut crate::moby::Ctx) {
+    footprints(world, ctx);
     let Some(d) = ctx.hero.posture.puffs.take() else { return };
     let Some(sys) = ctx.parts.as_deref_mut() else { return };
     let Some(m) = ctx.hero_moby.and_then(|i| world.mobys.get(i)) else { return };

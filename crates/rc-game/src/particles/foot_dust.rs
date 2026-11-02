@@ -1,6 +1,6 @@
 //! Particle type 0x1c, the dust at Ratchet's feet (L00 spawner `0x336888`, update `0x336b40` at `0x1fe6c0[0x1c]`):
 //! a pale puff that brightens to 0.12 and fades again, turning as it drifts. crate::hero::posture arms it (the skid,
-//! the landings) and [`crate::hero::posture::dust_pass`] puffs it at the feet.
+//! the landings) and [`crate::hero::posture::dust_pass`] puffs it at the feet; and type 0x46, his footprints on snow.
 
 use super::{rec, Particles};
 use crate::hero::physics::{add, V3};
@@ -80,4 +80,37 @@ pub fn update(sys: &mut Particles, i: usize) {
     r[8] = (t * 255.0) as i32 as u8;
     let p = add(rec::v3(r, 0x10), rec::v3(r, 0x30));
     rec::set_v3(r, 0x10, p);
+}
+
+/// Type 0x46, the footprint (L00 spawner `0x33cd98`, update `0x33ce70` at `0x1fe6c0[0x46]`).
+pub const PRINT: u8 = 0x46;
+
+/// `0x33cd98(yaw, at, left)`: a grey print (`0x5a404040`) at `at`, the second frame of its type for the left foot,
+/// its roll the yaw (`yaw · 256 / 2π − 0x20`), size 105000, 120 ticks before it fades.
+pub fn footprint(sys: &mut Particles, yaw: f32, at: V3, left: bool) -> Option<usize> {
+    let i = sys.create_part(PRINT)?;
+    let frame = sys.def_frame(PRINT, left as usize);
+    let r = &mut sys.pool.recs[i];
+    rec::set_v3(r, 0x10, at);
+    rec::set_u32(r, 4, 0x5a40_4040);
+    r[9] = 0x21;
+    r[3] = 0x44;
+    r[1] = 1;
+    r[2] = frame;
+    r[8] = ((yaw * 40.743_664) as i32 as u8).wrapping_sub(0x20);
+    rec::set_ff(r, 0xc, f32::from_bits(0x47cd_1400));
+    rec::set_i16(r, 0xa, 0x78);
+    Some(i)
+}
+
+/// `0x33ce70`: its ticks run down; at the last one its alpha drops a step every other tick, gone at 0.
+pub fn update_print(sys: &mut Particles, i: usize) {
+    let r = &mut sys.pool.recs[i];
+    let n = rec::i16(r, 0xa);
+    rec::set_i16(r, 0xa, n.wrapping_sub(1));
+    if n == 1 {
+        rec::set_i16(r, 0xa, 2);
+        rec::set_u32(r, 4, rec::u32(r, 4).wrapping_sub(0x0100_0000));
+    }
+    if rec::u32(r, 4) & 0xff00_0000 == 0 { sys.kill_part(i); }
 }

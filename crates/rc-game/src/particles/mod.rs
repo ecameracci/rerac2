@@ -1139,6 +1139,7 @@ pub fn update_parts(sys: &mut Particles, mobys: &crate::moby::MobyWorld, cam: [f
             cinder::CINDER => cinder::update(sys, i, rng, mobys.frame),
             dust::DUST => dust::update(sys, i),
             foot_dust::PUFF => foot_dust::update(sys, i),
+            foot_dust::PRINT => foot_dust::update_print(sys, i),
             lava::SPARK => lava::update_spark(sys, i, aux.coll),
             lava::DROP => lava::update_drop(sys, i),
             line::LINE => line::update(sys, i),

@@ -62,6 +62,11 @@ impl Hero {
         if self.gear.updraft != 0 { return Entry::Return(self.set_state(anim, env, 0x82, true)); }
         self.group = 4;
         self.cam_mode = if matches!(id, 0x28 | 0x29) { 3 } else { 0x50 };
+        // The take-off's footprints (no sound): the jumps 7 / 0xd / 0xf, the crouch flip 0xb but from a jump.
+        if matches!(id, 7 | 0xd | 0xf) || (id == 0xb && self.prev_group != 4) {
+            self.steps.push((0, false, 0x1e));
+            self.steps.push((1, false, 0x1e));
+        }
         self.vel = self.eff;
         // Out of the water: its splash (crate::hero::water).
         self.jump_splash(id);
@@ -678,8 +683,10 @@ impl Hero {
         let v = anim.view();
         if j.landed == 0 && self.air_ticks == 0 && j.descending != 0 && !early_double {
             self.jump.landed = 1;
-            // `0x2a6188`: the landing's footstep; 5 ticks of dust at the feet.
-            self.land_step = true;
+            // `0x2a6188`: the landing's footsteps (the left now, the right 7 ticks on: `0x2b9d60(0x16, 7, 0)`); 5 ticks
+            // of dust at the feet.
+            self.steps.push((0, true, 0x32));
+            self.land_late = 7;
             self.posture.dust.arm(f32::from_bits(0x3c83_126f), f32::from_bits(0x3b03_126f), 5, 2, 0, 1);
             self.wall.count = 0;
             if self.stick_mag < 0.2 && 0.041_666_668 < self.speed { self.speed = 0.041_666_668; }
