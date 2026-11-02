@@ -562,6 +562,10 @@ pub struct MobyWorld {
     pub chopper: classes::chopper::Pool,
     /// The Pulse Rifle's records in the trail slots' memory and its beams' next (classes::pulse_rifle).
     pub pulse: classes::pulse_rifle::Mem,
+    /// The Minirocket Tube's rockets' trail slots (classes::minirocket).
+    pub rockets: classes::minirocket::Trails,
+    /// The Vaporizer's records in the trail slots' memory, its beams' next and its trails' scroll (classes::vaporizer).
+    pub vapor: classes::vaporizer::Mem,
     /// The Mini-Turret Glove's turrets' table and shots (classes::turret).
     pub turret: classes::turret::Mem,
     /// The Lava Gun's stream and burning pools (classes::lava_gun).

@@ -114,4 +114,22 @@ impl MobyWorld {
         }
         ids.len()
     }
+
+    /// `0x31def8(damage, out, up, source, centre, list, n, spared, flags, a, b)`: every moby of `list` but `spared`
+    /// takes `damage` knocked away from `centre` (its way the yaw from it: `(cos, sin)·out`, `up`, the no-limit
+    /// 5627.925), flags `flags` (also its `t[8]`), its kind the source's class `<< 16 | b << 8 | a`
+    /// (`0x31d378`, [`Self::deliver_hit_any`]).
+    #[allow(clippy::too_many_arguments)]
+    pub fn knock_hits(&mut self, damage: f32, out: f32, up: f32, source: usize, centre: V3, list: &[usize], spared: Option<usize>, flags: u32, a: u8, b: u8) {
+        let class = self.mobys.get(source).map_or(0, |m| m.o_class as u16 as u32);
+        for &id in list {
+            if Some(id) == spared || self.mobys.get(id).is_none() { continue; }
+            let p = self.mobys[id].pos;
+            let yaw = crate::hero::physics::atan2(p[0] - centre[0], p[1] - centre[1]);
+            let mut t = HitTemplate::new(damage, Some(source), flags, [yaw.cos() * out, yaw.sin() * out, up, 5627.925]);
+            t.kind = class << 16 | (b as u32) << 8 | a as u32;
+            t.count = flags;
+            self.deliver_hit_any(id, &t, [0.0; 4]);
+        }
+    }
 }

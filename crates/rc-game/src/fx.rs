@@ -18,6 +18,8 @@
 //! | `0x3feba0` | the beam 0x0dc1 (the upgrade screen's lightning) | its bolt ([`crate::moby::classes::beam::draw`]) |
 //! | `0x3d4320` / `0x3fe250` | the upgraded Blitz Gun 0x0af1 after a shot / its tracer 0x0d9c | its arcs, ring and glare ([`crate::moby::classes::blitz_mega::draw`]); the beam |
 //! | `0x3a9a48` | the Pulse Rifle's shot 0x05d6 with smoke or a beam | its slot's smoke and beams ([`crate::moby::classes::pulse_rifle::draw`]) |
+//! | `0x3ae138` | the Minirocket Tube's rocket 0x05da from its fourth tick | its exhaust's glow and streak ([`crate::moby::classes::minirocket::draw`]) |
+//! | `0x3f6b90` | the Vaporizer's shot 0x0cf7 with a trail, a beam or smoke | its trail, its slot's beams and puffs ([`crate::moby::classes::vaporizer::draw`]) |
 //! | `0x3eecd0` | the Synthenoids' shot 0x0cbb | its streaks ([`crate::moby::classes::synthenoid::draw`]) |
 //! | `0x41c328` | the Lava Gun in the hand 0x05c9 drawn | its stream, muzzle glows and burning pools ([`crate::moby::classes::lava_gun::draw`]) |
 //! | `0x3ec108` | the Mini-Turret Glove in the hand 0x0c5a | where its throw lands ([`crate::moby::classes::turret::draw_marker`]) |
@@ -343,6 +345,8 @@ fn one(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut crate::ga
         crate::moby::classes::blitz_mega::HAND_CLASS => crate::moby::classes::blitz_mega::draw(w, id, &mut game.rng, cam, out),
         crate::moby::classes::beam::CLASS => crate::moby::classes::beam::draw(w, id, cam, out),
         crate::moby::classes::pulse_rifle::SHOT => crate::moby::classes::pulse_rifle::draw(w, id, hero_state, cam, out),
+        crate::moby::classes::minirocket::ROCKET => crate::moby::classes::minirocket::draw(w, id, &mut game.rng, cam, out),
+        crate::moby::classes::vaporizer::SHOT => crate::moby::classes::vaporizer::draw(w, id, hero_state, cam, out),
         crate::moby::classes::synthenoid::SHOT => crate::moby::classes::synthenoid::draw(w, id, cam, out),
         crate::moby::classes::lava_gun::HAND_CLASS => crate::moby::classes::lava_gun::draw(w, id, &mut game.rng, cam, out),
         crate::moby::classes::turret::HAND_CLASS | crate::moby::classes::turret::UP_HAND => crate::moby::classes::turret::draw_marker(w, id, hero_state, game.scenes.mode, game.frame, out),

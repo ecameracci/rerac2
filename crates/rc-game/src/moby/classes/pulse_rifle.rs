@@ -79,8 +79,12 @@
 //! Not ported: the pad rumble (`0x2d6d60` / `0x2d6f38`), the lock cheat (`0x18b270`), the weapon mods' effects on a hit
 //! (`0x4126b8`), the moving frames (`$gp−0x14e4`: their aim straight at a lock or the scope's target, the shot's mode 2,
 //! and the frame's carry `0x380e58` / bends `0x380e08`), the LOD ranges the zoom widens (`0x36a1c0`, `0x1aa100`: the
-//! engine's LOD is its own), `0x18ccd0` (set to 0xffff while zooming; no reader on Aranos). The upgraded rows (the
-//! hand `0x3e4e98`, the impact's blast `0x320538` and its sphere's damage) are not in crate::hero::items::UPGRADE_ROWS.
+//! engine's LOD is its own), `0x18ccd0` (set to 0xffff while zooming; no reader on Aranos), the impact's upgraded branch
+//! (`0x3a9668` → `0x320538` and a sphere of the row's `+0x64`: the upgraded rows swap the hand for the Vaporizer's,
+//! crate::moby::classes::vaporizer, whose own shot never comes here).
+//!
+//! Shared with the Vaporizer: the scope ([`scope_at`]), the way out ([`put_back`]), the first-person aim ([`view_aim`]),
+//! the beams' step and draw ([`step_beam_at`], [`draw_beam`] in a [`BeamLook`]).
 
 use crate::collision::QueryFlags;
 use crate::first_person::Tune;
@@ -211,7 +215,7 @@ fn stop_zoom_sound(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 
 /// The way out (put away, the state 0x6f): the view turn's globals back (when they were saved), the play's field of
 /// view, the light let go.
-fn put_back(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, saved: bool) {
+pub fn put_back(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, saved: bool) {
     let m = &w.mobys[id];
     if saved { ctx.game.cameras.fp.tune = Tune { k: m.pv_f(0x40), d: m.pv_f(0x44), turn: m.pv_f(0x48) }; }
     ctx.game.cam_tweaks.set_fov(crate::camera::PLAY_FOV, 0.005, 0.2, 0.0, 3);
@@ -286,11 +290,15 @@ fn start(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 }
 
 /// The scope in first person (module docs).
-fn scope(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+fn scope(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) { scope_at(w, id, ctx, 0x2c) }
+
+/// The scope with its pvars at `base` (has a target (s16), its blink (s16), the target: the rifle's `+0x2c`, the
+/// Vaporizer's `+0x28`); the cooldown at `+0x04`.
+pub fn scope_at(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, base: usize) {
     if ctx.game.frame & 4 != 0 {
         let m = &mut w.mobys[id];
-        m.set_pv_i(0x30, 0);
-        m.set_pv_s(0x2c, 0);
+        m.set_pv_i(base + 4, 0);
+        m.set_pv_s(base, 0);
         let (cam, rows) = (ctx.host.camera_pos(), ctx.host.camera_rows());
         let far = add(cam, scale(rows[0], 128.0));
         let met = ctx.coll.and_then(|c| crate::collision::coll_line_m(c, ctx.scene, cam, far, QueryFlags(0x10), ctx.hero_moby)).and_then(|o| o.moby);
@@ -298,18 +306,18 @@ fn scope(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             let kind5 = w.class(w.mobys[t].o_class).is_some_and(|c| c.kind == 5);
             if aim::is_crate(w, t) || (kind5 && aim::health(w, t).is_some_and(|(hp, _)| 0.0 < hp)) {
                 let m = &mut w.mobys[id];
-                m.set_pv_i(0x30, t as i32);
-                m.set_pv_s(0x2c, 1);
+                m.set_pv_i(base + 4, t as i32);
+                m.set_pv_s(base, 1);
             }
         }
     }
     if ctx.hero.items.look_wait != 0 { return; }
     let ammo = ctx.hero.items.has_ammo(ctx.game);
     let cool = w.mobys[id].pv_f(4);
-    if w.mobys[id].pv_s(0x2c) != 0 {
-        let mut b = w.mobys[id].pv_s(0x2e) + 1;
+    if w.mobys[id].pv_s(base) != 0 {
+        let mut b = w.mobys[id].pv_s(base + 2) + 1;
         if 0x14 < b { b = 0; }
-        w.mobys[id].set_pv_s(0x2e, b);
+        w.mobys[id].set_pv_s(base + 2, b);
         if cool <= 0.0 && ammo && 0xb <= b { crate::hud::marker(&mut ctx.game.markers, 1.5, id, 0x4000_00ff, None, 0x20); }
     }
     let colour = if 0.0 < cool && ammo { 0x6000_00ff } else { 0x600f_ff0f };
@@ -424,15 +432,15 @@ fn light(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     w.point_lights.set(s as usize, PointLight { color: [t * 0.75, t, t * 0.75], intensity: 0.0, pos: add(muzzle, off), radius: 15.0 });
 }
 
-/// `0x380ef8(speed, 128, 20°, …)`: the first-person aim — from the muzzle toward what the view meets 128 out (flags 0,
-/// Ratchet left out; else its end), turned back to 20° off Ratchet's forward row when further; at `speed`.
-fn view_aim(ctx: &Ctx, muzzle: V3, speed: f32) -> V3 {
+/// `0x380ef8(speed, far, most, …)`: the first-person aim — from the muzzle toward what the view meets `far` out
+/// (flags 0, Ratchet left out; else its end), turned back to `most` off Ratchet's forward row when further; at `speed`
+/// (the rifle's: 128 and 20°).
+pub fn view_aim(ctx: &Ctx, muzzle: V3, speed: f32, far: f32, most: f32) -> V3 {
     let (cam, rows) = (ctx.host.camera_pos(), ctx.host.camera_rows());
-    let mut end = add(cam, scale(rows[0], 128.0));
+    let mut end = add(cam, scale(rows[0], far));
     if let Some(o) = ctx.coll.and_then(|c| crate::collision::coll_line_m(c, ctx.scene, cam, end, QueryFlags(0), ctx.hero_moby)) { end = o.point; }
     let d = unit(sub(end, muzzle));
     let fwd = ctx.hero.rows[0];
-    let most = 0.349_065_9f32;
     if dot(d, fwd) < most.cos() {
         set_len(crate::camera::rot(fwd, most, cross_ba(d, fwd)), speed)
     } else {
@@ -457,7 +465,7 @@ pub fn fire(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, fp: bool, speed: f32) {
         if let Some((t, _)) = ctx.hero.items.aim_target.filter(|&(t, _)| w.mobys.get(t).is_some()) { dir = set_len(sub(aim::aim_point(w, t), muzzle), f); }
     } else {
         mode = 1;
-        dir = view_aim(ctx, muzzle, f);
+        dir = view_aim(ctx, muzzle, f, 128.0, 0.349_065_9);
     }
     let slot = w.mobys[id].pv_i(0x18);
     let shot = spawn(w, ctx, muzzle, dir, slot, mode, speed);
@@ -662,7 +670,12 @@ fn step_puffs(w: &mut MobyWorld, ctx: &Ctx, slot: usize) -> usize {
 fn step_beam(w: &mut MobyWorld, id: usize) -> bool {
     let m = &w.mobys[id];
     let (pos, vel, slot, b) = (m.pos, m.pv_v(0), m.pv_s(0x1a) as usize, m.pv_s(0x18) as usize);
-    let bm = &mut w.pulse.slot(slot).beams[b.min(BEAMS - 1)];
+    step_beam_at(&mut w.pulse.slot(slot).beams[b.min(BEAMS - 1)], pos, vel, [0.05, 0.075])
+}
+
+/// One beam's step (`0x3aa430`, the Vaporizer's `0x3f7608`): its far end on the shot at `pos`, its textures scrolling
+/// by `scroll` a tick (wrapped at 4), its near points sliding 4 a second along `vel`. Whether it lives.
+pub fn step_beam_at(bm: &mut Beam, pos: V3, vel: V3, scroll: [f32; 2]) -> bool {
     if !bm.live { return false; }
     let mut life = bm.life as i32;
     let out = countdown(&mut life);
@@ -672,7 +685,7 @@ fn step_beam(w: &mut MobyWorld, id: usize) -> bool {
         return false;
     }
     bm.p[2] = pos;
-    for (k, step) in [0.05f32, 0.075].into_iter().enumerate() {
+    for (k, step) in scroll.into_iter().enumerate() {
         let s = bm.scroll[k] + step;
         bm.scroll[k] = if 4.0 <= s { s - 4.0 } else { s };
     }
@@ -742,42 +755,57 @@ fn draw_puffs(s: &Slot, hero_state: i32, cam: V3, out: &mut Vec<crate::fx::FxQua
     }
 }
 
+/// The colours of a beam's draw: its rings (FX 0x15) and its wide and thin strips (FX 0xe / 0x17, additive), each
+/// `(rgb, alpha at full life, the muzzle end's word)`.
+#[derive(Clone, Copy, Debug)]
+pub struct BeamLook {
+    pub ring: (u32, f32, u32),
+    pub wide: (u32, f32, u32),
+    pub thin: (u32, f32, u32),
+}
+
+/// The rifle's (`0x3aa5d0`).
+pub const RIFLE_BEAM: BeamLook = BeamLook { ring: (0x70_8070, 64.0, 0x80_6060), wide: (0x40_8040, 80.0, 0x80_4040), thin: (0x40_4080, 255.0, 0x80_4040) };
+
 /// `0x3aa5d0`: each beam's rings and strips (module docs).
 fn draw_beams(s: &Slot, cam: V3, out: &mut Vec<crate::fx::FxQuad>) {
+    for b in s.beams.iter().filter(|b| b.live) { draw_beam(b, cam, &RIFLE_BEAM, out); }
+}
+
+/// One beam's rings and strips in `look`'s colours (`0x3aa5d0`, the Vaporizer's `0x3f77a8`).
+pub fn draw_beam(b: &Beam, cam: V3, look: &BeamLook, out: &mut Vec<crate::fx::FxQuad>) {
     use crate::fx::FxQuad;
-    for b in s.beams.iter().filter(|b| b.live) {
-        let f = b.life as f32 * b.inv;
-        let across = cross_ba(b.axis, b.side);
-        let rings: [[V3; 20]; 3] = std::array::from_fn(|k| std::array::from_fn(|i| add(b.p[k], add(scale(across, RING[i][0] * 0.2), scale(b.side, RING[i][1] * 0.2)))));
-        let far = ((f * 64.0) as i32 as u32) << 24 | 0x70_8070;
-        let sc = b.scroll[0];
-        for k in 0..2 {
-            let near = if k == 0 { 0x80_6060 } else { far };
-            let mut t0 = 0.0f32;
-            for i in 0..20 {
-                let t1 = t0 + 0.05;
-                let j = (i + 1) % 20;
-                out.push(FxQuad {
-                    fx: 0x15,
-                    additive: false,
-                    corners: [rings[k + 1][i], rings[k + 1][j], rings[k][i], rings[k][j]],
-                    st: [[sc, t0], [sc, t1], [sc + 4.0, t0], [sc + 4.0, t1]],
-                    rgba: [far, far, near, near],
-                });
-                t0 = t1;
-            }
+    let f = b.life as f32 * b.inv;
+    let across = cross_ba(b.axis, b.side);
+    let rings: [[V3; 20]; 3] = std::array::from_fn(|k| std::array::from_fn(|i| add(b.p[k], add(scale(across, RING[i][0] * 0.2), scale(b.side, RING[i][1] * 0.2)))));
+    let far = ((f * look.ring.1) as i32 as u32) << 24 | look.ring.0;
+    let sc = b.scroll[0];
+    for k in 0..2 {
+        let near = if k == 0 { look.ring.2 } else { far };
+        let mut t0 = 0.0f32;
+        for i in 0..20 {
+            let t1 = t0 + 0.05;
+            let j = (i + 1) % 20;
+            out.push(FxQuad {
+                fx: 0x15,
+                additive: false,
+                corners: [rings[k + 1][i], rings[k + 1][j], rings[k][i], rings[k][j]],
+                st: [[sc, t0], [sc, t1], [sc + 4.0, t0], [sc + 4.0, t1]],
+                rgba: [far, far, near, near],
+            });
+            t0 = t1;
         }
-        let to_cam = sub(cam, b.p[0]);
-        let strip = |out: &mut Vec<FxQuad>, fx: usize, wide: f32, c: u32, s: [[f32; 2]; 2]| {
-            let wv = set_len(cross_ba(b.axis, to_cam), wide);
-            for k in 0..2 {
-                let near = if k == 0 { 0x80_4040 } else { c };
-                let (p, q) = (b.p[k + 1], b.p[k]);
-                out.push(FxQuad { fx, additive: true, corners: [add(p, wv), sub(p, wv), add(q, wv), sub(q, wv)], st: [[s[k][0], 0.0], [s[k][0], 1.0], [s[k][1], 0.0], [s[k][1], 1.0]], rgba: [c, c, near, near] });
-            }
-        };
-        strip(out, 0xe, 1.0, ((f * 80.0) as i32 as u32) << 24 | 0x40_8040, [[0.0, 0.5], [0.5, 3.0]]);
-        let s2 = b.scroll[1];
-        strip(out, 0x17, 0.1, ((f * 255.0) as i32 as u32) << 24 | 0x40_4080, [[0.0, s2 + 0.5], [s2 + 0.5, s2 + 3.0]]);
     }
+    let to_cam = sub(cam, b.p[0]);
+    let strip = |out: &mut Vec<FxQuad>, fx: usize, wide: f32, c: u32, first: u32, s: [[f32; 2]; 2]| {
+        let wv = set_len(cross_ba(b.axis, to_cam), wide);
+        for k in 0..2 {
+            let near = if k == 0 { first } else { c };
+            let (p, q) = (b.p[k + 1], b.p[k]);
+            out.push(FxQuad { fx, additive: true, corners: [add(p, wv), sub(p, wv), add(q, wv), sub(q, wv)], st: [[s[k][0], 0.0], [s[k][0], 1.0], [s[k][1], 0.0], [s[k][1], 1.0]], rgba: [c, c, near, near] });
+        }
+    };
+    strip(out, 0xe, 1.0, ((f * look.wide.1) as i32 as u32) << 24 | look.wide.0, look.wide.2, [[0.0, 0.5], [0.5, 3.0]]);
+    let s2 = b.scroll[1];
+    strip(out, 0x17, 0.1, ((f * look.thin.1) as i32 as u32) << 24 | look.thin.0, look.thin.2, [[0.0, s2 + 0.5], [s2 + 0.5, s2 + 3.0]]);
 }

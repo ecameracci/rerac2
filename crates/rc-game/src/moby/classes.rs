@@ -56,8 +56,10 @@ pub mod telepad;
 pub mod maktar;
 pub mod maktar_hints;
 pub mod maktar_pads;
+pub mod minirocket;
 pub mod swamp_monster;
 pub mod tractor;
+pub mod vaporizer;
 pub mod turret;
 pub mod vendor;
 pub mod weather;
@@ -89,8 +91,9 @@ use super::UpdateFn;
 /// The upgraded Spiderbot 0x0e79 and its shot 0x0eaa and shell 0x0eab (L00 `lvl.vtbl`) are listed for the levels whose
 /// class list lacks them. The upgraded Blitz's tracer 0x0d9c and the beam 0x0dc1 have no model. The Synthenoids' shot
 /// 0x0cbb (L00 `lvl.vtbl`) is listed for the levels whose class list lacks it. The upgraded Mini-Turret's plasma shot
-/// 0x0a82 (L00 `lvl.vtbl` `0x3cadc0`) is listed so too.
-pub const CREATED_LOGIC: &[i16] = &[crate::ship::LASER_CLASS, teleport::CLASS, explosion::CLASS, spiderbot::BOT_CLASS, endako_boss::BEAM, endako_boss::TRACER, endako_boss::ROCKET, blitz::TRACER, gravity_bomb::MINI_BOMB, gravity_bomb::MINI_BLAST, pulse_rifle::SHOT, spiderbot::PLUS_BOT, spiderbot_plus::SHOT, spiderbot_plus::LOB, blitz::MEGA_TRACER, beam::CLASS, synthenoid::SHOT, turret::PLASMA];
+/// 0x0a82 (L00 `lvl.vtbl` `0x3cadc0`) is listed so too. The Vaporizer's shot 0x0cf7 has no model: its trail, beam and smoke
+/// are its draw's.
+pub const CREATED_LOGIC: &[i16] = &[crate::ship::LASER_CLASS, teleport::CLASS, explosion::CLASS, spiderbot::BOT_CLASS, endako_boss::BEAM, endako_boss::TRACER, endako_boss::ROCKET, blitz::TRACER, gravity_bomb::MINI_BOMB, gravity_bomb::MINI_BLAST, pulse_rifle::SHOT, spiderbot::PLUS_BOT, spiderbot_plus::SHOT, spiderbot_plus::LOB, blitz::MEGA_TRACER, beam::CLASS, synthenoid::SHOT, turret::PLASMA, vaporizer::SHOT];
 
 pub fn update_for(o_class: i16) -> Option<UpdateFn> {
     match o_class {
@@ -120,8 +123,15 @@ pub fn update_for(o_class: i16) -> Option<UpdateFn> {
         beam::CLASS => Some(beam::update),
         pulse_rifle::HAND_CLASS => Some(pulse_rifle::update),
         pulse_rifle::SHOT => Some(pulse_rifle::update_shot),
+        // The Vaporizer (`0x3e4e98`, rows 0x42 / 0x57 / 0x58) and its shot (`0x3f6368`).
+        vaporizer::HAND_CLASS => Some(vaporizer::update),
+        vaporizer::SHOT => Some(vaporizer::update_shot),
         seeker::HAND_CLASS => Some(seeker::update),
+        // The upgraded Seeker Gun (`0x3f51f0`, rows 0x43 / 0x55 / 0x56).
+        seeker::PLUS_CLASS => Some(seeker::update_plus),
         seeker::MISSILE => Some(seeker::update_missile),
+        minirocket::HAND_CLASS => Some(minirocket::update),
+        minirocket::ROCKET => Some(minirocket::update_rocket),
         lava_gun::HAND_CLASS => Some(lava_gun::update),
         bouncer::HAND_CLASS => Some(bouncer::update),
         bouncer::BOMB => Some(bouncer::update_bomb),

@@ -63,8 +63,19 @@
 //! Not ported: the lock cheat (`0x18b270` → `0x18aa18`), the weapon mods' effects on a hit (`0x4126b8`), the gravity
 //! frames and moving frames (`0x380e08`, `0x37f538` / `0x37f618` / `0x37f5f8`), the light word copied at the make
 //! (`0x313330` → `+0x38`, unread), the 0x13a0 blast's heat shimmer (its `+0x18`, crate::moby::blast). The missile's
-//! loop sound is let go when it goes (the engine frees a deleted moby's sounds). The upgraded rows (row 0x43 on, the
-//! hand 0x0cee) are not in crate::hero::items::UPGRADE_ROWS.
+//! loop sound is let go when it goes (the engine frees a deleted moby's sounds); the word `0x25c5cc` both hands set to
+//! 0.1 each tick (no reader found).
+//!
+//! **The upgraded hand** 0x0cee (rows 0x43, 0x55, 0x56 (L00 `0x265fa0`, `0x266f60`, `0x267040`): 14 a second, two a
+//! second, damage 6 (16, 24), the blast's 3 (0 on the Mega rows), 20 missiles (40, 50); [`update_plus`], `0x3f51f0`):
+//! state 0 → 1; the claims age; its sequence run out, back to 1 (blend 2); its size the class's × 0.9 (`$gp+0x18b8`);
+//! the look stance 1 goes to 0x1d, where the crosshair (2, FX 0x27, red / green as the base's) shows and the look wait
+//! counts down (else 0x28). The cooldown out, the items not kept away, past 0x16 ticks in the hand and the wait out:
+//! ○ held and a missile taken — from joint 0, its class sound 0, its sequence 2 (blend 2), the row's speed / 60 along
+//! Ratchet's forward row (the arm raised: the gun's −row 1; in first person toward what the view meets 32 out, held
+//! within 40°: `0x380ef8`), toward a lock's aim point (`0x18aa18`, `0x32b4d0`); three missiles ([`spawn`]): along it
+//! (wait 5), turned −7° and +7° about the up at the hand (waits 5 and 5, with a lock 10 and 15), the hand their owner;
+//! the cooldown 1 / the row's rate. Else ○ pressed with none left: its class sound 0.
 
 use crate::collision::QueryFlags;
 use crate::hero::items::{row, ItemRow, SEEKER};
@@ -83,6 +94,11 @@ const HAND_SIZE: f32 = 0.75;
 const ALL_ROUND: f32 = f32::from_bits(0x4049_0fdc);
 /// The claim a fresh pick makes (ticks).
 const CLAIM_TICKS: i32 = 0x14;
+/// The upgraded hand's class (rows 0x43 / 0x55 / 0x56 `+0x04`), its size against its class's (`$gp+0x18b8`) and its two
+/// side missiles' turn (`0x3dfa35de`: 7°).
+pub const PLUS_CLASS: i16 = 0xcee;
+const PLUS_SIZE: f32 = 0.9;
+const SPREAD: f32 = f32::from_bits(0x3dfa_35de);
 
 mod pv {
     pub const VEL: usize = 0x00;
@@ -109,7 +125,13 @@ mod pv {
 fn cur_row(game: &crate::game::GameState) -> Option<&'static ItemRow> { row(game, SEEKER) }
 
 /// The record's `+0x64` (the blast's damage) by row.
-fn blast_damage(_row: &ItemRow) -> f32 { 1.0 }
+fn blast_damage(r: &ItemRow) -> f32 {
+    match r.item {
+        0x43 => 3.0,
+        0x55 | 0x56 => 0.0,
+        _ => 1.0,
+    }
+}
 
 /// `0x2eef88(out, a, b)` = b × a.
 fn cross_ba(a: V3, b: V3) -> V3 { cross(b, a) }
@@ -140,6 +162,64 @@ fn count_s(w: &mut MobyWorld, id: usize, off: usize) -> bool {
 /// A moby id kept in a pvar (−1 none), when it still exists.
 fn moby_at(w: &MobyWorld, id: usize, off: usize) -> Option<usize> {
     usize::try_from(w.mobys[id].pv_i(off)).ok().filter(|&t| w.mobys.get(t).is_some())
+}
+
+/// `0x3f51f0` (module docs): the upgraded hand 0x0cee.
+pub fn update_plus(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    w.mobys[id].pvars.resize(crate::moby::PVAR_BYTES, 0);
+    if w.mobys[id].state == 0 { w.mobys[id].state = 1; }
+    if let Some(o) = ctx.hero_moby {
+        let mut c = std::mem::take(&mut w.claims);
+        c.age(w, o);
+        w.claims = c;
+    }
+    if let Some(a) = ctx.host.anim(&w.mobys[id]) {
+        if a.seq_a == a.seq_b && a.flags & 2 != 0 { ctx.host.set_anim(&w.mobys[id], 1, 0, 2); }
+    }
+    let class_scale = w.class(w.mobys[id].o_class).map_or(1.0, |c| c.scale);
+    w.mobys[id].scale = class_scale * PLUS_SIZE;
+    if ctx.hero.state == 1 { ctx.hero.request_state(0x1d, true); }
+    let look = ctx.hero.state == 0x1d;
+    if look {
+        let colour = if 0.0 < w.mobys[id].pv_f(0) && ctx.hero.items.has_ammo(ctx.game) { 0x6000_00ff } else { 0x600f_ff0f };
+        crate::hud::marker(&mut ctx.game.markers, 2.0, id, colour, None, 0x27);
+    }
+    let ok = if look { countdown(&mut ctx.hero.items.look_wait) } else {
+        ctx.hero.items.look_wait = 0x28;
+        true
+    };
+    let it = ctx.hero.items;
+    if !cooldown(w, id) || it.no_use != 0 || it.item_ticks <= 0x16 || !ok { return; }
+    let Some(r) = cur_row(ctx.game).copied() else { return };
+    if it.held & it.trigger != 0 && ctx.hero.items.take_ammo(ctx.game, 1) {
+        let muzzle = ctx.host.joint(&w.mobys[id], 0).unwrap_or(w.mobys[id].pos);
+        ctx.host.play_sound(&w.mobys[id], 0, 0);
+        ctx.host.set_anim(&w.mobys[id], 2, 0, 2);
+        let f = r.speed * 0.016_666_668;
+        let mut dir = if ctx.hero.items.raised {
+            set_len(w.mobys[id].rows[1], -f)
+        } else if ctx.hero.items.fp.on {
+            super::pulse_rifle::view_aim(ctx, muzzle, f, 32.0, f32::from_bits(0x3f32_b8c4))
+        } else {
+            set_len(ctx.hero.rows[0], f)
+        };
+        let lock = ctx.hero.items.aim_target.map(|(t, _)| t).filter(|&t| w.mobys.get(t).is_some());
+        let waits = if let Some(t) = lock {
+            dir = set_len(sub(aim::aim_point(w, t), muzzle), f);
+            [5, 10, 15]
+        } else {
+            [5, 5, 5]
+        };
+        if let Some(m) = spawn(w, ctx, muzzle, dir, lock, waits[0], &r) { w.mobys[m].parent = Some(id); }
+        let up = ctx.hero.gravity.up_at(w.mobys[id].pos);
+        for (k, a) in [-SPREAD, SPREAD].into_iter().enumerate() {
+            let v = turn(dir, up, a);
+            if let Some(m) = spawn(w, ctx, muzzle, v, lock, waits[k + 1], &r) { w.mobys[m].parent = Some(id); }
+        }
+        w.mobys[id].set_pv_f(0, 1.0 / r.rate);
+    } else if it.pressed & it.trigger != 0 && !ctx.hero.items.has_ammo(ctx.game) && it.no_use == 0 {
+        ctx.host.play_sound(&w.mobys[id], 0, 0);
+    }
 }
 
 /// `0x3a5360` (module docs).

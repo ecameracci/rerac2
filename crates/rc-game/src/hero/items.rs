@@ -67,6 +67,9 @@ pub const LAVA_CLASS: i16 = crate::moby::classes::lava_gun::HAND_CLASS;
 /// The Bouncer: item 0x25, class 0xe14 (L00 row `0x264560`; crate::moby::classes::bouncer).
 pub const BOUNCER: i32 = 0x25;
 pub const BOUNCER_CLASS: i16 = crate::moby::classes::bouncer::HAND_CLASS;
+/// The Minirocket Tube: item 0x1b, class 0x5cf (L00 row `0x263ca0`; crate::moby::classes::minirocket).
+pub const MINIROCKET: i32 = 0x1b;
+pub const MINIROCKET_CLASS: i16 = crate::moby::classes::minirocket::HAND_CLASS;
 
 /// An item record (`0x262500 + 0xe0·row`, row `0x139568[item]`: crate::upgrades): the fields the port reads.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -98,8 +101,9 @@ pub struct ItemRow {
 /// The rows the port has (L00 `0x262dc0`, `0x263f40`, `0x2649c0`; the Dynamo's from Oozla's live table; the
 /// Electrolyzer's and the Spiderbot Glove's from L02's; the Swingshot's from L03's; the Chopper's L00 `0x263840`; the
 /// Blitz Gun's L00 `0x263bc0`; the Pulse Rifle's L00 `0x263920`; the Mini-Turret Glove's L00 `0x2648e0`; the
-/// Synthenoids' L00 `0x264020`; the Lava Gun's L00 `0x263e60`; the Seeker Gun's L00 `0x263a00`; the Bouncer's L00 `0x264560`).
-pub const ROWS: [ItemRow; 16] = [
+/// Synthenoids' L00 `0x264020`; the Lava Gun's L00 `0x263e60`; the Seeker Gun's L00 `0x263a00`; the Bouncer's L00 `0x264560`;
+/// the Minirocket Tube's L00 `0x263ca0`).
+pub const ROWS: [ItemRow; 17] = [
     ItemRow { item: WRENCH, attach: 0, class: WRENCH_CLASS, stance: 0, icon: 0, use_seq: 0, keep: false, fire_seq: [0, 0], speed: 0.0, rate: 0.0, damage: 1.0, ammo: false, max_ammo: 0, start_ammo: 0 },
     ItemRow { item: LANCER, attach: 0, class: LANCER_CLASS, stance: 1, icon: 0xea64, use_seq: 0x38, keep: true, fire_seq: [-1, 0x3e], speed: 60.0, rate: 7.0, damage: 0.5, ammo: true, max_ammo: 200, start_ammo: 200 },
     ItemRow { item: DYNAMO, attach: 1, class: DYNAMO_CLASS, stance: 1, icon: 0xea7f, use_seq: 0x8d, keep: false, fire_seq: [0x8e, 0x8d], speed: 0.0, rate: 0.0, damage: 0.0, ammo: false, max_ammo: 0, start_ammo: 0 },
@@ -116,13 +120,16 @@ pub const ROWS: [ItemRow; 16] = [
     ItemRow { item: LAVA, attach: 0, class: LAVA_CLASS, stance: 2, icon: 0xea69, use_seq: 0x36, keep: true, fire_seq: [-1, 0x46], speed: 0.0, rate: 0.0, damage: 6.0, ammo: true, max_ammo: 200, start_ammo: 200 },
     ItemRow { item: SEEKER, attach: 0, class: SEEKER_CLASS, stance: 1, icon: 0xea6b, use_seq: 0x33, keep: false, fire_seq: [-1, -1], speed: 12.0, rate: 2.0, damage: 6.0, ammo: true, max_ammo: 25, start_ammo: 25 },
     ItemRow { item: BOUNCER, attach: 0, class: BOUNCER_CLASS, stance: 2, icon: 0xea73, use_seq: 0x89, keep: false, fire_seq: [-1, -1], speed: 0.0, rate: 0.3, damage: 6.0, ammo: true, max_ammo: 25, start_ammo: 25 },
+    ItemRow { item: MINIROCKET, attach: 0, class: MINIROCKET_CLASS, stance: 2, icon: 0xea70, use_seq: 0x36, keep: false, fire_seq: [-1, 0x46], speed: 60.0, rate: 1.7, damage: 12.0, ammo: true, max_ammo: 25, start_ammo: 25 },
 ];
 
 /// The upgraded rows the port has (L00 `0x262500 + 0xe0·row`; their item in brackets): the Heavy Lancer 0x3c and the
 /// Mega rows 0x4f / 0x50 (0x1e), the Mini-Nuke 0x47, 0x51, 0x52 (0x2a), the Spiderbot Glove's 0x4e, 0x69, 0x6a (0x20),
 /// the Mega Chopper 0x41, 0x53, 0x54 (0x16), the upgraded Blitz Gun 0x44, 0x5b, 0x5c (0x1a), the upgraded Mini-Turret
-/// Glove 0x40, 0x59, 0x5a (0x29: L00 `0x265d00`, `0x2672e0`, `0x2673c0`). Each names its own hand class (`+0x04`).
-pub const UPGRADE_ROWS: [ItemRow; 18] = [
+/// Glove 0x40, 0x59, 0x5a (0x29: L00 `0x265d00`, `0x2672e0`, `0x2673c0`), the Vaporizer 0x42, 0x57, 0x58 (0x17: L00
+/// `0x265ec0`, `0x267120`, `0x267200`), the upgraded Seeker Gun 0x43, 0x55, 0x56 (0x18: L00 `0x265fa0`, `0x266f60`,
+/// `0x267040`). Each names its own hand class (`+0x04`).
+pub const UPGRADE_ROWS: [ItemRow; 24] = [
     ItemRow { item: 0x3c, attach: 0, class: 0xc05, stance: 2, icon: 0xea64, use_seq: 0x33, keep: true, fire_seq: [-1, -1], speed: 80.0, rate: 10.0, damage: 0.67, ammo: true, max_ammo: 300, start_ammo: 300 },
     ItemRow { item: 0x4f, attach: 0, class: 0xc05, stance: 2, icon: 0xea64, use_seq: 0x33, keep: true, fire_seq: [-1, -1], speed: 80.0, rate: 10.0, damage: 4.0, ammo: true, max_ammo: 400, start_ammo: 300 },
     ItemRow { item: 0x50, attach: 0, class: 0xc05, stance: 2, icon: 0xea64, use_seq: 0x33, keep: true, fire_seq: [-1, -1], speed: 80.0, rate: 10.0, damage: 8.0, ammo: true, max_ammo: 500, start_ammo: 300 },
@@ -141,6 +148,12 @@ pub const UPGRADE_ROWS: [ItemRow; 18] = [
     ItemRow { item: 0x40, attach: 6, class: crate::moby::classes::turret::UP_HAND, stance: 0, icon: 0xea6a, use_seq: 0x2c, keep: false, fire_seq: [0x42, 0x2c], speed: 30.0, rate: 8.0, damage: 4.1, ammo: true, max_ammo: 20, start_ammo: 20 },
     ItemRow { item: 0x59, attach: 6, class: crate::moby::classes::turret::UP_HAND, stance: 0, icon: 0xea6a, use_seq: 0x2c, keep: false, fire_seq: [0x42, 0x2c], speed: 30.0, rate: 1.5, damage: 8.2, ammo: true, max_ammo: 30, start_ammo: 20 },
     ItemRow { item: 0x5a, attach: 6, class: crate::moby::classes::turret::UP_HAND, stance: 0, icon: 0xea6a, use_seq: 0x2c, keep: false, fire_seq: [0x42, 0x2c], speed: 30.0, rate: 1.5, damage: 18.0, ammo: true, max_ammo: 50, start_ammo: 20 },
+    ItemRow { item: 0x42, attach: 0, class: crate::moby::classes::vaporizer::HAND_CLASS, stance: 2, icon: 0xea68, use_seq: 0x36, keep: false, fire_seq: [-1, 0x46], speed: 400.0, rate: 1.0, damage: 20.0, ammo: true, max_ammo: 8, start_ammo: 8 },
+    ItemRow { item: 0x57, attach: 0, class: crate::moby::classes::vaporizer::HAND_CLASS, stance: 2, icon: 0xea68, use_seq: 0x36, keep: false, fire_seq: [-1, 0x46], speed: 400.0, rate: 1.0, damage: 40.0, ammo: true, max_ammo: 12, start_ammo: 8 },
+    ItemRow { item: 0x58, attach: 0, class: crate::moby::classes::vaporizer::HAND_CLASS, stance: 2, icon: 0xea68, use_seq: 0x36, keep: false, fire_seq: [-1, 0x46], speed: 400.0, rate: 1.0, damage: 80.0, ammo: true, max_ammo: 20, start_ammo: 8 },
+    ItemRow { item: 0x43, attach: 0, class: crate::moby::classes::seeker::PLUS_CLASS, stance: 1, icon: 0xea6b, use_seq: 0x33, keep: false, fire_seq: [-1, -1], speed: 14.0, rate: 2.0, damage: 6.0, ammo: true, max_ammo: 20, start_ammo: 20 },
+    ItemRow { item: 0x55, attach: 0, class: crate::moby::classes::seeker::PLUS_CLASS, stance: 1, icon: 0xea6b, use_seq: 0x33, keep: false, fire_seq: [-1, -1], speed: 14.0, rate: 2.0, damage: 16.0, ammo: true, max_ammo: 40, start_ammo: 20 },
+    ItemRow { item: 0x56, attach: 0, class: crate::moby::classes::seeker::PLUS_CLASS, stance: 1, icon: 0xea6b, use_seq: 0x33, keep: false, fire_seq: [-1, -1], speed: 14.0, rate: 2.0, damage: 24.0, ammo: true, max_ammo: 50, start_ammo: 20 },
 ];
 
 /// Row `row` of the records ([`ROWS`], [`UPGRADE_ROWS`]).
@@ -624,8 +637,10 @@ fn hand_pass(world: &mut MobyWorld, ctx: &mut Ctx) {
 /// The Lava Gun (0x1d) pulses `0xff00ffff` .. `0xff104080` and sheds a sprite at (0.06, −0.509, 0): 73500, capped
 /// 0x30, in use faster (0.1076) at 57750 capped 0x28.
 ///
-/// Not ported: the other items' cases (0xe, 0x10, 0x12, 0x18, 0x19, 0x1b, 0x1c, 0x2b, 0x2c: their weapons are
-/// not ported), the upgraded Pulse Rifle's (its joint 1, `0x7f1010ff`, and a sprite: its hand is not ported).
+/// The Vaporizer (0x17 upgraded) queues a red glow at its joint 1 and sheds a red sprite; the Minirocket Tube (0x1b) glows
+/// only on its upgraded rows (`0xff20205f` .. `0xffdfdfdf`), which are not ported.
+///
+/// Not ported: the other items' cases (0xe, 0x10, 0x12, 0x19, 0x1c, 0x2b, 0x2c: their weapons are not ported).
 fn hand_glow(world: &mut MobyWorld, ctx: &mut Ctx, id: usize) {
     let it = &mut ctx.hero.items;
     if ctx.hero.state == 0x61 || world.mobys[id].mode & 1 != 0 || it.item_ticks < 0x17 { return; }
@@ -708,6 +723,13 @@ fn hand_glow(world: &mut MobyWorld, ctx: &mut Ctx, id: usize) {
             }
             return;
         }
+        // The Vaporizer (case 0x17 upgraded): a red glow at its joint 1 (`0x2a7e60(0.14, 0.03, joint, 0x7f1010ff)`) and a
+        // sprite at (0.399, 0.035, 0), 42000, no pull, `0x7f1010ff` (no word, no cap).
+        PULSE => {
+            if let Some(point) = ctx.host.joint(&world.mobys[id], 1) { world.hero_glows.push(crate::fx::HeroGlow { size: 0.14, push: 0.03, point, rgba: 0x7f10_10ff }); }
+            sprites.push((42_000.0, 0.0, [f32::from_bits(0x3ecc_49ba), f32::from_bits(0x3d0f_5c29), 0.0], 0x7f10_10ff));
+        }
+        // The Minirocket Tube (case 0x1b): only its upgraded rows glow (not in UPGRADE_ROWS).
         _ => return,
     }
     let m = &world.mobys[id];
