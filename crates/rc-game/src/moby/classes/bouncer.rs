@@ -53,8 +53,12 @@
 //!
 //! Its glow in the hand: none (`0x2a7ed8` has no case 0x25).
 //!
-//! Not ported: the upgraded hand 0x0e9e (rows 0x4c on; this module keeps its constants behind the bomb's `+0x2c`); the
-//! pad rumble (`0x2d6d60` / `0x2d6f38`); the weapon mods' effects and statistics on a hit (`0x3f9f70`); the lock cheat
+//! **The upgraded hand** 0x0e9e (rows 0x4c, 0x61, 0x62, crate::hero::items::UPGRADE_ROWS; L00 `0x266780`, `0x2679e0`,
+//! `0x267ac0`: damage 12 (24, 50), the bomblets' 6 (8, 15), 25 bombs (40, 60); the Mega rows' firing arm 0x8a moving and
+//! crouched) runs the same update `0x3ff2e8`; its bomb and bomblets take the upgraded constants (the bracketed ones
+//! above) by the hand's class (the bomb's `+0x2c`, the bomblet's `+0x24`).
+//!
+//! Not ported: the pad rumble (`0x2d6d60` / `0x2d6f38`); the weapon mods' effects and statistics on a hit (`0x3f9f70`); the lock cheat
 //! (`0x18b270`); the gravity frames and the moving frames (`0x326448`'s other gravities, `0x380e08`, `0x37f538` /
 //! `0x37f618` / `0x37f5f8`: the port's crate::gravity stands in for the up); the write-only word `0x1b2b64` (0x14 at the
 //! start and at an empty press); the blasts' heat shimmer (crate::moby::blast). The sweep's flag `+0x50` (a moby of
@@ -69,7 +73,7 @@ use crate::moby::hits::HitTemplate;
 use crate::moby::{aim, countdown, mode, Ctx, MobyWorld};
 use crate::quat::{axis_angle, mul, Q};
 
-/// The hand's class (item 0x25's row `+0x04`), the upgraded hand's (not ported), the bomb's and the bomblet's.
+/// The hand's class (item 0x25's row `+0x04`), the upgraded hand's (rows 0x4c / 0x61 / 0x62), the bomb's and the bomblet's.
 pub const HAND_CLASS: i16 = 0x0e14;
 pub const UPGRADED_HAND: i16 = 0x0e9e;
 pub const BOMB: i16 = 0x0e64;
@@ -109,8 +113,16 @@ const BOMBLET_BOUNCE: f32 = f32::from_bits(0x3f73_3333);
 const BOMBLET_SHADOW: [f32; 2] = [f32::from_bits(0x3e66_6666), 0.5];
 const BOMBLET_LIFE: (i32, i32) = (0xf0, 0x168);
 const BOMBLET_ARMING: i16 = 0x46;
-/// Row 0x25's `+0x64`: the bomblets' damage (the port's rows keep `+0x60` only).
-const BOMBLET_DAMAGE: f32 = 3.0;
+/// The bomblets' damage: the current row's `+0x64` (`0x262564 + 0xe0·0x139568[0x25]`; the port's rows keep `+0x60`
+/// only): 3 on row 0x25, 6 on 0x4c, 8 on 0x61, 15 on 0x62.
+fn bomblet_damage(game: &crate::game::GameState) -> f32 {
+    match game.item_row(BOUNCER) {
+        0x4c => 6.0,
+        0x61 => 8.0,
+        0x62 => 15.0,
+        _ => 3.0,
+    }
+}
 /// `t[3]` of the hits' template (`0x45afdf66`).
 const NO_KNOCK_LIMIT: f32 = 5627.987;
 /// `0x37edb8`'s least up of a floor at a bounce that may stop (`1.5`: never a floor; the bomb's fourth: 0).
@@ -539,7 +551,7 @@ pub fn update_bomblet(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         // The hit's template: the bomblets' damage along its way.
         let v = w.mobys[id].pv_v(pv::VEL);
         let d = unit(v);
-        let mut t = HitTemplate::new(BOMBLET_DAMAGE, Some(id), 0x83_0000, [d[0], d[1], d[2], NO_KNOCK_LIMIT]);
+        let mut t = HitTemplate::new(bomblet_damage(ctx.game), Some(id), 0x83_0000, [d[0], d[1], d[2], NO_KNOCK_LIMIT]);
         t.kind = (BOMBLET as u16 as u32) << 16 | 0x0103;
         let mut life = w.mobys[id].pv_s(pv::LIFE) as i32;
         let out = countdown(&mut life);

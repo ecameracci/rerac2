@@ -93,8 +93,8 @@
 //! effects on a hit (`0x3f9f70(moby, 0x1b, owner)`), the gravity frames and moving frames (the way flattened to the
 //! frame at the make, `0x380e08`, `0x37f538` / `0x37f618` / `0x37f5f8`), the projectile list `0x1b1f30` the rocket
 //! joins (`0x3216e0` / `0x321760`: no reader ported), the frame (1) of the standing use's sequence (the use stance's
-//! request carries none: frame 0). The upgraded rows (row 0x45 on, the hand 0x1004) are not in
-//! crate::hero::items::UPGRADE_ROWS.
+//! request carries none: frame 0). The upgraded rows (row 0x45 on, the hand 0x1004) are the Megarocket Cannon,
+//! crate::moby::classes::megarocket, firing these rockets.
 
 use crate::collision::{CollOutput, QueryFlags};
 
@@ -167,11 +167,29 @@ pub struct Trails {
     pub points: [[V3; 4]; SLOTS],
 }
 
+/// The lock's words in a hand's pvars (the base hand's [`BASE_LOCK`]; the Megarocket Cannon's,
+/// crate::moby::classes::megarocket): the lock, its hold, its aim height, the last pick, the pick's count.
+pub(super) struct LockPv {
+    pub lock: usize,
+    pub hold: usize,
+    pub aimh: usize,
+    pub last: usize,
+    pub count: usize,
+}
+const BASE_LOCK: LockPv = LockPv { lock: hv::LOCK, hold: hv::HOLD, aimh: hv::AIMH, last: hv::LAST, count: hv::COUNT };
+
 /// The Minirocket Tube's row as `0x139568[0x1b]` gives it (crate::upgrades).
 fn cur_row(game: &crate::game::GameState) -> Option<&'static ItemRow> { row(game, MINIROCKET) }
 
-/// The record's `+0x64` (the blast's damage) by row.
-fn blast_damage(_row: &ItemRow) -> f32 { 6.0 }
+/// The record's `+0x64` (the blast's damage) by row: 6 on row 0x1b, 7 on the Megarocket Cannon's 0x45, 0 on its Mega
+/// rows 0x63 / 0x64.
+fn blast_damage(r: &ItemRow) -> f32 {
+    match r.item {
+        0x45 => 7.0,
+        0x63 | 0x64 => 0.0,
+        _ => 6.0,
+    }
+}
 
 /// `0x2eef88(out, a, b)` = b × a.
 fn cross_ba(a: V3, b: V3) -> V3 { cross(b, a) }
@@ -248,7 +266,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         (f32::from_bits(0x3ea0_d97d), f32::from_bits(0x3e97_e9d9))
     };
     let way = if !look && ctx.hero.items.raised { scale(w.mobys[id].rows[1], -1.0) } else { ctx.hero.rows[0] };
-    aim(w, id, ctx, yaw, pitch, way);
+    aim(w, id, ctx, yaw, pitch, way, &BASE_LOCK);
     let ok = if ctx.hero.state == 0x1d { countdown(&mut ctx.hero.items.look_wait) } else {
         ctx.hero.items.look_wait = 0x28;
         true
@@ -269,23 +287,23 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     light(w, id, ctx);
 }
 
-/// The aim's search and lock (module docs).
-fn aim(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, yaw: f32, pitch: f32, way: V3) {
+/// The aim's search and lock (module docs), its words at `o`.
+pub(super) fn aim(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, yaw: f32, pitch: f32, way: V3, o: &LockPv) {
     let h = &*ctx.hero;
     let from = add(h.pos, scale(h.rows[2], 0.75));
     let cone = aim::Cone { yaw, pitch, range: 75.0, near_pitch: yaw, near_yaw: yaw };
     let found = aim::search(w, ctx, cone, from, way, true);
     let aimh = |w: &MobyWorld, t: usize| aim::health(w, t).map_or(0.1, |(_, a)| a);
-    match w.mobys[id].pv_link(hv::LOCK) {
+    match w.mobys[id].pv_link(o.lock) {
         None => {
-            if found != w.mobys[id].pv_link(hv::LAST) {
-                w.mobys[id].set_pv_i(hv::COUNT, 5);
-            } else if count_i(w, id, hv::COUNT) {
+            if found != w.mobys[id].pv_link(o.last) {
+                w.mobys[id].set_pv_i(o.count, 5);
+            } else if count_i(w, id, o.count) {
                 let a = found.map_or(0.1, |f| aimh(w, f));
                 let m = &mut w.mobys[id];
-                m.set_pv_i(hv::LOCK, found.map_or(0, |f| f as i32));
-                m.set_pv_i(hv::HOLD, 5);
-                m.set_pv_f(hv::AIMH, a);
+                m.set_pv_i(o.lock, found.map_or(0, |f| f as i32));
+                m.set_pv_i(o.hold, 5);
+                m.set_pv_f(o.aimh, a);
             }
         }
         Some(lock) => {
@@ -293,30 +311,30 @@ fn aim(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, yaw: f32, pitch: f32, way: V
                 && aim::health(w, lock).is_none_or(|(hp, _)| 0.0 < hp)
                 && !ctx.hero.items.raised;
             if !live {
-                w.mobys[id].set_pv_i(hv::LOCK, 0);
-                w.mobys[id].set_pv_i(hv::COUNT, 5);
+                w.mobys[id].set_pv_i(o.lock, 0);
+                w.mobys[id].set_pv_i(o.count, 5);
             } else if found == Some(lock) {
                 let a = aimh(w, lock);
-                w.mobys[id].set_pv_i(hv::HOLD, 5);
-                w.mobys[id].set_pv_f(hv::AIMH, a);
+                w.mobys[id].set_pv_i(o.hold, 5);
+                w.mobys[id].set_pv_f(o.aimh, a);
                 let t = &w.mobys[lock];
                 let at = add(t.pos, scale(t.rows[2], a));
                 let d = dist(ctx.host.camera_pos(), t.pos);
                 crate::hud::marker(&mut ctx.game.markers, (0.9 - d * 0.006_666_667 * 0.65).abs(), id, 0xff0f_ff0f, Some(at), 0x26);
                 ctx.hero.items.aim_target = Some((lock, a));
-            } else if count_i(w, id, hv::HOLD) {
-                w.mobys[id].set_pv_i(hv::LOCK, 0);
-                w.mobys[id].set_pv_i(hv::COUNT, 5);
+            } else if count_i(w, id, o.hold) {
+                w.mobys[id].set_pv_i(o.lock, 0);
+                w.mobys[id].set_pv_i(o.count, 5);
             }
         }
     }
-    w.mobys[id].set_pv_i(hv::LAST, found.map_or(0, |f| f as i32));
+    w.mobys[id].set_pv_i(o.last, found.map_or(0, |f| f as i32));
 }
 
 /// The shot of `0x3a5d00` (module docs).
 fn fire(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, r: &ItemRow) {
     w.mobys[id].set_pv_i(hv::FLAG, 1);
-    if w.mobys[id].pv_link(hv::LOCK).is_none() { point_blank(w, id, ctx); }
+    if w.mobys[id].pv_link(hv::LOCK).is_none() { point_blank(w, id, ctx, hv::LOCK); }
     ctx.host.play_sound(&w.mobys[id], 0, 0);
     w.mobys[id].set_pv_s(hv::TICKS, 0xf);
     burst(w, id, ctx);
@@ -335,8 +353,9 @@ fn fire(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, r: &ItemRow) {
     w.mobys[id].set_pv_f(hv::COOL, 1.0 / r.rate);
 }
 
-/// The point-blank lock (module docs): `0x2e14b0(1, at, 1, Ratchet)` and the first moby it touched (`0x1bf198`).
-fn point_blank(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+/// The point-blank lock (module docs): `0x2e14b0(1, at, 1, Ratchet)` and the first moby it touched (`0x1bf198`), into
+/// the word `lock`.
+pub(super) fn point_blank(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, lock_pv: usize) {
     let m = &w.mobys[id];
     let at = add(sub(m.pos, m.rows[1]), scale(m.rows[0], 0.275));
     let Some(sc) = ctx.scene else { return };
@@ -349,7 +368,7 @@ fn point_blank(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         if !(0.0 < hp) && !aim::is_crate(w, t) { continue; }
         if w.class(x.o_class).is_some_and(|c| c.kind == 5) { continue; }
         let lock = w.hits.last_target.map_or(0, |l| l as i32);
-        w.mobys[id].set_pv_i(hv::LOCK, lock);
+        w.mobys[id].set_pv_i(lock_pv, lock);
         break;
     }
 }
@@ -465,6 +484,13 @@ fn burst(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 
 /// `0x3ace00(aim height, 2, 5, 0.6, hand, muzzle, lock, 0)` (module docs), when the class is loaded.
 pub fn spawn(w: &mut MobyWorld, ctx: &mut Ctx, hand: usize, muzzle: V3, aimh: f32, lock: Option<usize>, r: &ItemRow) -> Option<usize> {
+    spawn_with(w, ctx, hand, muzzle, aimh, (2.0, 5.0), lock, [0.0; 3], r)
+}
+
+/// `0x3ace00(aim height, lo, hi, .., hand, muzzle, lock, offset)`: [`spawn`] with its `+0x1c` drawn from `lo..hi` and
+/// the aim point's offset `offset` (`+0x40`; the Megarocket Cannon's volleys, crate::moby::classes::megarocket).
+#[allow(clippy::too_many_arguments)]
+pub(super) fn spawn_with(w: &mut MobyWorld, ctx: &mut Ctx, hand: usize, muzzle: V3, aimh: f32, range: (f32, f32), lock: Option<usize>, offset: V3, r: &ItemRow) -> Option<usize> {
     if w.class(ROCKET).is_none() { return None; }
     let id = w.create(ROCKET);
     let mut n = w.rockets.next;
@@ -487,7 +513,7 @@ pub fn spawn(w: &mut MobyWorld, ctx: &mut Ctx, hand: usize, muzzle: V3, aimh: f3
         [r0, r1, cross_ba(r1, r0)]
     };
     let g = &mut ctx.game.rng;
-    let r1c = g.randf(2.0, 5.0);
+    let r1c = g.randf(range.0, range.1);
     let r20 = g.randf_signed(6.0, 10.0);
     let r28 = g.rand_angle();
     {
@@ -510,7 +536,7 @@ pub fn spawn(w: &mut MobyWorld, ctx: &mut Ctx, hand: usize, muzzle: V3, aimh: f3
         m.set_pv_i(pv::TARGET, lock.map_or(0, |t| t as i32));
         m.set_pv_b(pv::TICKS, 1);
         m.set_pv_v(pv::DIR, rows[0]);
-        m.set_pv_v(pv::OFFSET, [0.0; 3]);
+        m.set_pv_v(pv::OFFSET, offset);
         m.set_pv_s(pv::LIFE, (75.0 / speed) as i32 as i16);
     }
     if let Some(t) = lock {

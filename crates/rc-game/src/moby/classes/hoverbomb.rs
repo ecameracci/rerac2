@@ -45,9 +45,22 @@
 //! Not ported: the lock cheat (`0x18b270`, `0x32b4d0`), the gravity frames' trackers and bends (`0x37f538` /
 //! `0x37f618` / `0x37f5f8`, `0x380e08`, the way flattened along the frame's up at the launch), the camera's flag the
 //! steering sets (`0x428588`: the current camera of class 4 or 0x51 marked), the bounce sound's volume (`0x3605f0`'s
-//! f12), the weapon mods' effects on a hit (`0x3f9f70`), the blast's screen flash (crate::moby::blast), the small
-//! blast of a set fuse (`+0x16`: every bomb is made with none), the upgraded Hoverbomb Gun (row 0x46: its hand class
-//! 0x0e2f, `0x3ff9c8`).
+//! f12), the weapon mods' effects on a hit (`0x3f9f70`), the blast's screen flash (crate::moby::blast). The bomb's
+//! steering's lag and set-off rules read the item held, 0x19 or 0x46 (0x46 is a row, never an item: as the original).
+//!
+//! **The Tetrabomb Gun**, the upgrade (rows 0x46, 0x67, 0x68, crate::hero::items::UPGRADE_ROWS; L00 `0x266240`,
+//! `0x267f20`, `0x268000`: damage 30 (30, 100), 10 shots (15, 25); the Mega rows' firing arm 0x8a moving and crouched):
+//! the hand **0x0e2f** ([`update_tetra`], `0x3ff9c8`; pvars `+0x00` the cooldown, `+0x04` (s16) the launch's wait,
+//! `+0x06` (s16) the use's ticks, `+0x08` the next bomb, `+0x10..` its five bombs). As the base hand (its sequence run
+//! out back to 1 with blend 6, the muzzle `$gp+0x1bc0` the same) but one shot takes one ammo and launches five bombs
+//! (`$gp+0x1bdc`), the first two ticks after the press (`$gp+0x1bd0`) and the rest three apart (`$gp+0x1bd4`), each
+//! (`0x3ffe20`) along Ratchet's way (the arm raised: the gun's −row 1; in first person toward what the view meets 32 out,
+//! held within 40°: `0x380ef8`) turned about his up (the gun's row 0, the camera's up) from −20° to +20° in steps of 10°
+//! (`$gp+0x1be0`; the middle one not turned), with six grey puffs half a unit out along it ([`smoke_tetra`],
+//! `0x4000a0`) and a fuse of 1..30 ticks (`0x3fffc8` → `0x3aad18`, height 0.5 `$gp+0x1be4`), the hand their owner. After
+//! the last, **3** until none of its bombs lives (dead ones forgotten while ○ is let go), then **1**. A set fuse
+//! counts down once the bomb is set off; its blast is the small one (`0x3f8348(0.6, 20, …, 1, 0x14, 0xf, 0x1e, 0xf,
+//! 0x1e, …)`).
 
 use crate::hero::items::{row, ItemRow, HOVERBOMB};
 use crate::hero::physics::{add, add_rot, dot, len, scale, set_len, sub, unit, V3};
@@ -61,6 +74,14 @@ pub const BOMB: i16 = 0x5d8;
 const MUZZLE: V3 = [0.2, -0.9, 0.0];
 /// The crosshair's FX texture.
 const CROSSHAIR: u16 = 0x1f;
+/// The Tetrabomb Gun's hand (rows 0x46 / 0x67 / 0x68 `+0x04`), its bombs (`$gp+0x1bdc`), the waits before the first and
+/// between the next (`$gp+0x1bd0` / `+0x1bd4`), the use's ticks (`+0x1bd8`), the spread's half (`+0x1be0`, degrees).
+pub const TETRA_HAND: i16 = 0x0e2f;
+const TETRA_BOMBS: i32 = 5;
+const TETRA_FIRST: i16 = 2;
+const TETRA_NEXT: i16 = 3;
+const TETRA_USE: i16 = 0x10;
+const TETRA_SPREAD: f32 = 20.0;
 /// `t[3]` of the blast's hit (`0x45afdf66`).
 const NO_KNOCK_LIMIT: f32 = 5627.925;
 
@@ -178,12 +199,131 @@ fn launch(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, muzzle: V3, r: &ItemRow) 
     if let Some(b) = b { w.mobys[b].parent = Some(id); }
 }
 
+/// `0x3ff9c8` (module docs: the Tetrabomb Gun).
+pub fn update_tetra(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    w.mobys[id].pvars.resize(crate::moby::PVAR_BYTES, 0);
+    if w.mobys[id].state == 0 {
+        let m = &mut w.mobys[id];
+        m.set_pv_f(0, 0.0);
+        m.set_pv_s(6, 0);
+        for k in 0..TETRA_BOMBS as usize { m.set_pv_i(0x10 + 4 * k, 0); }
+        m.state = 1;
+    }
+    if ctx.hero.state == 1 { ctx.hero.request_state(0x1d, true); }
+    if let Some(a) = ctx.host.anim(&w.mobys[id]) {
+        if a.seq_a == a.seq_b && a.flags & 2 != 0 { ctx.host.set_anim(&w.mobys[id], 1, 0, 6); }
+    }
+    if w.mobys[id].pv_s(6) != 0 && count_s(w, id, 6) {
+        let idle = ctx.hero.idle_seq();
+        ctx.hero.items.use_end(ctx.hero.state, ctx.hero_view.seq_b, idle);
+    }
+    let muzzle = {
+        let m = &w.mobys[id];
+        add(crate::gravity::to_world(MUZZLE, &m.rows), m.pos)
+    };
+    {
+        let c = w.mobys[id].pv_f(0);
+        w.mobys[id].set_pv_f(0, if 1.0 / 60.0 < c { c - 1.0 / 60.0 } else { 0.0 });
+    }
+    let mut ok = true;
+    if ctx.hero.state == 0x1d {
+        if countdown(&mut ctx.hero.items.look_wait) {
+            let red = 0.0 < w.mobys[id].pv_f(0) || !ctx.hero.items.has_ammo(ctx.game) || w.mobys[id].state != 1;
+            crate::hud::marker(&mut ctx.game.markers, 1.0, id, if red { 0x6000_00ff } else { 0x600f_ff0f }, None, CROSSHAIR);
+        } else {
+            ok = false;
+        }
+    } else {
+        ctx.hero.items.look_wait = 0x28;
+    }
+    let Some(r) = cur_row(ctx.game).copied() else { return };
+    match w.mobys[id].state {
+        1 => {
+            let it = ctx.hero.items;
+            let seq_a = ctx.host.anim(&w.mobys[id]).map_or(0, |a| a.seq_a);
+            if !(ctx.game.scenes.mode == crate::scene::PLAY && ok && w.mobys[id].pv_f(0) == 0.0 && it.no_use == 0 && seq_a < 2 && it.held & it.trigger != 0 && 0x17 <= it.item_ticks) { return; }
+            if !it.has_ammo(ctx.game) {
+                if it.pressed & it.trigger != 0 || w.hoverbomb.latch {
+                    ctx.host.play_sound(&w.mobys[id], 1, 0);
+                    w.hoverbomb.latch = false;
+                }
+            } else {
+                ctx.hero.items.take_ammo(ctx.game, 1);
+                if ctx.hero.state != 0x1d { ctx.host.set_anim(&w.mobys[id], 2, 0, 2); }
+                ctx.host.play_sound(&w.mobys[id], 0, 0);
+                ctx.hero.items.use_start(ctx.hero.group);
+                let m = &mut w.mobys[id];
+                m.state = 2;
+                m.set_pv_s(4, TETRA_FIRST);
+                m.set_pv_s(6, TETRA_USE);
+                m.set_pv_i(8, 0);
+            }
+            w.mobys[id].set_pv_f(0, 1.0 / r.rate);
+        }
+        2 => {
+            if !count_s(w, id, 4) { return; }
+            let k = w.mobys[id].pv_i(8);
+            let dir = tetra_way(w, id, ctx, k, muzzle, &r);
+            smoke_tetra(ctx, muzzle, dir);
+            let fuse = ctx.game.rng.rand_range(1, 0x1e) as i16;
+            let b = spawn_fused(w, ctx, len(dir), r.damage, 0.5, muzzle, dir, fuse);
+            w.mobys[id].set_pv_i(0x10 + 4 * k.clamp(0, TETRA_BOMBS - 1) as usize, b.map_or(0, |b| b as i32));
+            if let Some(b) = b { w.mobys[b].parent = Some(id); }
+            w.mobys[id].set_pv_i(8, k + 1);
+            if k + 1 < TETRA_BOMBS {
+                w.mobys[id].set_pv_s(4, TETRA_NEXT);
+            } else {
+                w.mobys[id].state = 3;
+            }
+        }
+        _ => {
+            let held = ctx.hero.items.held & ctx.hero.items.trigger != 0;
+            let mut any = false;
+            for k in 0..TETRA_BOMBS as usize {
+                let Some(b) = w.mobys[id].pv_link(0x10 + 4 * k) else { continue };
+                any = true;
+                let dead = w.mobys.get(b).is_none_or(|m| m.o_class != BOMB || matches!(m.state, 0xfe | 0xfd));
+                if dead && !held { w.mobys[id].set_pv_i(0x10 + 4 * k, 0); }
+            }
+            if !any { w.mobys[id].state = 1; }
+        }
+    }
+}
+
+/// `0x3ffe20(hand, out, k, muzzle)` (module docs): the `k`-th bomb's velocity.
+fn tetra_way(w: &MobyWorld, id: usize, ctx: &Ctx, k: i32, muzzle: V3, r: &ItemRow) -> V3 {
+    let f = r.speed * 0.016_666_668;
+    let (v, axis) = if ctx.hero.items.raised {
+        (set_len(w.mobys[id].rows[1], -f), w.mobys[id].rows[0])
+    } else if ctx.hero.items.fp.on {
+        (super::pulse_rifle::view_aim(ctx, muzzle, f, 32.0, f32::from_bits(0x3f32_b8c4)), ctx.host.camera_rows()[2])
+    } else {
+        (set_len(ctx.hero.rows[0], f), ctx.hero.rows[2])
+    };
+    if k == 2 { return v; }
+    let half = TETRA_SPREAD * 0.017_453_294;
+    let a = add_rot(-half, (half + half) * (k as f32 / (TETRA_BOMBS - 1) as f32));
+    if len(axis) == 0.0 { return v; }
+    crate::gravity::rotate(v, unit(axis), a)
+}
+
+/// `0x4000a0(hand, at, way)`: six grey puffs half a unit out along `way`, as [`smoke`]'s.
+fn smoke_tetra(ctx: &mut Ctx, at: V3, way: V3) {
+    let l = len(way);
+    if l == 0.0 { return; }
+    let at = add(at, scale(way, 1.0 / l * 0.5));
+    smoke_n(ctx, at, 6);
+}
+
 /// `0x3c4d68(hand, at)`: twenty grey puffs at the muzzle (`0x335bb8(0.3, 1, 1.01, 70000..150000, at, 0, a random way
 /// 1/60000..1/150 a tick, grey 10..0x7f, 1)`: 120 ticks), two draws of `0x31b9a0(2)` before each left unused.
-fn smoke(ctx: &mut Ctx, at: V3) {
+fn smoke(ctx: &mut Ctx, at: V3) { smoke_n(ctx, at, 20); }
+
+/// `n` of [`smoke`]'s puffs.
+fn smoke_n(ctx: &mut Ctx, at: V3, n: usize) {
     let Some(sys) = ctx.parts.as_deref_mut() else { return };
     let g = &mut ctx.game.rng;
-    for _ in 0..20 {
+    for _ in 0..n {
         g.randi(2);
         g.randi(2);
         let size = g.randf(70_000.0, 150_000.0);
@@ -203,6 +343,12 @@ fn smoke(ctx: &mut Ctx, at: V3) {
 /// a wall between Ratchet and the muzzle: it goes off there).
 #[allow(clippy::too_many_arguments)]
 pub fn spawn(w: &mut MobyWorld, ctx: &mut Ctx, speed: f32, damage: f32, height: f32, at: V3, dir: V3) -> Option<usize> {
+    spawn_fused(w, ctx, speed, damage, height, at, dir, 0)
+}
+
+/// [`spawn`] with a fuse of `fuse` ticks (`+0x16`; the Tetrabomb Gun's).
+#[allow(clippy::too_many_arguments)]
+fn spawn_fused(w: &mut MobyWorld, ctx: &mut Ctx, speed: f32, damage: f32, height: f32, at: V3, dir: V3, fuse: i16) -> Option<usize> {
     if w.class(BOMB).is_none() {
         eprintln!("rc_game::hoverbomb: class {BOMB:#x} is not loaded: no bomb");
         return None;
@@ -231,7 +377,7 @@ pub fn spawn(w: &mut MobyWorld, ctx: &mut Ctx, speed: f32, damage: f32, height: 
         m.set_pv_v(0, vel);
         m.set_pv_v(0x50, vel);
         m.set_pv_f(0x1c, speed);
-        m.set_pv_s(0x16, 0);
+        m.set_pv_s(0x16, fuse);
         m.set_pv_f(0x18, damage);
         m.set_pv_f(0x20, height);
         m.set_pv_s(0x14, 0);
@@ -367,11 +513,16 @@ pub fn update_bomb(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let check = pressed || (!held && 0x14 < w.mobys[id].pv_s(0x2e)) || !matches!(it.item, 0x19 | 0x46) || w.mobys[id].state == 1;
     if check && 0x14 < w.mobys[id].pv_s(0x14) {
         w.mobys[id].state = 1;
+        let fused = w.mobys[id].pv_s(0x16) != 0;
         if count_s(w, id, 0x16) {
             stop_sound(w, id, ctx);
             ctx.host.play_sound(&w.mobys[id], 1, 0);
             let at = w.mobys[id].pos;
-            let b = crate::moby::blast::Blast { size: 1.5, bursts: [0x28, 0x14, 0x1e], puffs: 0x28, streaks: 0x32, light: true, shake: true };
+            let b = if fused {
+                crate::moby::blast::Blast { size: f32::from_bits(0x3f19_999a), bursts: [0x14, 0xf, 0x1e], puffs: 0xf, streaks: 0x1e, light: true, shake: true }
+            } else {
+                crate::moby::blast::Blast { size: 1.5, bursts: [0x28, 0x14, 0x1e], puffs: 0x28, streaks: 0x32, light: true, shake: true }
+            };
             crate::moby::blast::burst(w, ctx, at, &b);
             hit(w, ctx, id, at);
             w.delete(id);

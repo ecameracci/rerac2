@@ -19,10 +19,13 @@
 //! | `0x3d4320` / `0x3fe250` | the upgraded Blitz Gun 0x0af1 after a shot / its tracer 0x0d9c | its arcs, ring and glare ([`crate::moby::classes::blitz_mega::draw`]); the beam |
 //! | `0x3a9a48` | the Pulse Rifle's shot 0x05d6 with smoke or a beam | its slot's smoke and beams ([`crate::moby::classes::pulse_rifle::draw`]) |
 //! | `0x3ae138` | the Minirocket Tube's rocket 0x05da from its fourth tick | its exhaust's glow and streak ([`crate::moby::classes::minirocket::draw`]) |
+//! | `0x411b90` | the Megarocket Cannon in the hand 0x1004 charging | its charge's glows ([`crate::moby::classes::megarocket::draw`]) |
 //! | `0x40c830` | the RYNO II's missile 0x0ed7 from its fourth tick | its exhaust's glow and streak ([`crate::moby::classes::ryno::draw`]) |
+//! | `0x3c8e40` | the Sheepinator in the hand 0x0a5d firing | its beam's strips, pulses, muzzle glow and tube ([`crate::moby::classes::sheepinator::draw`]) |
 //! | `0x40a980` / `0x418c00` | the Zodiac in the hand 0x0ec8 summoning / its lightning 0x139e | the white-out's fills; the arcs and their ends' glows ([`crate::moby::classes::zodiac::draw_flash`], [`crate::moby::classes::zodiac::draw_effect`]) |
 //! | `0x3f6b90` | the Vaporizer's shot 0x0cf7 with a trail, a beam or smoke | its trail, its slot's beams and puffs ([`crate::moby::classes::vaporizer::draw`]) |
 //! | `0x3eecd0` | the Synthenoids' shot 0x0cbb | its streaks ([`crate::moby::classes::synthenoid::draw`]) |
+//! | `0x3ddaa8` | the Meteor Gun's meteor 0x0b2e | its trail, glow and scorches ([`crate::moby::classes::meteor::draw`]) |
 //! | `0x41c328` | the Lava Gun in the hand 0x05c9 drawn | its stream, muzzle glows and burning pools ([`crate::moby::classes::lava_gun::draw`]) |
 //! | `0x3c5c98` (first list) | the Shield Charger's shield 0x0a5c holding | its arcs, sphere, halo and comets ([`crate::moby::classes::shield::draw`]) |
 //! | `0x3e9f18` / `0x3cd2d8` | the Plasma Coil in the hand 0x0c4a / its ball 0x0a9b | the hand's lightning and glints; the ball's arcs, rays and glow ([`crate::moby::classes::plasma_coil::draw_hand`], [`crate::moby::classes::plasma_coil::draw_ball`]) |
@@ -319,6 +322,7 @@ pub fn callbacks(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut
     let mut out = Vec::new();
     // The blob shadows first (`0x2e7ab0` runs before the callbacks' list, `0x2e7970`).
     crate::shadows::draw(&w.shadows, &mut out);
+    out.append(&mut w.update_quads);
     for id in w.draws.clone() { one(w, host, game, hero_state, view, cam, id, false, &mut out, &mut frame); }
     Lists { first, second: out, frame }
 }
@@ -350,17 +354,23 @@ fn one(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut crate::ga
         crate::moby::classes::beam::CLASS => crate::moby::classes::beam::draw(w, id, cam, out),
         crate::moby::classes::pulse_rifle::SHOT => crate::moby::classes::pulse_rifle::draw(w, id, hero_state, cam, out),
         crate::moby::classes::minirocket::ROCKET => crate::moby::classes::minirocket::draw(w, id, &mut game.rng, cam, out),
+        crate::moby::classes::megarocket::HAND_CLASS => {
+            let ammo = game.ammo.get(crate::hero::items::MINIROCKET as usize).copied().unwrap_or(0);
+            crate::moby::classes::megarocket::draw(w, id, ammo, cam, out);
+        }
         crate::moby::classes::ryno::MISSILE => crate::moby::classes::ryno::draw(w, id, &mut game.rng, cam, out),
         crate::moby::classes::zodiac::HAND_CLASS => crate::moby::classes::zodiac::draw_flash(w, id),
         crate::moby::classes::zodiac::EFFECT => crate::moby::classes::zodiac::draw_effect(w, id, &mut game.rng, cam, out),
+        crate::moby::classes::sheepinator::HAND_CLASS => crate::moby::classes::sheepinator::draw(w, id, cam, out),
         crate::moby::classes::vaporizer::SHOT => crate::moby::classes::vaporizer::draw(w, id, hero_state, cam, out),
         crate::moby::classes::synthenoid::SHOT => crate::moby::classes::synthenoid::draw(w, id, cam, out),
         crate::moby::classes::lava_gun::HAND_CLASS => crate::moby::classes::lava_gun::draw(w, id, &mut game.rng, cam, out),
+        crate::moby::classes::meteor::METEOR => crate::moby::classes::meteor::draw(w, id, &mut game.rng, cam, out),
         crate::moby::classes::plasma_coil::HAND_CLASS => crate::moby::classes::plasma_coil::draw_hand(w, host, id, &mut game.rng, cam, out),
         crate::moby::classes::plasma_coil::BALL => crate::moby::classes::plasma_coil::draw_ball(w, id, &mut game.rng, cam, out),
         crate::moby::classes::shield::CLASS => crate::moby::classes::shield::draw(w, host, id, game.scenes.mode == crate::scene::PLAY, &mut game.rng, cam, out),
         crate::moby::classes::turret::HAND_CLASS | crate::moby::classes::turret::UP_HAND => crate::moby::classes::turret::draw_marker(w, id, hero_state, game.scenes.mode, game.frame, out),
-        crate::moby::classes::bouncer::HAND_CLASS => crate::moby::classes::bouncer::draw_marker(w, id, hero_state, game.scenes.mode, game.frame, out),
+        crate::moby::classes::bouncer::HAND_CLASS | crate::moby::classes::bouncer::UPGRADED_HAND => crate::moby::classes::bouncer::draw_marker(w, id, hero_state, game.scenes.mode, game.frame, out),
         crate::moby::classes::turret::TURRET | crate::moby::classes::turret::UP_TURRET => crate::moby::classes::turret::draw(w, host, id, &mut game.rng, cam, out),
         crate::moby::classes::turret::PLASMA => crate::moby::classes::turret::draw_plasma(w, id, &mut game.rng, cam, out),
         crate::moby::classes::spiderbot::HAND_CLASS | crate::moby::classes::spiderbot::PLUS_HAND => crate::moby::classes::spiderbot::draw_marker(w, id, hero_state, game.scenes.mode, game.frame, out),

@@ -968,7 +968,7 @@ fn tick(
     if p.hero.mode == 0 { rc_game::hero::layers::upkeep(&mut p.hero, &p.anim.ctl(class)); }
     // `UpdateParts` (`0x331150`), after the hero.
     if let Some(s) = parts.as_deref_mut() {
-        let aux = rc_game::particles::PartAux { cam_yaw: p.camera.yaw(), water_z: p.hero.surf.water_z, coll: Some(coll), rain: mobys.world.weather.aux(&mobys.level, &p.game) };
+        let aux = rc_game::particles::PartAux { cam_yaw: p.camera.yaw(), water_z: p.hero.surf.water_z, hero_speed: p.hero.eff_len, coll: Some(coll), rain: mobys.world.weather.aux(&mobys.level, &p.game) };
         rc_game::particles::update_parts(&mut s.sys, &mobys.world, p.camera.pos, p.hero.pos, &mut p.game.rng, &aux);
     }
     // The draw callbacks the updates registered, called by the frame's draw (rc_game::fx).
@@ -1163,6 +1163,8 @@ fn tick(
     p.hud.tick(p.hero.hp, p.game.max_health, sb, sh, weapon);
     // The boss bar's own update (`0x2f2458`): its ticks left counted down, gone at 0.
     p.game.boss_bar = p.game.boss_bar.and_then(|(f, t)| (1 < t).then_some((f, t - 1)));
+    // The side meter's tick (`0x2fcb48`, rc_game::hud::SideMeter; this runs in play).
+    p.game.side_meter.tick(false);
     // The message boxes (`0x4451e8`'s part, after the panel).
     if let Some(g) = p.glyphs.as_deref() { p.boxes.tick(&mut p.game.messages, &p.texts, g); }
     // The help panel (`0x2f5680`).
@@ -1302,7 +1304,7 @@ fn puzzle_frame(p: &mut Play, lv: &crate::level_load::LoadedLevel, occl: Option<
     (p.fx_quads_first, p.fx_quads, p.frame_quads) = (Vec::new(), Vec::new(), Vec::new());
     p.game.markers.clear();
     if let Some(s) = parts.as_deref_mut() {
-        let aux = rc_game::particles::PartAux { cam_yaw: p.camera.yaw(), water_z: p.hero.surf.water_z, coll: Some(coll), rain: mobys.world.weather.aux(&mobys.level, &p.game) };
+        let aux = rc_game::particles::PartAux { cam_yaw: p.camera.yaw(), water_z: p.hero.surf.water_z, hero_speed: p.hero.eff_len, coll: Some(coll), rain: mobys.world.weather.aux(&mobys.level, &p.game) };
         rc_game::particles::update_parts(s, &mobys.world, p.camera.pos, p.hero.pos, &mut p.game.rng, &aux);
     }
     let id = usize::try_from(p.game.scenes.arg.0).ok().filter(|&i| mobys.world.mobys.get(i).is_some_and(|m| m.state < 0x80 && matches!(m.o_class, rc_game::moby::classes::electrolyzer::CLASS | rc_game::moby::classes::hacker_panel::CLASS)));
@@ -1379,7 +1381,7 @@ fn upgrade_frame(p: &mut Play, lv: &crate::level_load::LoadedLevel, occl: Option
     (p.fx_quads_first, p.fx_quads, p.frame_quads) = (Vec::new(), Vec::new(), Vec::new());
     p.game.markers.clear();
     if let Some(s) = parts.as_deref_mut() {
-        let aux = rc_game::particles::PartAux { cam_yaw: p.camera.yaw(), water_z: p.hero.surf.water_z, coll: Some(coll), rain: mobys.world.weather.aux(&mobys.level, &p.game) };
+        let aux = rc_game::particles::PartAux { cam_yaw: p.camera.yaw(), water_z: p.hero.surf.water_z, hero_speed: p.hero.eff_len, coll: Some(coll), rain: mobys.world.weather.aux(&mobys.level, &p.game) };
         rc_game::particles::update_parts(s, &mobys.world, rc_game::menus::upgrade::EYE, p.hero.pos, &mut p.game.rng, &aux);
     }
     let mut host = crate::mobys::Host { lv: &lv.mobys, occl: occl.as_deref(), anim: anim.as_deref_mut(), created: &mut mobys.created, hero: None, hero_chains: &[], chains: Some(&mobys.chains), camera: p.camera.pos, camera_rows: p.camera.rows, sound: None };
@@ -2145,7 +2147,7 @@ fn scene_tick(p: &mut Play, lv: &mut crate::level_load::LoadedLevel, commands: &
     let ship = p.game.scenes.player.as_ref().and_then(|pl| pl.actors.iter().map(|a| a.0).find(|&a| mobys.world.mobys.get(a).is_some_and(|m| m.o_class == 0xd54)));
     canopy_tick(mobys, lv, occl.as_deref(), anim.as_deref_mut(), ship, frame.camera.eye, p.game.scenes.mode);
     if let Some(sys) = parts.as_deref_mut() {
-        let aux = rc_game::particles::PartAux { cam_yaw: p.camera.yaw(), water_z: p.hero.surf.water_z, coll: Some(coll), rain: mobys.world.weather.aux(&mobys.level, &p.game) };
+        let aux = rc_game::particles::PartAux { cam_yaw: p.camera.yaw(), water_z: p.hero.surf.water_z, hero_speed: p.hero.eff_len, coll: Some(coll), rain: mobys.world.weather.aux(&mobys.level, &p.game) };
         rc_game::particles::update_parts(sys, &mobys.world, frame.camera.eye, p.hero.pos, &mut p.game.rng, &aux);
     }
     // The frame's draw calls the callbacks the scene tick's updates registered too (rc_game::fx): the enemies hidden
@@ -2547,6 +2549,8 @@ fn draw_hud(
         let mut draws = if p.ship.is_some() || screen { screen_draws } else { p.hud.draw(p.game.bolts) };
         // The boss bar while a fight refreshes it (`0x2f2158`).
         if let (None, Some((f, _))) = (&p.ship, p.game.boss_bar) { rc_game::hud::boss_bar(f, p.game.boss_icon, &mut draws); }
+        // The side meter while a weapon refreshes it (`0x2fc5c8`: the Sheepinator's drain).
+        if p.ship.is_none() { p.game.side_meter.draw(&mut draws); }
         // The quick select's ring and texts (rc_game::quick_select).
         if let Some(m) = p.mobys.as_ref() {
             let slots = rc_game::quick_select::slots(&p.game, &m.level.items);

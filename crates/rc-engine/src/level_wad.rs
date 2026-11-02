@@ -75,7 +75,9 @@ pub fn gadgets(root: &Path, index: u32) -> Vec<i32> {
     // Every weapon a vendor sells, on every level: one bought on a later planet is carried back to the earlier ones,
     // and on into the levels past the vendors' last (the game streams a weapon's class into its gadget slots when it is
     // equipped; the port keeps them all loaded).
-    let sold = rc_game::vendor::STOCK_LEVELS.iter().map(|&(item, _)| item).chain(rc_game::vendor::GADGETRON_ITEMS);
+    // The weapons no vendor sells but the port holds (the Sheepinator, item 0x10, got from the game's own reward)
+    // stream in the same way when equipped.
+    let sold = rc_game::vendor::STOCK_LEVELS.iter().map(|&(item, _)| item).chain(rc_game::vendor::GADGETRON_ITEMS).chain([rc_game::hero::items::SHEEPINATOR]);
     for item in sold {
         let Some(c) = tables.items.get(item as usize).map(|r| r.classes[0]).filter(|&c| c != 0) else { continue };
         if !out.contains(&c) { out.push(c); }

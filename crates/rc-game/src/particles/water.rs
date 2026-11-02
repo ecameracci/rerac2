@@ -38,6 +38,8 @@ pub struct PartAux<'a> {
     pub cam_yaw: f32,
     /// The hero's water level (`0x18a150`).
     pub water_z: f32,
+    /// Ratchet's speed (`0x189f90`: the wool's push, crate::particles::wool).
+    pub hero_speed: f32,
     /// The level's collision (the drops' line test).
     pub coll: Option<&'a Collision>,
     /// The rain's (crate::particles::rain).

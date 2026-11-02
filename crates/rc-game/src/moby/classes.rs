@@ -32,6 +32,7 @@ pub mod hoverbomb;
 pub mod keeper;
 pub mod lancer;
 pub mod lava_gun;
+pub mod meteor;
 pub mod pulse_rifle;
 pub mod seeker;
 pub mod leaper;
@@ -59,6 +60,7 @@ pub mod maktar;
 pub mod maktar_hints;
 pub mod maktar_pads;
 pub mod minirocket;
+pub mod megarocket;
 pub mod ryno;
 pub mod plasma_coil;
 pub mod swamp_monster;
@@ -79,6 +81,8 @@ pub mod endako_d;
 pub mod endako_boss;
 pub mod mod_vendor;
 pub mod hacker_panel;
+pub mod sheep;
+pub mod sheepinator;
 
 use super::UpdateFn;
 
@@ -139,6 +143,8 @@ pub fn update_for(o_class: i16) -> Option<UpdateFn> {
         seeker::PLUS_CLASS => Some(seeker::update_plus),
         seeker::MISSILE => Some(seeker::update_missile),
         minirocket::HAND_CLASS => Some(minirocket::update),
+        // The Megarocket Cannon (`0x410ba0`, rows 0x45 / 0x63 / 0x64).
+        megarocket::HAND_CLASS => Some(megarocket::update),
         minirocket::ROCKET => Some(minirocket::update_rocket),
         // The RYNO II (`0x3c9ed8`) and its missile (`0x40b9b0`).
         ryno::HAND_CLASS => Some(ryno::update),
@@ -146,16 +152,24 @@ pub fn update_for(o_class: i16) -> Option<UpdateFn> {
         // The Zodiac (`0x40a358`) and its lightning (`0x4185a8`).
         zodiac::HAND_CLASS => Some(zodiac::update),
         zodiac::EFFECT => Some(zodiac::update_effect),
+        // The Sheepinator (`0x3c76e0`; the challenge mode's row 0x6d too) and its sheep (`0x404338`).
+        sheepinator::HAND_CLASS => Some(sheepinator::update),
+        sheep::CLASS => Some(sheep::update),
         // The Plasma Coil (`0x3e9608`) and its ball (`0x3cbb78`).
         plasma_coil::HAND_CLASS => Some(plasma_coil::update),
         plasma_coil::BALL => Some(plasma_coil::update_ball),
         // The Hoverbomb Gun (`0x3c4860`) and its bomb (`0x3ab088`).
         hoverbomb::HAND_CLASS => Some(hoverbomb::update),
+        // The Tetrabomb Gun (`0x3ff9c8`, rows 0x46 / 0x67 / 0x68).
+        hoverbomb::TETRA_HAND => Some(hoverbomb::update_tetra),
         hoverbomb::BOMB => Some(hoverbomb::update_bomb),
         // The Shield Charger's shield (`0x3c51d8`).
         shield::CLASS => Some(shield::update),
         lava_gun::HAND_CLASS => Some(lava_gun::update),
-        bouncer::HAND_CLASS => Some(bouncer::update),
+        // The Meteor Gun (`0x3eb9c0`, rows 0x3f / 0x5f / 0x60) and its meteor (`0x3dc568`).
+        meteor::HAND_CLASS => Some(meteor::update_hand),
+        meteor::METEOR => Some(meteor::update),
+        bouncer::HAND_CLASS | bouncer::UPGRADED_HAND => Some(bouncer::update),
         bouncer::BOMB => Some(bouncer::update_bomb),
         bouncer::BOMBLET => Some(bouncer::update_bomblet),
         synthenoid::DRONE => Some(synthenoid::update),

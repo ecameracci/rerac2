@@ -85,6 +85,9 @@ pub const ZODIAC_CLASS: i16 = crate::moby::classes::zodiac::HAND_CLASS;
 /// The RYNO II: item 0x2c, class 0xa67 (L00 row `0x264b80`; crate::moby::classes::ryno).
 pub const RYNO: i32 = crate::moby::classes::ryno::ITEM;
 pub const RYNO_CLASS: i16 = crate::moby::classes::ryno::HAND_CLASS;
+/// The Sheepinator: item 0x10, class 0xa5d (L00 row `0x263300`; crate::moby::classes::sheepinator).
+pub const SHEEPINATOR: i32 = crate::moby::classes::sheepinator::ITEM;
+pub const SHEEPINATOR_CLASS: i16 = crate::moby::classes::sheepinator::HAND_CLASS;
 
 /// An item record (`0x262500 + 0xe0·row`, row `0x139568[item]`: crate::upgrades): the fields the port reads.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -117,8 +120,8 @@ pub struct ItemRow {
 /// Electrolyzer's and the Spiderbot Glove's from L02's; the Swingshot's from L03's; the Chopper's L00 `0x263840`; the
 /// Blitz Gun's L00 `0x263bc0`; the Pulse Rifle's L00 `0x263920`; the Mini-Turret Glove's L00 `0x2648e0`; the
 /// Synthenoids' L00 `0x264020`; the Lava Gun's L00 `0x263e60`; the Seeker Gun's L00 `0x263a00`; the Bouncer's L00 `0x264560`;
-/// the Minirocket Tube's L00 `0x263ca0`; the Plasma Coil's L00 `0x263d80`; the Hoverbomb Gun's L00 `0x263ae0`; the Shield Charger's L00 `0x264c60`; the Zodiac's L00 `0x264aa0`; the RYNO II's L00 `0x264b80`).
-pub const ROWS: [ItemRow; 22] = [
+/// the Minirocket Tube's L00 `0x263ca0`; the Plasma Coil's L00 `0x263d80`; the Hoverbomb Gun's L00 `0x263ae0`; the Shield Charger's L00 `0x264c60`; the Zodiac's L00 `0x264aa0`; the RYNO II's L00 `0x264b80`; the Sheepinator's L00 `0x263300`).
+pub const ROWS: [ItemRow; 23] = [
     ItemRow { item: WRENCH, attach: 0, class: WRENCH_CLASS, stance: 0, icon: 0, use_seq: 0, keep: false, fire_seq: [0, 0], speed: 0.0, rate: 0.0, damage: 1.0, ammo: false, max_ammo: 0, start_ammo: 0 },
     ItemRow { item: LANCER, attach: 0, class: LANCER_CLASS, stance: 1, icon: 0xea64, use_seq: 0x38, keep: true, fire_seq: [-1, 0x3e], speed: 60.0, rate: 7.0, damage: 0.5, ammo: true, max_ammo: 200, start_ammo: 200 },
     ItemRow { item: DYNAMO, attach: 1, class: DYNAMO_CLASS, stance: 1, icon: 0xea7f, use_seq: 0x8d, keep: false, fire_seq: [0x8e, 0x8d], speed: 0.0, rate: 0.0, damage: 0.0, ammo: false, max_ammo: 0, start_ammo: 0 },
@@ -141,6 +144,7 @@ pub const ROWS: [ItemRow; 22] = [
     ItemRow { item: SHIELD, attach: 0, class: crate::moby::classes::shield::CLASS, stance: 1, icon: 0xea74, use_seq: 0x38, keep: true, fire_seq: [0x39, 0x3e], speed: 0.0, rate: 0.0, damage: 1.0, ammo: true, max_ammo: 5, start_ammo: 5 },
     ItemRow { item: ZODIAC, attach: 0, class: ZODIAC_CLASS, stance: 1, icon: 0xea76, use_seq: 0x94, keep: false, fire_seq: [-1, 0x3e], speed: 0.0, rate: 0.25, damage: 100.0, ammo: true, max_ammo: 4, start_ammo: 4 },
     ItemRow { item: RYNO, attach: 0, class: RYNO_CLASS, stance: 2, icon: 0xea6c, use_seq: 0x36, keep: false, fire_seq: [-1, 0x46], speed: 0.0, rate: 6.5, damage: 100.0, ammo: true, max_ammo: 100, start_ammo: 100 },
+    ItemRow { item: SHEEPINATOR, attach: 0, class: SHEEPINATOR_CLASS, stance: 1, icon: 0xea77, use_seq: 0x38, keep: true, fire_seq: [-1, 0x3e], speed: 0.0, rate: 0.0, damage: 0.0, ammo: false, max_ammo: 0, start_ammo: 0 },
 ];
 
 /// The upgraded rows the port has (L00 `0x262500 + 0xe0·row`; their item in brackets): the Heavy Lancer 0x3c and the
@@ -148,8 +152,13 @@ pub const ROWS: [ItemRow; 22] = [
 /// the Mega Chopper 0x41, 0x53, 0x54 (0x16), the upgraded Blitz Gun 0x44, 0x5b, 0x5c (0x1a), the upgraded Mini-Turret
 /// Glove 0x40, 0x59, 0x5a (0x29: L00 `0x265d00`, `0x2672e0`, `0x2673c0`), the Vaporizer 0x42, 0x57, 0x58 (0x17: L00
 /// `0x265ec0`, `0x267120`, `0x267200`), the upgraded Seeker Gun 0x43, 0x55, 0x56 (0x18: L00 `0x265fa0`, `0x266f60`,
-/// `0x267040`). Each names its own hand class (`+0x04`).
-pub const UPGRADE_ROWS: [ItemRow; 24] = [
+/// `0x267040`), the Meteor Gun 0x3f, 0x5f, 0x60 (0x1d: L00 `0x265c20`, `0x267820`, `0x267900`), the upgraded Bouncer 0x4c,
+/// 0x61, 0x62 (0x25: L00 `0x266780`, `0x2679e0`, `0x267ac0`), the Megarocket Cannon 0x45, 0x63, 0x64 (0x1b: L00
+/// `0x266160`, `0x267ba0`, `0x267c80`), the Tetrabomb Gun 0x46, 0x67, 0x68 (0x19: L00 `0x266240`, `0x267f20`, `0x268000`),
+/// the Sheepinator's challenge-mode Mega row 0x6d (0x10: L00 `0x268460`, the base hand 0xa5d; its 0x48 "Black
+/// Sheepinator" and 0x6e, the hand 0xead `0x406cf8`, are not ported).
+/// Each names its own hand class (`+0x04`).
+pub const UPGRADE_ROWS: [ItemRow; 37] = [
     ItemRow { item: 0x3c, attach: 0, class: 0xc05, stance: 2, icon: 0xea64, use_seq: 0x33, keep: true, fire_seq: [-1, -1], speed: 80.0, rate: 10.0, damage: 0.67, ammo: true, max_ammo: 300, start_ammo: 300 },
     ItemRow { item: 0x4f, attach: 0, class: 0xc05, stance: 2, icon: 0xea64, use_seq: 0x33, keep: true, fire_seq: [-1, -1], speed: 80.0, rate: 10.0, damage: 4.0, ammo: true, max_ammo: 400, start_ammo: 300 },
     ItemRow { item: 0x50, attach: 0, class: 0xc05, stance: 2, icon: 0xea64, use_seq: 0x33, keep: true, fire_seq: [-1, -1], speed: 80.0, rate: 10.0, damage: 8.0, ammo: true, max_ammo: 500, start_ammo: 300 },
@@ -174,6 +183,19 @@ pub const UPGRADE_ROWS: [ItemRow; 24] = [
     ItemRow { item: 0x43, attach: 0, class: crate::moby::classes::seeker::PLUS_CLASS, stance: 1, icon: 0xea6b, use_seq: 0x33, keep: false, fire_seq: [-1, -1], speed: 14.0, rate: 2.0, damage: 6.0, ammo: true, max_ammo: 20, start_ammo: 20 },
     ItemRow { item: 0x55, attach: 0, class: crate::moby::classes::seeker::PLUS_CLASS, stance: 1, icon: 0xea6b, use_seq: 0x33, keep: false, fire_seq: [-1, -1], speed: 14.0, rate: 2.0, damage: 16.0, ammo: true, max_ammo: 40, start_ammo: 20 },
     ItemRow { item: 0x56, attach: 0, class: crate::moby::classes::seeker::PLUS_CLASS, stance: 1, icon: 0xea6b, use_seq: 0x33, keep: false, fire_seq: [-1, -1], speed: 14.0, rate: 2.0, damage: 24.0, ammo: true, max_ammo: 50, start_ammo: 20 },
+    ItemRow { item: 0x3f, attach: 0, class: crate::moby::classes::meteor::HAND_CLASS, stance: 2, icon: 0xea69, use_seq: 0x36, keep: false, fire_seq: [-1, 0x46], speed: 0.0, rate: 4.5, damage: 8.0, ammo: true, max_ammo: 200, start_ammo: 200 },
+    ItemRow { item: 0x5f, attach: 0, class: crate::moby::classes::meteor::HAND_CLASS, stance: 2, icon: 0xea69, use_seq: 0x36, keep: false, fire_seq: [-1, 0x46], speed: 0.0, rate: 7.5, damage: 12.0, ammo: true, max_ammo: 300, start_ammo: 200 },
+    ItemRow { item: 0x60, attach: 0, class: crate::moby::classes::meteor::HAND_CLASS, stance: 2, icon: 0xea69, use_seq: 0x36, keep: false, fire_seq: [-1, 0x46], speed: 0.0, rate: 7.5, damage: 24.0, ammo: true, max_ammo: 400, start_ammo: 200 },
+    ItemRow { item: 0x4c, attach: 0, class: crate::moby::classes::bouncer::UPGRADED_HAND, stance: 2, icon: 0xea73, use_seq: 0x89, keep: false, fire_seq: [-1, -1], speed: 0.0, rate: 0.3, damage: 12.0, ammo: true, max_ammo: 25, start_ammo: 25 },
+    ItemRow { item: 0x61, attach: 0, class: crate::moby::classes::bouncer::UPGRADED_HAND, stance: 2, icon: 0xea73, use_seq: 0x89, keep: false, fire_seq: [0x8a, 0x8a], speed: 0.0, rate: 0.3, damage: 24.0, ammo: true, max_ammo: 40, start_ammo: 25 },
+    ItemRow { item: 0x62, attach: 0, class: crate::moby::classes::bouncer::UPGRADED_HAND, stance: 2, icon: 0xea73, use_seq: 0x89, keep: false, fire_seq: [0x8a, 0x8a], speed: 0.0, rate: 0.3, damage: 50.0, ammo: true, max_ammo: 60, start_ammo: 25 },
+    ItemRow { item: 0x45, attach: 0, class: crate::moby::classes::megarocket::HAND_CLASS, stance: 2, icon: 0xea70, use_seq: 0x36, keep: false, fire_seq: [-1, 0x46], speed: 60.0, rate: 4.0, damage: 18.0, ammo: true, max_ammo: 25, start_ammo: 25 },
+    ItemRow { item: 0x63, attach: 0, class: crate::moby::classes::megarocket::HAND_CLASS, stance: 2, icon: 0xea70, use_seq: 0x36, keep: false, fire_seq: [-1, 0x46], speed: 60.0, rate: 4.0, damage: 30.0, ammo: true, max_ammo: 40, start_ammo: 25 },
+    ItemRow { item: 0x64, attach: 0, class: crate::moby::classes::megarocket::HAND_CLASS, stance: 2, icon: 0xea70, use_seq: 0x36, keep: false, fire_seq: [-1, 0x46], speed: 60.0, rate: 4.0, damage: 60.0, ammo: true, max_ammo: 60, start_ammo: 25 },
+    ItemRow { item: 0x46, attach: 0, class: crate::moby::classes::hoverbomb::TETRA_HAND, stance: 2, icon: 0xea72, use_seq: 0x89, keep: false, fire_seq: [-1, -1], speed: 7.0, rate: 3.0, damage: 30.0, ammo: true, max_ammo: 10, start_ammo: 10 },
+    ItemRow { item: 0x67, attach: 0, class: crate::moby::classes::hoverbomb::TETRA_HAND, stance: 2, icon: 0xea72, use_seq: 0x89, keep: false, fire_seq: [0x8a, 0x8a], speed: 7.0, rate: 3.0, damage: 30.0, ammo: true, max_ammo: 15, start_ammo: 10 },
+    ItemRow { item: 0x68, attach: 0, class: crate::moby::classes::hoverbomb::TETRA_HAND, stance: 2, icon: 0xea72, use_seq: 0x89, keep: false, fire_seq: [0x8a, 0x8a], speed: 7.0, rate: 3.0, damage: 100.0, ammo: true, max_ammo: 25, start_ammo: 10 },
+    ItemRow { item: 0x6d, attach: 0, class: SHEEPINATOR_CLASS, stance: 1, icon: 0xea77, use_seq: 0x38, keep: true, fire_seq: [-1, 0x3e], speed: 0.0, rate: 0.0, damage: 0.0, ammo: false, max_ammo: 0, start_ammo: 0 },
 ];
 
 /// Row `row` of the records ([`ROWS`], [`UPGRADE_ROWS`]).
@@ -658,7 +680,8 @@ fn hand_pass(world: &mut MobyWorld, ctx: &mut Ctx) {
 /// 0x30, in use faster (0.1076) at 57750 capped 0x28.
 ///
 /// The Vaporizer (0x17 upgraded) queues a red glow at its joint 1 and sheds a red sprite; the Minirocket Tube (0x1b) glows
-/// only on its upgraded rows (`0xff20205f` .. `0xffdfdfdf`), which are not ported.
+/// only on its upgraded rows (the Megarocket Cannon: `0xff20205f` .. `0xffdfdfdf`). The Meteor Gun (0x1d upgraded) pulses
+/// slower and sheds its own sprite.
 ///
 /// The Plasma Coil (0x1c) pulses `0xff202020` .. `0xffefefef`. The Hoverbomb Gun (0x19) pulses `0xff5f5f5f` ..
 /// `0xffdfdfdf` and sheds a sprite at (0.05, −0.45, 0). The Zodiac (0x2b) pulses `0xff9f4f7f` .. `0xffdfdfdf`,
@@ -666,7 +689,9 @@ fn hand_pass(world: &mut MobyWorld, ctx: &mut Ctx) {
 ///
 /// The RYNO II (0x2c) only pulses (`0xffdf6060` .. `0xffdfbfbf`).
 ///
-/// Not ported: the other items' cases (0xe, 0x10, 0x12: their weapons are not ported).
+/// The Sheepinator (0x10) pulses `0xff00bfef` .. `0xff104080` and sheds a sprite at (0.16, −0.41, 0).
+///
+/// Not ported: the other items' cases (0xe, 0x12: their weapons are not ported).
 fn hand_glow(world: &mut MobyWorld, ctx: &mut Ctx, id: usize) {
     let it = &mut ctx.hero.items;
     if ctx.hero.state == 0x61 || world.mobys[id].mode & 1 != 0 || it.item_ticks < 0x17 { return; }
@@ -756,6 +781,13 @@ fn hand_glow(world: &mut MobyWorld, ctx: &mut Ctx, id: usize) {
             world.mobys[id].glow = g;
             sprites.push((size, 0.1, [0.06, -0.509, 0.0], g & cap(c)));
         }
+        // The Meteor Gun (case 0x1d upgraded): slower, a sprite at (−0.07, −0.67, 0), 99750, pull 0.15, its alpha 0x30
+        // uncapped.
+        LAVA => {
+            let g = pulse(&mut it.glow_phase, 0.040_724_356, [0xff00_ffff, 0xff10_4080]);
+            world.mobys[id].glow = g;
+            sprites.push((99_750.0, f32::from_bits(0x3e19_999a), [f32::from_bits(0xbd8f_5c29), f32::from_bits(0xbf2b_851f), 0.0], g & 0x30ff_ffff));
+        }
         // The Seeker Gun (case 0x18): a sprite at (−0.158, −0.194, 0), 98700, pull 0.1, capped 0x30 (in use faster,
         // capped 0x28); its upgrade pulses greys and sheds 109200 at 0.15, its alpha 0x30 uncapped.
         SEEKER if !up => {
@@ -781,11 +813,27 @@ fn hand_glow(world: &mut MobyWorld, ctx: &mut Ctx, id: usize) {
             if let Some(point) = ctx.host.joint(&world.mobys[id], 1) { world.hero_glows.push(crate::fx::HeroGlow { size: 0.14, push: 0.03, point, rgba: 0x7f10_10ff }); }
             sprites.push((42_000.0, 0.0, [f32::from_bits(0x3ecc_49ba), f32::from_bits(0x3d0f_5c29), 0.0], 0x7f10_10ff));
         }
+        // The Sheepinator (case 0x10): a sprite at (0.16, −0.41, 0), 94500, pull 0.1, capped 0x30 (in use faster, capped
+        // 0x28); its upgraded rows slower, `0xff00bfff` .. `0xff104080`, 105000 at 0.15, its alpha 0x30 uncapped.
+        SHEEPINATOR if !up => {
+            let (step, c) = if using { (f32::from_bits(0x3ddc_6c69), 0x28ff_ffffu32) } else { (f32::from_bits(0x3d6e_4bb0), 0x30ff_ffff) };
+            let g = pulse(&mut it.glow_phase, step, [0xff00_bfef, 0xff10_4080]);
+            world.mobys[id].glow = g;
+            sprites.push((94_500.0, 0.1, [f32::from_bits(0x3e23_d70a), f32::from_bits(0xbed1_eb85), 0.0], g & cap(c)));
+        }
+        SHEEPINATOR => {
+            let g = pulse(&mut it.glow_phase, f32::from_bits(0x3d26_ce95), [0xff00_bfff, 0xff10_4080]);
+            world.mobys[id].glow = g;
+            sprites.push((105_000.0, f32::from_bits(0x3e19_999a), [f32::from_bits(0x3e23_d70a), f32::from_bits(0xbed1_eb85), 0.0], g & 0x30ff_ffff));
+        }
         // The RYNO II (case 0x2c): only pulses.
         RYNO => {
             world.mobys[id].glow = pulse(&mut it.glow_phase, f32::from_bits(0x3d03_1007), [0xffdf_6060, 0xffdf_bfbf]);
         }
-        // The Minirocket Tube (case 0x1b): only its upgraded rows glow (not in UPGRADE_ROWS).
+        // The Megarocket Cannon (case 0x1b): only the Minirocket Tube's upgraded rows glow; only pulses.
+        MINIROCKET if up => {
+            world.mobys[id].glow = pulse(&mut it.glow_phase, 0.040_724_356, [0xff20_205f, 0xffdf_dfdf]);
+        }
         _ => return,
     }
     let m = &world.mobys[id];

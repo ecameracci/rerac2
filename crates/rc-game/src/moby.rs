@@ -582,6 +582,8 @@ pub struct MobyWorld {
     pub bouncer: classes::bouncer::Mem,
     /// The Zodiac's arcs (`0x25a8a0`, classes::zodiac).
     pub zodiac: classes::zodiac::Arcs,
+    /// The Sheepinator's globals: its light, loop sound, beam and the flock (classes::sheepinator).
+    pub sheep: classes::sheepinator::Mem,
     /// The camera's rows (`0x1b8f70`: forward, left, up) as the last moby loop saw them, for the particles that read
     /// the view matrix `0x1b8c00` ([`MobyWorld::view_x`]).
     pub cam_rows: [V3; 3],
@@ -593,6 +595,10 @@ pub struct MobyWorld {
     /// The frame's additive full-screen fills (`0x2e8810` under ALPHA 0x48, GS RGBA) the draw callbacks asked for
     /// (crate::fx::callbacks clears them; the engine draws them under the HUD): the Blitz Gun's screen flash.
     pub screen_fills: Vec<u32>,
+    /// The quads the updates send straight to the GS (`0x2eb998` called from an update, not a draw callback: the
+    /// Meteor Gun's scorches, crate::moby::classes::meteor), drawn with the frame's callbacks (crate::fx::callbacks
+    /// takes them).
+    pub update_quads: Vec<crate::fx::FxQuad>,
     /// The frame's blob shadows (`0x1be840`, crate::shadows), asked for by the updates and drawn with crate::fx's quads.
     pub shadows: crate::shadows::Shadows,
     /// The dying mobys' fades and their manager (crate::moby::classes::death_fade).

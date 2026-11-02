@@ -45,7 +45,8 @@
 //!
 //! Not ported: the gravity frames' trackers and bends (`0x37f538` / `0x37f618` / `0x37f5f8`, `0x380e08`), the lock
 //! cheat (`0x18b270`, `0x32b4d0`), the weapon mods' effects on a hit (`0x3f9f70`), the GS test register the draw sets
-//! (`0x37c948`), the 125 records past the pools no code reads (`$gp+0x23f8`), the upgraded Lava Gun (row 0x3f).
+//! (`0x37c948`), the 125 records past the pools no code reads (`$gp+0x23f8`). Its upgrade (rows 0x3f on) is the Meteor Gun,
+//! crate::moby::classes::meteor.
 
 use crate::hero::items::{row, ItemRow, LAVA};
 use crate::hero::physics::{add, cross, dist2, scale, set_len, spring, sub, unit, V3};

@@ -31,6 +31,10 @@
 //! | 0x6e | [`plasma`] (`0x342740`) | (`0x342988`) | the upgraded Mini-Turret's plasma shots' smoke: rising, growing, fading |
 //! | 0x13 | [`line`] (`0x3352c0`) | (`0x3353d8`) | lines (record kind 3) moving with their velocity, fading a step a tick (the Minirocket Tube's muzzle burst) |
 //! | 0x66 | [`ash`] (`0x3412e8`) | (`0x341438`) | ash: dark flakes falling and swaying across the view (the Zodiac's kills) |
+//! | 0x4e | [`swirl`] (`0x33d968`) | (`0x33daf8`) | swirls: twinkles flying their way, circling and closing on a moby they follow (the Sheepinator's beam) |
+//! | 0x16 | [`smoke`] (`0x335a90`) | (`0x331048`) | smoke puffs growing and rising, coloured over the life (R&C1's type 22; the sheep's pop) |
+//! | 0x63 | [`wool`] (`0x340ce8`) | (`0x340e38`) | wool: tufts slowing, falling, swaying, scattered by Ratchet (the sheep's pop) |
+//! | 0x6a, 0x6b, 0x6c | [`meteor`] (`0x341890`, `0x341bc8`, `0x342028`) | (`0x341a18`, `0x341dc0`, `0x342230`) | the Meteor Gun's burst streaks and embers, its burning's smoke |
 //!
 //! Any other type kills itself on its first update. The gravity direction (`0x18a0e0`) is (0, 0, −1): normal gravity.
 //! Not ported: the gravity-boots bend of the positions (`0x380e08`, `+0x1c` = 2).
@@ -40,12 +44,16 @@ pub mod cinder;
 pub mod dust;
 pub mod lava;
 pub mod line;
+pub mod meteor;
 pub mod plasma;
 mod pool;
 pub mod rain;
+pub mod smoke;
+pub mod swirl;
 pub mod type23;
 pub mod type48;
 pub mod water;
+pub mod wool;
 pub use pool::*;
 pub use water::PartAux;
 
@@ -1133,7 +1141,13 @@ pub fn update_parts(sys: &mut Particles, mobys: &crate::moby::MobyWorld, cam: [f
             lava::DROP => lava::update_drop(sys, i),
             line::LINE => line::update(sys, i),
             plasma::PUFF => plasma::update(sys, i, rng),
+            meteor::STREAK => meteor::update_streak(sys, i),
+            meteor::EMBER => meteor::update_ember(sys, i),
+            meteor::SMOKE => meteor::update_smoke(sys, i),
             ash::ASH => ash::update(sys, i, aux.coll, mobys.frame, mobys.view_x()),
+            swirl::SWIRL => swirl::update(sys, i, mobys),
+            smoke::SMOKE => smoke::update(sys, i),
+            wool::WOOL => wool::update(sys, i, rng, (hero, aux.hero_speed), mobys.frame, mobys.view_x()),
             FLARE => update_flare(sys, i),
             rain::DROP => rain::update_drop(sys, i, &aux.rain),
             rain::SPLASH => rain::update_splash(sys, i),

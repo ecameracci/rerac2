@@ -255,6 +255,99 @@ pub fn boss_bar(fraction: f32, icon: i32, out: &mut Vec<Draw>) {
     if 0 < icon { out.push(Draw::Icon { id: 0xeaa7, frame: (icon - 1) as u16, pos: [139.0, 352.0], size: [43.0, 43.0], colour: 0x807f_7f7f }); }
 }
 
+/// The side meter (`0x2fc520(fill, kind, c, c₂)`: its timer `$gp−0x5ca0`, kind `−0x5c9c`, fill `−0x5c98`, colours
+/// `−0x5c94` / `−0x5c90`; the tick `0x2fcb48` and the draw `0x2fc5c8` it registers): a column of cells at the screen's
+/// right edge. Each call steps the timer 2 toward 10 (a new kind takes it while it is out, kind 2 over the others); the
+/// tick (out of the pause, `0x1a8f00` = 0) takes one off, and out it is gone. Its first user: the Sheepinator's drain
+/// (kind 1, crate::moby::classes::sheepinator).
+///
+/// **The draw** (`0x2fc5c8`), faded in by `t = timer / 10`: the frame sprites 0xa6 (`0x442d00` at alpha `0x60·t`) and
+/// 0xa7 (`0xf0c070` at `0x55·t`) at (484, 206); the cells, x 476..488, 32 tall a pixel apart from 285 up, filled up to
+/// `285 − (1 − fill)·157`... read from the top: the meter is full at `fill` 0 and empty at 1. Kind 0 shades its
+/// cells in `c` (and `c₂` in a column one to the left and down, only while `fill` is 0..1); kinds 1 and 2 in `c`, its
+/// alpha × `t`.
+///
+/// Not ported: the hidden-HUD tests (`0x27d7c8` / `0x27d7ec`, but kind 2), the depth word `0x1bd2f0` (0.62 while it
+/// draws), the PAL screen scale `0x1b2684` (1 here).
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct SideMeter {
+    pub timer: i32,
+    pub kind: i32,
+    pub fill: f32,
+    pub colour: [u32; 2],
+}
+
+impl SideMeter {
+    /// `0x2fc520(fill, kind, c, c₂)` (struct docs).
+    pub fn show(&mut self, fill: f32, kind: i32, c: u32, c2: u32) {
+        if self.timer == 0 || (self.kind != 2 && kind == 2) { self.kind = kind; }
+        if kind == self.kind {
+            self.fill = fill;
+            self.colour = [c, c2];
+            self.timer += (10 - self.timer).clamp(-2, 2);
+        }
+    }
+
+    /// `0x2fcb48`: out of the pause, one off the timer (its end takes the meter away).
+    pub fn tick(&mut self, paused: bool) {
+        if !paused && 0 < self.timer { self.timer -= 1; }
+    }
+
+    /// `0x2fc5c8` (struct docs).
+    pub fn draw(&self, out: &mut Vec<Draw>) {
+        if self.timer <= 0 { return; }
+        let t = self.timer as f32 * 0.1;
+        out.push(Draw::Sprite { id: 0xa6, pos: [484.0, 206.0], scale: [1.0, 1.0], frame: 0.0, colour: lerp_rgba(t, 0x44_2d00, 0x6044_2d00) });
+        out.push(Draw::Sprite { id: 0xa7, pos: [484.0, 206.0], scale: [1.0, 1.0], frame: 0.0, colour: lerp_rgba(t, 0xf0_c070, 0x55f0_c070) });
+        let fill = self.fill;
+        let top = (0x11d - ((1.0 - fill) * 157.0) as i32) as f32;
+        let cell = (128.0f32 + 0.5) as i32 as f32 * 0.25;
+        let mut rect = |y0: f32, y1: i32, x0: f32, x1: f32, c: u32| {
+            out.push(Draw::Bar { pos: [x0, y0], size: [x1 - x0, y1 as f32 - y0], colours: [c, c] });
+        };
+        let (bottom, mut cut) = ((285.0f32 + 0.5) as i32 as f32, 0.0f32);
+        if self.kind == 0 {
+            if !(0.0..=1.0).contains(&fill) { return; }
+            let c = lerp_rgba(t, self.colour[0] & 0xff_ffff, self.colour[0]);
+            let c2 = lerp_rgba(t, self.colour[1] & 0xff_ffff, self.colour[1]);
+            let mut b = bottom;
+            cut = b - cell + 1.0;
+            for _ in 0..5 {
+                let y0 = if cut <= top { top } else { cut };
+                let y1 = b as i32;
+                b -= cell;
+                cut = y0 - cell;
+                rect(y0, y1, 477.0, 489.0, c);
+                if b <= top { break; }
+            }
+            let mut b = (128.0f32 + 0.5) as i32 as f32;
+            cut = b + cell - 1.0;
+            for _ in 0..5 {
+                let y1 = if top <= cut { top } else { cut };
+                let y0 = b;
+                b += cell;
+                cut = y1 + cell;
+                rect(y0, y1 as i32, 476.0, 488.0, c2);
+                if top <= b { break; }
+            }
+            return;
+        }
+        if !(0..3).contains(&self.kind) { return; }
+        let c = lerp_rgba(t, self.colour[0] & 0xff_ffff, self.colour[0]);
+        let top = (top + 0.5) as i32 as f32;
+        let mut b = bottom;
+        cut += b - cell + 1.0;
+        for _ in 0..5 {
+            let y0 = if cut <= top { top } else { cut };
+            let y1 = b as i32;
+            b -= cell;
+            cut = y0 - cell;
+            rect(y0, y1, 476.0, 488.0, c);
+            if b <= top { break; }
+        }
+    }
+}
+
 /// Where a [`Draw::Text`]'s `pos` is on the line.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Align {
