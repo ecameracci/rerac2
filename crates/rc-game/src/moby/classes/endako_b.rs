@@ -25,8 +25,7 @@
 //! * The robots **0x093c / 0x0940** (`0x3c31f8`, 49 functions: they walk the network of **0x0f2d** (`0x41b0b0`, built
 //!   by `0x32b318` from its list of paths) and raise 0x0e87 and stand on 0x097a): too large for this pass. The boss
 //!   **0x0c8a** (`0x3f5c78`) is crate::moby::classes::endako_boss.
-//! * **0x0cfc / 0x094c** (`0x3c9430`: Ghidra has no function there), **0x0f16** (`0x41af70`: the colour flash of scene 7's actor
-//!   `0x1bd810` and a pose word of scene 5's `0x1bd814`, the scene actors the port does not hand to classes).
+//! * **0x0cfc / 0x094c** (`0x3c9430`: Ghidra has no function there).
 
 use crate::hero::physics::{add, add_rot, dist, dist2, len, len2, scale, sub, turn_ease, ease, ease_speed, V3};
 use crate::moby::{countdown, Ctx, Moby, MobyWorld};
@@ -772,4 +771,44 @@ pub fn draw_097b(w: &MobyWorld, id: usize, cam: V3, out: &mut Vec<crate::fx::FxQ
         st: [[1.0 + s, 0.0], [1.0 + s, 1.0], [s, 0.0], [s, 1.0]],
         rgba: [0x7080_4030, 0x7080_4030, 0x0080_0000, 0x0080_0000],
     });
+}
+
+/// 0x0f16 (`0x41af70`, one placed): the flash of a scene's actor. **0**: at any distance, 1. **1**, a scene playing
+/// (`gp−0x60f0` = 2): in scene 5's first 10 ticks its actor 2 (`0x1bd814`, L00 `0x1bcbd4`) shows the pieces 0x3f
+/// (`+0x7c`); in scene 7 its actor 1 (`0x1bd810`) flashes from tick 0x427 to 0x470 — black three ticks in four, else
+/// `(0xb0, 0xb0, 0xf0)` (`0x314718`, its ambient) — its own ambient kept before (`+0x68`[1], `0x325468`) and put back
+/// after (`0x3254b0`).
+pub fn update_0f16(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    if w.mobys[id].state == 0 {
+        let m = &mut w.mobys[id];
+        m.state = 1;
+        m.update_dist = 0xff;
+        return;
+    }
+    if w.mobys[id].state != 1 || ctx.game.scenes.mode != crate::scene::SCENE { return; }
+    let Some(p) = ctx.game.scenes.player.as_ref() else { return };
+    let (scene, tick) = (p.id, p.tick);
+    let n = w.mobys.len();
+    let (a1, a2) = (p.actors.get(1).map(|a| a.0).filter(|&a| a < n), p.actors.get(2).map(|a| a.0).filter(|&a| a < n));
+    let actor = |k: usize| if k == 1 { a1 } else { a2 };
+    if scene == 5 && tick < 10 {
+        if let Some(a) = actor(2) {
+            let m = &mut w.mobys[a];
+            m.piece = None;
+            m.bangles = 0x3f;
+        }
+    }
+    if scene != 7 { return; }
+    let Some(a) = actor(1) else { return };
+    if (0x427..=0x470).contains(&tick) {
+        let n = w.mobys[id].pv_i(0) + 1;
+        w.mobys[id].set_pv_i(0, n);
+        w.mobys[a].ambient = if n % 4 < 3 { [0; 3] } else { [0xb0, 0xb0, 0xf0] };
+    } else if tick < 0x44c {
+        let c = w.mobys[a].ambient;
+        w.mobys[id].set_pv_i(4, (c[2] as i32) << 16 | (c[1] as i32) << 8 | c[0] as i32 | i32::MIN);
+    } else {
+        let c = w.mobys[id].pv_i(4) as u32;
+        w.mobys[a].ambient = [c as u8, (c >> 8) as u8, (c >> 16) as u8];
+    }
 }
