@@ -93,12 +93,16 @@ pub fn smoke_burst(w: &mut MobyWorld, ctx: &mut Ctx, size: f32, light: f32, src:
 }
 
 /// `0x3f8348` → `0x3f8a70`: a blast at `at` (crate docs).
-pub fn burst(w: &mut MobyWorld, ctx: &mut Ctx, at: V3, b: &Blast) {
+pub fn burst(w: &mut MobyWorld, ctx: &mut Ctx, at: V3, b: &Blast) { burst_shaking(w, ctx, at, b, 0x28) }
+
+/// [`burst`] with the shake lasting `shake_ticks`: the RYNO II's copy of the blast (L00 `0x415520` → `0x415a40`, its
+/// moby class 0x139c, crate::moby::classes::ryno) is the same but for its shake's 20 ticks (and no `k`).
+pub fn burst_shaking(w: &mut MobyWorld, ctx: &mut Ctx, at: V3, b: &Blast, shake_ticks: i32) {
     let cam = ctx.host.camera_pos();
     let s = b.size;
     // `0x3f8348`: in view (`0x2f0080(128, (at, 3·s))`) within 48 of the camera (`0x2ef018`), the shake when asked.
     if b.shake && !ctx.view.is_some_and(|v| v.culled(128.0, [at[0], at[1], at[2], s * 3.0])) && dist(at, cam) < 48.0 {
-        ctx.game.shakes.ask(0, 0.075, 0x28);
+        ctx.game.shakes.ask(0, 0.075, shake_ticks);
     }
     let yaw = atan2(cam[0] - at[0], cam[1] - at[1]);
     // The 0x13a0 moby's rows (`0x3f8348`): toward the camera, then across and up.

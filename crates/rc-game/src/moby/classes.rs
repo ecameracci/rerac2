@@ -59,6 +59,7 @@ pub mod maktar;
 pub mod maktar_hints;
 pub mod maktar_pads;
 pub mod minirocket;
+pub mod ryno;
 pub mod plasma_coil;
 pub mod swamp_monster;
 pub mod tractor;
@@ -139,6 +140,9 @@ pub fn update_for(o_class: i16) -> Option<UpdateFn> {
         seeker::MISSILE => Some(seeker::update_missile),
         minirocket::HAND_CLASS => Some(minirocket::update),
         minirocket::ROCKET => Some(minirocket::update_rocket),
+        // The RYNO II (`0x3c9ed8`) and its missile (`0x40b9b0`).
+        ryno::HAND_CLASS => Some(ryno::update),
+        ryno::MISSILE => Some(ryno::update_missile),
         // The Zodiac (`0x40a358`) and its lightning (`0x4185a8`).
         zodiac::HAND_CLASS => Some(zodiac::update),
         zodiac::EFFECT => Some(zodiac::update_effect),

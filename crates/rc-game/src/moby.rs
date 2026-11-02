@@ -564,6 +564,8 @@ pub struct MobyWorld {
     pub pulse: classes::pulse_rifle::Mem,
     /// The Minirocket Tube's rockets' trail slots (classes::minirocket).
     pub rockets: classes::minirocket::Trails,
+    /// The RYNO II's missiles' trail slots (classes::ryno).
+    pub ryno: classes::ryno::Trails,
     /// The Vaporizer's records in the trail slots' memory, its beams' next and its trails' scroll (classes::vaporizer).
     pub vapor: classes::vaporizer::Mem,
     /// The Mini-Turret Glove's turrets' table and shots (classes::turret).

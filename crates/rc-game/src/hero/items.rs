@@ -82,6 +82,9 @@ pub const SHIELD: i32 = 0x2d;
 /// The Zodiac: item 0x2b, class 0xec8 (L00 row `0x264aa0`; crate::moby::classes::zodiac).
 pub const ZODIAC: i32 = crate::moby::classes::zodiac::ITEM;
 pub const ZODIAC_CLASS: i16 = crate::moby::classes::zodiac::HAND_CLASS;
+/// The RYNO II: item 0x2c, class 0xa67 (L00 row `0x264b80`; crate::moby::classes::ryno).
+pub const RYNO: i32 = crate::moby::classes::ryno::ITEM;
+pub const RYNO_CLASS: i16 = crate::moby::classes::ryno::HAND_CLASS;
 
 /// An item record (`0x262500 + 0xe0·row`, row `0x139568[item]`: crate::upgrades): the fields the port reads.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -114,8 +117,8 @@ pub struct ItemRow {
 /// Electrolyzer's and the Spiderbot Glove's from L02's; the Swingshot's from L03's; the Chopper's L00 `0x263840`; the
 /// Blitz Gun's L00 `0x263bc0`; the Pulse Rifle's L00 `0x263920`; the Mini-Turret Glove's L00 `0x2648e0`; the
 /// Synthenoids' L00 `0x264020`; the Lava Gun's L00 `0x263e60`; the Seeker Gun's L00 `0x263a00`; the Bouncer's L00 `0x264560`;
-/// the Minirocket Tube's L00 `0x263ca0`; the Plasma Coil's L00 `0x263d80`; the Hoverbomb Gun's L00 `0x263ae0`; the Shield Charger's L00 `0x264c60`; the Zodiac's L00 `0x264aa0`).
-pub const ROWS: [ItemRow; 21] = [
+/// the Minirocket Tube's L00 `0x263ca0`; the Plasma Coil's L00 `0x263d80`; the Hoverbomb Gun's L00 `0x263ae0`; the Shield Charger's L00 `0x264c60`; the Zodiac's L00 `0x264aa0`; the RYNO II's L00 `0x264b80`).
+pub const ROWS: [ItemRow; 22] = [
     ItemRow { item: WRENCH, attach: 0, class: WRENCH_CLASS, stance: 0, icon: 0, use_seq: 0, keep: false, fire_seq: [0, 0], speed: 0.0, rate: 0.0, damage: 1.0, ammo: false, max_ammo: 0, start_ammo: 0 },
     ItemRow { item: LANCER, attach: 0, class: LANCER_CLASS, stance: 1, icon: 0xea64, use_seq: 0x38, keep: true, fire_seq: [-1, 0x3e], speed: 60.0, rate: 7.0, damage: 0.5, ammo: true, max_ammo: 200, start_ammo: 200 },
     ItemRow { item: DYNAMO, attach: 1, class: DYNAMO_CLASS, stance: 1, icon: 0xea7f, use_seq: 0x8d, keep: false, fire_seq: [0x8e, 0x8d], speed: 0.0, rate: 0.0, damage: 0.0, ammo: false, max_ammo: 0, start_ammo: 0 },
@@ -137,6 +140,7 @@ pub const ROWS: [ItemRow; 21] = [
     ItemRow { item: HOVERBOMB, attach: 0, class: HOVERBOMB_CLASS, stance: 2, icon: 0xea72, use_seq: 0x89, keep: false, fire_seq: [-1, -1], speed: 7.0, rate: 3.0, damage: 30.0, ammo: true, max_ammo: 10, start_ammo: 10 },
     ItemRow { item: SHIELD, attach: 0, class: crate::moby::classes::shield::CLASS, stance: 1, icon: 0xea74, use_seq: 0x38, keep: true, fire_seq: [0x39, 0x3e], speed: 0.0, rate: 0.0, damage: 1.0, ammo: true, max_ammo: 5, start_ammo: 5 },
     ItemRow { item: ZODIAC, attach: 0, class: ZODIAC_CLASS, stance: 1, icon: 0xea76, use_seq: 0x94, keep: false, fire_seq: [-1, 0x3e], speed: 0.0, rate: 0.25, damage: 100.0, ammo: true, max_ammo: 4, start_ammo: 4 },
+    ItemRow { item: RYNO, attach: 0, class: RYNO_CLASS, stance: 2, icon: 0xea6c, use_seq: 0x36, keep: false, fire_seq: [-1, 0x46], speed: 0.0, rate: 6.5, damage: 100.0, ammo: true, max_ammo: 100, start_ammo: 100 },
 ];
 
 /// The upgraded rows the port has (L00 `0x262500 + 0xe0·row`; their item in brackets): the Heavy Lancer 0x3c and the
@@ -660,7 +664,9 @@ fn hand_pass(world: &mut MobyWorld, ctx: &mut Ctx) {
 /// `0xffdfdfdf` and sheds a sprite at (0.05, −0.45, 0). The Zodiac (0x2b) pulses `0xff9f4f7f` .. `0xffdfdfdf`,
 /// sheds a sprite and queues a red glow at its joint 0.
 ///
-/// Not ported: the other items' cases (0xe, 0x10, 0x12, 0x2c: their weapons are not ported).
+/// The RYNO II (0x2c) only pulses (`0xffdf6060` .. `0xffdfbfbf`).
+///
+/// Not ported: the other items' cases (0xe, 0x10, 0x12: their weapons are not ported).
 fn hand_glow(world: &mut MobyWorld, ctx: &mut Ctx, id: usize) {
     let it = &mut ctx.hero.items;
     if ctx.hero.state == 0x61 || world.mobys[id].mode & 1 != 0 || it.item_ticks < 0x17 { return; }
@@ -774,6 +780,10 @@ fn hand_glow(world: &mut MobyWorld, ctx: &mut Ctx, id: usize) {
         PULSE => {
             if let Some(point) = ctx.host.joint(&world.mobys[id], 1) { world.hero_glows.push(crate::fx::HeroGlow { size: 0.14, push: 0.03, point, rgba: 0x7f10_10ff }); }
             sprites.push((42_000.0, 0.0, [f32::from_bits(0x3ecc_49ba), f32::from_bits(0x3d0f_5c29), 0.0], 0x7f10_10ff));
+        }
+        // The RYNO II (case 0x2c): only pulses.
+        RYNO => {
+            world.mobys[id].glow = pulse(&mut it.glow_phase, f32::from_bits(0x3d03_1007), [0xffdf_6060, 0xffdf_bfbf]);
         }
         // The Minirocket Tube (case 0x1b): only its upgraded rows glow (not in UPGRADE_ROWS).
         _ => return,

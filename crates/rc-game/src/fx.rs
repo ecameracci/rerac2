@@ -19,6 +19,7 @@
 //! | `0x3d4320` / `0x3fe250` | the upgraded Blitz Gun 0x0af1 after a shot / its tracer 0x0d9c | its arcs, ring and glare ([`crate::moby::classes::blitz_mega::draw`]); the beam |
 //! | `0x3a9a48` | the Pulse Rifle's shot 0x05d6 with smoke or a beam | its slot's smoke and beams ([`crate::moby::classes::pulse_rifle::draw`]) |
 //! | `0x3ae138` | the Minirocket Tube's rocket 0x05da from its fourth tick | its exhaust's glow and streak ([`crate::moby::classes::minirocket::draw`]) |
+//! | `0x40c830` | the RYNO II's missile 0x0ed7 from its fourth tick | its exhaust's glow and streak ([`crate::moby::classes::ryno::draw`]) |
 //! | `0x40a980` / `0x418c00` | the Zodiac in the hand 0x0ec8 summoning / its lightning 0x139e | the white-out's fills; the arcs and their ends' glows ([`crate::moby::classes::zodiac::draw_flash`], [`crate::moby::classes::zodiac::draw_effect`]) |
 //! | `0x3f6b90` | the Vaporizer's shot 0x0cf7 with a trail, a beam or smoke | its trail, its slot's beams and puffs ([`crate::moby::classes::vaporizer::draw`]) |
 //! | `0x3eecd0` | the Synthenoids' shot 0x0cbb | its streaks ([`crate::moby::classes::synthenoid::draw`]) |
@@ -349,6 +350,7 @@ fn one(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut crate::ga
         crate::moby::classes::beam::CLASS => crate::moby::classes::beam::draw(w, id, cam, out),
         crate::moby::classes::pulse_rifle::SHOT => crate::moby::classes::pulse_rifle::draw(w, id, hero_state, cam, out),
         crate::moby::classes::minirocket::ROCKET => crate::moby::classes::minirocket::draw(w, id, &mut game.rng, cam, out),
+        crate::moby::classes::ryno::MISSILE => crate::moby::classes::ryno::draw(w, id, &mut game.rng, cam, out),
         crate::moby::classes::zodiac::HAND_CLASS => crate::moby::classes::zodiac::draw_flash(w, id),
         crate::moby::classes::zodiac::EFFECT => crate::moby::classes::zodiac::draw_effect(w, id, &mut game.rng, cam, out),
         crate::moby::classes::vaporizer::SHOT => crate::moby::classes::vaporizer::draw(w, id, hero_state, cam, out),
