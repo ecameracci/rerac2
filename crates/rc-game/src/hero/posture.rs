@@ -22,7 +22,7 @@
 //! the items 0x1b / 0x2c; record 8 (his other arm) takes the same with both hands (stance 2); `0x18c30c` says so
 //! (the standing use then keeps his sequence: crate::hero::items).
 //!
-//! Not ported: the wall test's hold-off `0x18a042` (no writer found), the teeter at an edge (the ahead probe's edge test), the lean on gravity frames and magnetic walkways
+//! Not ported: the wall test's hold-off `0x18a042` (no writer found), the lean on gravity frames and magnetic walkways
 //! (`0x2b7820`), the dust at the feet, the records of Clank on the back and of Clank's body (kinds 1..5).
 
 use super::physics::*;
@@ -390,7 +390,8 @@ impl Hero {
 
     /// `0x2ab498`: the scaled joint; and, 20 ticks after the last strafe, idle in the sequences 0..2 or 0x3a, the head
     /// looks somewhere new every 90..280 ticks (−25°..9° down, 20°..57° or 50°..70° near a wall to a random side; a
-    /// fidget's look within 20° and 15°) with a random spring, the chest following at half.
+    /// fidget's look within 20° and 15°) with a random spring, the chest following at half; at a drop ahead (in any
+    /// state) he looks down at it instead.
     fn head_idle(&mut self, env: &Env, anim: &mut dyn AnimCtl) {
         // Clank's head scale on his record 18 with his big-head cheat (crate::hero::back).
         self.back_head_scale(env.cheat(crate::cheats::cheat::CLANK_HEAD));
@@ -408,6 +409,16 @@ impl Hero {
             p.recs[rec::CHEST].set_spring(0.03, 0.2);
             p.look_timer = self.rng.rand_range(0x5a, 0x78);
             self.fidget_gap = self.rng.rand_range(0x5a, 0x78) as i16;
+            return;
+        }
+        // A drop ahead (crate::hero::wall::EdgeAhead) more than 1.4 deep, nothing within 1 ahead: he looks down at it,
+        // by 1.5° a unit of depth from 11°, at most 27° and (1 − room) · 35°, the chest with 0.7 of it.
+        if self.edge.found && 1.4 < self.edge.depth && 1.0 < self.ahead.dist {
+            let r = &mut p.recs;
+            r[rec::HEAD].set_spring(0.015, 0.3);
+            r[rec::HEAD].target[1] = (self.edge.depth * 0.026_179_94 + 0.191_986_23).min(0.471_238_94).min((1.0 - self.edge.room) * 0.610_865_3);
+            r[rec::CHEST].set_spring(0.008, 0.3);
+            r[rec::CHEST].target[1] = r[rec::HEAD].target[1] * 0.7;
             return;
         }
         let seq = anim.view().seq_b;
@@ -429,7 +440,7 @@ impl Hero {
         r[rec::HEAD].set_spring(k, d);
         r[rec::HEAD].target[1] = p.look[0];
         r[rec::HEAD].target[2] = p.look[1];
-        r[rec::CHEST].set_spring(0.002, 0.3);
+        r[rec::CHEST].set_spring(0.008, 0.3);
         r[rec::CHEST].target[2] = r[rec::HEAD].target[2] * 0.52;
         r[rec::CHEST].target[1] = r[rec::HEAD].target[1] * 0.55;
     }

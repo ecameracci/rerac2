@@ -11,8 +11,7 @@
 //! one, the wall's normal and yaw are kept. A wall of surface 0xf allows wall jumps in a row; any other only one
 //! (`0x18c2fb` counts them).
 //!
-//! Not ported: the moby walls' "gives way" flag (`+0x3c` & 0x20), the strafe camera mode (`0x18c0e3`), the ahead
-//! probe's edge test (`0x18a0b0`, for the teeter `0x2ab498`).
+//! Not ported: the moby walls' "gives way" flag (`+0x3c` & 0x20) and the strafe camera mode (`0x18c0e3`).
 
 use super::physics::*;
 use super::Hero;
@@ -50,6 +49,15 @@ impl Default for AheadBlock {
     fn default() -> Self { AheadBlock { dist: 4.0, slope: 0.0, moby: false, solid: false } }
 }
 
+/// The ahead probe's edge test (every fifth frame, on the ground): `0x18a0b0` a drop ahead, `0x18a0a8` its depth from
+/// 1 up (20: no floor within 21), `0x18a0ac` the radius plus where the free spot starts past 1.1 (at least 0).
+#[derive(Clone, Copy, Debug, Default)]
+pub struct EdgeAhead {
+    pub found: bool,
+    pub depth: f32,
+    pub room: f32,
+}
+
 impl Hero {
     /// `0x2d39d8(d, 0, z, out, 1)`: the point `d` ahead along the facing, `z` up the body, from the feet.
     pub fn local_point(&self, x: f32, y: f32, z: f32) -> V3 {
@@ -69,18 +77,40 @@ impl Hero {
         env.line(a, b, 2).map(|o| { let k = dist(a, o.point); (o, k) })
     }
 
-    /// `0x2c3068`'s wall half (every third frame).
+    /// `0x2c3068`: the wall straight ahead (every third frame) and the edge ahead (every fifth).
     pub fn ahead_probe(&mut self, env: &Env) {
-        if self.frame % 3 != 0 { return; }
-        self.ahead = AheadBlock::default();
-        if let Some((o, d)) = self.ahead_line(env, 0.7, 4.0) {
-            self.ahead.dist = d;
-            self.ahead.slope = slope_of(o.normal);
-            if o.moby.is_some() {
-                self.ahead.moby = true;
-                self.ahead.solid = true;
+        if self.frame % 3 == 0 {
+            self.ahead = AheadBlock::default();
+            if let Some((o, d)) = self.ahead_line(env, 0.7, 4.0) {
+                self.ahead.dist = d;
+                self.ahead.slope = slope_of(o.normal);
+                if o.moby.is_some() {
+                    self.ahead.moby = true;
+                    self.ahead.solid = true;
+                }
             }
         }
+        if self.frame % 5 == 0 { self.edge_probe(env); }
+    }
+
+    /// `0x2c3068`'s edge half: on the ground, a line 1.1 ahead from 1 up to 20 down (not below 0.5) that finds no
+    /// floor, or one more than 3 below its start, is a drop; a sphere of his radius at the feet then steps from 0.7
+    /// to 1.5 ahead by 0.1 to the first spot clear of the world (none: no edge).
+    fn edge_probe(&mut self, env: &Env) {
+        self.edge = EdgeAhead::default();
+        if self.grounded_ticks == 0 { return; }
+        let a = self.local_point(1.1, 0.0, 1.0);
+        let mut b = self.local_point(1.1, 0.0, -20.0);
+        if b[2] < 0.5 { b[2] = 0.5; }
+        let hit = env.line(a, b, 2);
+        let depth = hit.map_or(20.0, |o| dist(a, o.point));
+        if hit.is_some() && depth <= 3.0 { return; }
+        let mut off = -0.4f32;
+        while env.sphere(self.local_point(off + 1.1, 0.0, 0.0), self.cap_radius, 2).is_some() {
+            off += 0.1;
+            if 0.5 <= off { return; }
+        }
+        self.edge = EdgeAhead { found: true, depth, room: (self.cap_radius + off).max(0.0) };
     }
 
     /// `0x2ac5f0`: arms the wall jump (module docs).
