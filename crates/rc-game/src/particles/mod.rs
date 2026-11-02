@@ -30,10 +30,12 @@
 //! | 0x19, 0x6d | [`lava`] (`0x336148`, `0x3424d0`) | (`0x3362d0`, `0x3425e8`) | the Lava Gun's sparks (falling, cooling, stopping on the world) and drops (sinking, then rising as smoke) |
 //! | 0x6e | [`plasma`] (`0x342740`) | (`0x342988`) | the upgraded Mini-Turret's plasma shots' smoke: rising, growing, fading |
 //! | 0x13 | [`line`] (`0x3352c0`) | (`0x3353d8`) | lines (record kind 3) moving with their velocity, fading a step a tick (the Minirocket Tube's muzzle burst) |
+//! | 0x66 | [`ash`] (`0x3412e8`) | (`0x341438`) | ash: dark flakes falling and swaying across the view (the Zodiac's kills) |
 //!
 //! Any other type kills itself on its first update. The gravity direction (`0x18a0e0`) is (0, 0, −1): normal gravity.
 //! Not ported: the gravity-boots bend of the positions (`0x380e08`, `+0x1c` = 2).
 
+pub mod ash;
 pub mod cinder;
 pub mod dust;
 pub mod lava;
@@ -390,7 +392,7 @@ pub const EXHAUST: u8 = 0x4a;
 
 /// The exhaust puffs' descriptors (L25 `$gp+0xba8`, `+0xbb8`, `+0xbc8` the fighter's, `+0xc10`, `+0xc20`, `+0xc30` the
 /// gunship's; read live): the colour at the start and at the end, the size's range and least (in thousandths), the life.
-pub const EXHAUST_DESCS: [(u32, u32, i16, i16, i32); 11] = [
+pub const EXHAUST_DESCS: [(u32, u32, i16, i16, i32); 15] = [
     (0xcf00_00ff, 0x0000_00cf, -20, 60, 10),
     (0x6000_ffff, 0x0000_0080, -20, 60, 12),
     (0xefff_7f4f, 0x00ff_0000, -40, 40, 8),
@@ -404,7 +406,14 @@ pub const EXHAUST_DESCS: [(u32, u32, i16, i16, i32); 11] = [
     (0xcf00_00ff, 0x0000_00cf, -10, 20, 11),
     (0x6000_ffff, 0x0000_0080, -10, 30, 12),
     (0xefff_7f4f, 0x00ff_0000, -12, 12, 7),
+    // The Zodiac's lightning 0x139e (L00 `$gp+0x23c8`, `+0x23a8`, `+0x23b8`, `+0x23d8`; crate::moby::classes::zodiac).
+    (0xddff_ffaa, 0x22ff_0000, -200, 200, 30),
+    (0x88ff_8020, 0x00cf_6000, -400, 600, 15),
+    (0x66ff_ff00, 0x0080_0000, -300, 550, 16),
+    (0x6000_0000, 0x0000_0000, 300, 500, 25),
 ];
+/// The Zodiac's first descriptor in [`EXHAUST_DESCS`].
+pub const ZODIAC_DESC: usize = 11;
 
 /// `0x349c48(moby, pos, vel, desc, 1)` (L00 `0x33d400`, the same code on every level): an exhaust puff (type 0x4a) at
 /// `pos`, riding `moby` (its place kept in the moby's frame, `+0x30`), moving `vel` a tick in that frame; the descriptor
@@ -1124,6 +1133,7 @@ pub fn update_parts(sys: &mut Particles, mobys: &crate::moby::MobyWorld, cam: [f
             lava::DROP => lava::update_drop(sys, i),
             line::LINE => line::update(sys, i),
             plasma::PUFF => plasma::update(sys, i, rng),
+            ash::ASH => ash::update(sys, i, aux.coll, mobys.frame, mobys.view_x()),
             FLARE => update_flare(sys, i),
             rain::DROP => rain::update_drop(sys, i, &aux.rain),
             rain::SPLASH => rain::update_splash(sys, i),

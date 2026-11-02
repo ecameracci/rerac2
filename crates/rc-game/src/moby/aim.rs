@@ -45,20 +45,27 @@ pub fn aim_point(w: &MobyWorld, m: usize) -> V3 {
 }
 
 /// `0x3257a0(cone, from, dir, ..)`: the moby picked, if any.
-pub fn search(w: &MobyWorld, ctx: &Ctx, cone: Cone, from: V3, dir: V3, crates: bool) -> Option<usize> { scan(w, ctx, cone, from, dir, crates, &EXCLUDED, None) }
+pub fn search(w: &MobyWorld, ctx: &Ctx, cone: Cone, from: V3, dir: V3, crates: bool) -> Option<usize> { scan(w, ctx, cone, from, dir, crates, &[], &EXCLUDED, None) }
 
 /// `0x3257a0` with a list (`&count, list, max`) and no excluded classes (its `param_13` null): every candidate that
 /// beat the best so far, in the target list's order (at most `max`), the best then swapped to the front.
 pub fn search_list(w: &MobyWorld, ctx: &Ctx, cone: Cone, from: V3, dir: V3, crates: bool, max: usize) -> Vec<usize> {
+    search_list_except(w, ctx, cone, from, dir, crates, max, &[], &[])
+}
+
+/// [`search_list`] leaving out the mobys `mobys` (`param_11`, a list ending at 0) and the classes `classes`
+/// (`param_13`, ending at −1): the Plasma Coil's ball's arcs (crate::moby::classes::plasma_coil).
+#[allow(clippy::too_many_arguments)]
+pub fn search_list_except(w: &MobyWorld, ctx: &Ctx, cone: Cone, from: V3, dir: V3, crates: bool, max: usize, mobys: &[usize], classes: &[i16]) -> Vec<usize> {
     let mut list = Vec::new();
-    if let Some(b) = scan(w, ctx, cone, from, dir, crates, &[], Some((&mut list, max))) {
+    if let Some(b) = scan(w, ctx, cone, from, dir, crates, mobys, classes, Some((&mut list, max))) {
         if let Some(i) = list.iter().position(|&t| t == b) { list.swap(0, i); } else if let Some(f) = list.first_mut() { *f = b; }
     }
     list
 }
 
 #[allow(clippy::too_many_arguments)]
-fn scan(w: &MobyWorld, ctx: &Ctx, cone: Cone, from: V3, dir: V3, crates: bool, excluded: &[i16], mut list: Option<(&mut Vec<usize>, usize)>) -> Option<usize> {
+fn scan(w: &MobyWorld, ctx: &Ctx, cone: Cone, from: V3, dir: V3, crates: bool, except: &[usize], excluded: &[i16], mut list: Option<(&mut Vec<usize>, usize)>) -> Option<usize> {
     let mut best: Option<(f32, usize)> = None;
     let dir_yaw = atan2(dir[0], dir[1]);
     let dir_pitch = atan2(len2(dir), dir[2]);
@@ -71,7 +78,7 @@ fn scan(w: &MobyWorld, ctx: &Ctx, cone: Cone, from: V3, dir: V3, crates: bool, e
         let Some((hp, _)) = health(w, id) else { continue };
         if !(0.0 < hp || crate_) { continue; }
         if !(t.kind == 5 || crate_) { continue; }
-        if excluded.contains(&m.o_class) { continue; }
+        if except.contains(&id) || excluded.contains(&m.o_class) { continue; }
         let p = aim_point(w, id);
         let d = sub(p, from);
         let dist = len(d);

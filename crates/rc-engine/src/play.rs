@@ -466,9 +466,11 @@ fn tick(
                 }
             }
             // The last is the held item before the first hand is made (`0x2afc68` makes `0x1a7398`'s), so Ratchet
-            // starts with it and not with the save's item swapped out a few ticks later.
+            // starts with it and not with the save's item swapped out a few ticks later. The items never held (the
+            // Synthenoids, the Shield Charger) are only asked for: the first item change uses them.
             if let Some(&last) = items.last() {
-                if last != rc_game::hero::items::WRENCH && rc_game::hero::items::row(&p.game, last).is_some() {
+                use rc_game::hero::items::{SHIELD, SYNTHENOID};
+                if last != rc_game::hero::items::WRENCH && !matches!(last, SYNTHENOID | SHIELD) && rc_game::hero::items::row(&p.game, last).is_some() {
                     p.game.held = last;
                     p.game.wrench_out = false;
                 }
@@ -2361,11 +2363,11 @@ fn draw_hud(
             Err(e) => eprintln!("play: no HUD icons ({e:#})"),
         }
         // The markers' FX textures (the Lancer's reticle, the Pulse Rifle's and the Seeker Gun's crosshair 0x27, the Pulse Rifle's lock 0x20, the Blitz Guns'
-        // crosshair 0x21), the space
+        // crosshair 0x21, the Hoverbomb Gun's crosshair 0x1f), the space
         // fights' HUD's (rc_game::ship), font 3 (FX texture 3: the arena's counters,
         // rc_game::moby::classes::arena::draw_hud) and the arena wipe's edge.
         let mut fx = std::collections::HashMap::new();
-        for id in [0x26u16, 0x20, 0x21, 0x27, rc_game::moby::classes::arena::FONT_3, rc_game::moby::classes::arena::WIPE_FX].into_iter().chain(rc_game::ship::HUD_FX) {
+        for id in [0x26u16, 0x20, 0x21, 0x27, 0x1f, rc_game::moby::classes::arena::FONT_3, rc_game::moby::classes::arena::WIPE_FX].into_iter().chain(rc_game::ship::HUD_FX) {
             if let Some(t) = level.0.particles.textures.as_ref().and_then(|t| t.fx_textures.get(id as usize)).and_then(Option::as_ref) {
                 fx.insert(id, (textures.len(), [t.width as f32, t.height as f32]));
                 // The HUD's atlas holds the GS's bytes (0x80 = 1.0); the FX textures' alpha is decoded to 0..0xff (their

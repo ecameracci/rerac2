@@ -28,6 +28,7 @@ pub mod flash;
 pub mod flock;
 pub mod gate;
 pub mod gravity_bomb;
+pub mod hoverbomb;
 pub mod keeper;
 pub mod lancer;
 pub mod lava_gun;
@@ -43,6 +44,7 @@ pub mod death_fade;
 pub mod props;
 pub mod space;
 pub mod spitter;
+pub mod shield;
 pub mod shot;
 pub mod smash;
 pub mod spawn_point;
@@ -57,6 +59,7 @@ pub mod maktar;
 pub mod maktar_hints;
 pub mod maktar_pads;
 pub mod minirocket;
+pub mod plasma_coil;
 pub mod swamp_monster;
 pub mod tractor;
 pub mod vaporizer;
@@ -64,6 +67,7 @@ pub mod turret;
 pub mod vendor;
 pub mod weather;
 pub mod wrench;
+pub mod zodiac;
 pub mod endako_a;
 pub mod endako_a_enemies;
 pub mod endako_b;
@@ -93,7 +97,10 @@ use super::UpdateFn;
 /// 0x0cbb (L00 `lvl.vtbl`) is listed for the levels whose class list lacks it. The upgraded Mini-Turret's plasma shot
 /// 0x0a82 (L00 `lvl.vtbl` `0x3cadc0`) is listed so too. The Vaporizer's shot 0x0cf7 has no model: its trail, beam and smoke
 /// are its draw's.
-pub const CREATED_LOGIC: &[i16] = &[crate::ship::LASER_CLASS, teleport::CLASS, explosion::CLASS, spiderbot::BOT_CLASS, endako_boss::BEAM, endako_boss::TRACER, endako_boss::ROCKET, blitz::TRACER, gravity_bomb::MINI_BOMB, gravity_bomb::MINI_BLAST, pulse_rifle::SHOT, spiderbot::PLUS_BOT, spiderbot_plus::SHOT, spiderbot_plus::LOB, blitz::MEGA_TRACER, beam::CLASS, synthenoid::SHOT, turret::PLASMA, vaporizer::SHOT];
+/// The Plasma Coil's ball 0x0a9b (L00 `lvl.vtbl` `0x3cbb78`) is listed for the levels whose class list lacks it: its look
+/// is its draw's. The Shield Charger's shield 0x0a5c (`0x3c51d8`) has no model (`GADGET.WAD` has none): its look is its
+/// draw's. The Zodiac's lightning 0x139e (L00 `lvl.vtbl` `0x4185a8`) has no model: its arcs are its draw's.
+pub const CREATED_LOGIC: &[i16] = &[crate::ship::LASER_CLASS, teleport::CLASS, explosion::CLASS, spiderbot::BOT_CLASS, endako_boss::BEAM, endako_boss::TRACER, endako_boss::ROCKET, blitz::TRACER, gravity_bomb::MINI_BOMB, gravity_bomb::MINI_BLAST, pulse_rifle::SHOT, spiderbot::PLUS_BOT, spiderbot_plus::SHOT, spiderbot_plus::LOB, blitz::MEGA_TRACER, beam::CLASS, synthenoid::SHOT, turret::PLASMA, vaporizer::SHOT, plasma_coil::BALL, zodiac::EFFECT, shield::CLASS];
 
 pub fn update_for(o_class: i16) -> Option<UpdateFn> {
     match o_class {
@@ -132,6 +139,17 @@ pub fn update_for(o_class: i16) -> Option<UpdateFn> {
         seeker::MISSILE => Some(seeker::update_missile),
         minirocket::HAND_CLASS => Some(minirocket::update),
         minirocket::ROCKET => Some(minirocket::update_rocket),
+        // The Zodiac (`0x40a358`) and its lightning (`0x4185a8`).
+        zodiac::HAND_CLASS => Some(zodiac::update),
+        zodiac::EFFECT => Some(zodiac::update_effect),
+        // The Plasma Coil (`0x3e9608`) and its ball (`0x3cbb78`).
+        plasma_coil::HAND_CLASS => Some(plasma_coil::update),
+        plasma_coil::BALL => Some(plasma_coil::update_ball),
+        // The Hoverbomb Gun (`0x3c4860`) and its bomb (`0x3ab088`).
+        hoverbomb::HAND_CLASS => Some(hoverbomb::update),
+        hoverbomb::BOMB => Some(hoverbomb::update_bomb),
+        // The Shield Charger's shield (`0x3c51d8`).
+        shield::CLASS => Some(shield::update),
         lava_gun::HAND_CLASS => Some(lava_gun::update),
         bouncer::HAND_CLASS => Some(bouncer::update),
         bouncer::BOMB => Some(bouncer::update_bomb),

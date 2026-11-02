@@ -70,6 +70,18 @@ pub const BOUNCER_CLASS: i16 = crate::moby::classes::bouncer::HAND_CLASS;
 /// The Minirocket Tube: item 0x1b, class 0x5cf (L00 row `0x263ca0`; crate::moby::classes::minirocket).
 pub const MINIROCKET: i32 = 0x1b;
 pub const MINIROCKET_CLASS: i16 = crate::moby::classes::minirocket::HAND_CLASS;
+/// The Plasma Coil: item 0x1c, class 0xc4a (L00 row `0x263d80`; crate::moby::classes::plasma_coil).
+pub const PLASMA_COIL: i32 = 0x1c;
+pub const PLASMA_COIL_CLASS: i16 = crate::moby::classes::plasma_coil::HAND_CLASS;
+/// The Hoverbomb Gun: item 0x19, class 0xa5b (L00 row `0x263ae0`; crate::moby::classes::hoverbomb).
+pub const HOVERBOMB: i32 = 0x19;
+pub const HOVERBOMB_CLASS: i16 = crate::moby::classes::hoverbomb::HAND_CLASS;
+/// The Shield Charger: item 0x2d, its shield's class 0xa5c (L00 row `0x264c60`; not held: asked for, the shield is
+/// raised, crate::moby::classes::shield).
+pub const SHIELD: i32 = 0x2d;
+/// The Zodiac: item 0x2b, class 0xec8 (L00 row `0x264aa0`; crate::moby::classes::zodiac).
+pub const ZODIAC: i32 = crate::moby::classes::zodiac::ITEM;
+pub const ZODIAC_CLASS: i16 = crate::moby::classes::zodiac::HAND_CLASS;
 
 /// An item record (`0x262500 + 0xe0·row`, row `0x139568[item]`: crate::upgrades): the fields the port reads.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -102,8 +114,8 @@ pub struct ItemRow {
 /// Electrolyzer's and the Spiderbot Glove's from L02's; the Swingshot's from L03's; the Chopper's L00 `0x263840`; the
 /// Blitz Gun's L00 `0x263bc0`; the Pulse Rifle's L00 `0x263920`; the Mini-Turret Glove's L00 `0x2648e0`; the
 /// Synthenoids' L00 `0x264020`; the Lava Gun's L00 `0x263e60`; the Seeker Gun's L00 `0x263a00`; the Bouncer's L00 `0x264560`;
-/// the Minirocket Tube's L00 `0x263ca0`).
-pub const ROWS: [ItemRow; 17] = [
+/// the Minirocket Tube's L00 `0x263ca0`; the Plasma Coil's L00 `0x263d80`; the Hoverbomb Gun's L00 `0x263ae0`; the Shield Charger's L00 `0x264c60`; the Zodiac's L00 `0x264aa0`).
+pub const ROWS: [ItemRow; 21] = [
     ItemRow { item: WRENCH, attach: 0, class: WRENCH_CLASS, stance: 0, icon: 0, use_seq: 0, keep: false, fire_seq: [0, 0], speed: 0.0, rate: 0.0, damage: 1.0, ammo: false, max_ammo: 0, start_ammo: 0 },
     ItemRow { item: LANCER, attach: 0, class: LANCER_CLASS, stance: 1, icon: 0xea64, use_seq: 0x38, keep: true, fire_seq: [-1, 0x3e], speed: 60.0, rate: 7.0, damage: 0.5, ammo: true, max_ammo: 200, start_ammo: 200 },
     ItemRow { item: DYNAMO, attach: 1, class: DYNAMO_CLASS, stance: 1, icon: 0xea7f, use_seq: 0x8d, keep: false, fire_seq: [0x8e, 0x8d], speed: 0.0, rate: 0.0, damage: 0.0, ammo: false, max_ammo: 0, start_ammo: 0 },
@@ -121,6 +133,10 @@ pub const ROWS: [ItemRow; 17] = [
     ItemRow { item: SEEKER, attach: 0, class: SEEKER_CLASS, stance: 1, icon: 0xea6b, use_seq: 0x33, keep: false, fire_seq: [-1, -1], speed: 12.0, rate: 2.0, damage: 6.0, ammo: true, max_ammo: 25, start_ammo: 25 },
     ItemRow { item: BOUNCER, attach: 0, class: BOUNCER_CLASS, stance: 2, icon: 0xea73, use_seq: 0x89, keep: false, fire_seq: [-1, -1], speed: 0.0, rate: 0.3, damage: 6.0, ammo: true, max_ammo: 25, start_ammo: 25 },
     ItemRow { item: MINIROCKET, attach: 0, class: MINIROCKET_CLASS, stance: 2, icon: 0xea70, use_seq: 0x36, keep: false, fire_seq: [-1, 0x46], speed: 60.0, rate: 1.7, damage: 12.0, ammo: true, max_ammo: 25, start_ammo: 25 },
+    ItemRow { item: PLASMA_COIL, attach: 0, class: PLASMA_COIL_CLASS, stance: 1, icon: 0xea71, use_seq: 0x38, keep: true, fire_seq: [-1, 0x3e], speed: 15.0, rate: 1.0, damage: 18.0, ammo: true, max_ammo: 15, start_ammo: 15 },
+    ItemRow { item: HOVERBOMB, attach: 0, class: HOVERBOMB_CLASS, stance: 2, icon: 0xea72, use_seq: 0x89, keep: false, fire_seq: [-1, -1], speed: 7.0, rate: 3.0, damage: 30.0, ammo: true, max_ammo: 10, start_ammo: 10 },
+    ItemRow { item: SHIELD, attach: 0, class: crate::moby::classes::shield::CLASS, stance: 1, icon: 0xea74, use_seq: 0x38, keep: true, fire_seq: [0x39, 0x3e], speed: 0.0, rate: 0.0, damage: 1.0, ammo: true, max_ammo: 5, start_ammo: 5 },
+    ItemRow { item: ZODIAC, attach: 0, class: ZODIAC_CLASS, stance: 1, icon: 0xea76, use_seq: 0x94, keep: false, fire_seq: [-1, 0x3e], speed: 0.0, rate: 0.25, damage: 100.0, ammo: true, max_ammo: 4, start_ammo: 4 },
 ];
 
 /// The upgraded rows the port has (L00 `0x262500 + 0xe0·row`; their item in brackets): the Heavy Lancer 0x3c and the
@@ -640,7 +656,11 @@ fn hand_pass(world: &mut MobyWorld, ctx: &mut Ctx) {
 /// The Vaporizer (0x17 upgraded) queues a red glow at its joint 1 and sheds a red sprite; the Minirocket Tube (0x1b) glows
 /// only on its upgraded rows (`0xff20205f` .. `0xffdfdfdf`), which are not ported.
 ///
-/// Not ported: the other items' cases (0xe, 0x10, 0x12, 0x19, 0x1c, 0x2b, 0x2c: their weapons are not ported).
+/// The Plasma Coil (0x1c) pulses `0xff202020` .. `0xffefefef`. The Hoverbomb Gun (0x19) pulses `0xff5f5f5f` ..
+/// `0xffdfdfdf` and sheds a sprite at (0.05, −0.45, 0). The Zodiac (0x2b) pulses `0xff9f4f7f` .. `0xffdfdfdf`,
+/// sheds a sprite and queues a red glow at its joint 0.
+///
+/// Not ported: the other items' cases (0xe, 0x10, 0x12, 0x2c: their weapons are not ported).
 fn hand_glow(world: &mut MobyWorld, ctx: &mut Ctx, id: usize) {
     let it = &mut ctx.hero.items;
     if ctx.hero.state == 0x61 || world.mobys[id].mode & 1 != 0 || it.item_ticks < 0x17 { return; }
@@ -689,6 +709,32 @@ fn hand_glow(world: &mut MobyWorld, ctx: &mut Ctx, id: usize) {
             let g = pulse(&mut it.glow_phase, 0.040_724_356, [0xff20_4090, 0xff80_4040]);
             world.mobys[id].glow = g;
             for z in [0.1263, -0.1263] { sprites.push((57_750.0, 0.15, [0.423, -0.0555, z], g & 0x40ff_ffff)); }
+        }
+        // The Hoverbomb Gun (case 0x19): a sprite at (0.05, −0.45, 0), 94500, pull 0.1, capped 0x30 (in use faster,
+        // capped 0x20); its upgrade slower, at (0.05, −0.35, 0), 102900, pull 0.15, its alpha 0x15 uncapped.
+        HOVERBOMB if !up => {
+            let (step, c) = if using { (0.107_628_65, 0x20ff_ffffu32) } else { (0.063_995_41, 0x30ff_ffff) };
+            let g = pulse(&mut it.glow_phase, step, [0xff5f_5f5f, 0xffdf_dfdf]);
+            world.mobys[id].glow = g;
+            sprites.push((94_500.0, 0.1, [0.05, -0.45, 0.0], g & cap(c)));
+        }
+        HOVERBOMB => {
+            let g = pulse(&mut it.glow_phase, 0.046_542_123, [0xff5f_5f5f, 0xffdf_dfdf]);
+            world.mobys[id].glow = g;
+            sprites.push((102_900.0, f32::from_bits(0x3e19_999a), [0.05, -0.35, 0.0], g & 0x15ff_ffff));
+        }
+        // The Plasma Coil (case 0x1c): only pulses (its upgrade slower).
+        PLASMA_COIL => {
+            let step = if up { 0.040_724_356 } else { 0.058_177_65 };
+            world.mobys[id].glow = pulse(&mut it.glow_phase, step, [0xff20_2020, 0xffef_efef]);
+        }
+        // The Zodiac (case 0x2b): a sprite at (−0.1245, −0.8, 0), 76650, pull 0.1, capped 0x20, and a red glow at its joint
+        // 0 (`0x2a7e60(0.031, 0.03, joint, 0x421010ff)`).
+        ZODIAC => {
+            let g = pulse(&mut it.glow_phase, f32::from_bits(0x3d83_1007), [0xff9f_4f7f, 0xffdf_dfdf]);
+            world.mobys[id].glow = g;
+            sprites.push((76_650.0, 0.1, [f32::from_bits(0xbdfe_f9db), -0.8, 0.0], g & cap(0x20ff_ffff)));
+            if let Some(point) = ctx.host.joint(&world.mobys[id], 0) { world.hero_glows.push(crate::fx::HeroGlow { size: 0.031, push: 0.03, point, rgba: 0x4210_10ff }); }
         }
         // The Blitz Gun (case 0x1a): only pulses.
         BLITZ => {
@@ -797,6 +843,12 @@ fn switch(world: &mut MobyWorld, ctx: &mut Ctx) {
         it.request = 0;
         crate::moby::classes::synthenoid::deploy(world, ctx);
     }
+    // The Shield Charger asked for (`0x3c4eb8`): its shield raised, not held (crate::moby::classes::shield).
+    let it = &mut ctx.hero.items;
+    if ctx.hero.no_menu != 0 && it.item == WRENCH && it.request == SHIELD {
+        it.request = 0;
+        crate::moby::classes::shield::deploy(world, ctx);
+    }
     let h = &mut *ctx.hero;
     let it = &mut h.items;
     if it.no_use != 0 && (!it.wrench_req || it.item == WRENCH) {
@@ -806,6 +858,10 @@ fn switch(world: &mut MobyWorld, ctx: &mut Ctx) {
     if matches!(it.request, SYNTHENOID | 0x3d) {
         it.request = 0;
         crate::moby::classes::synthenoid::deploy(world, ctx);
+    }
+    if ctx.hero.items.request == SHIELD {
+        ctx.hero.items.request = 0;
+        crate::moby::classes::shield::deploy(world, ctx);
     }
     let h = &mut *ctx.hero;
     let it = &mut h.items;

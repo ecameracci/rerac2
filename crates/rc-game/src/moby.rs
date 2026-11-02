@@ -570,8 +570,19 @@ pub struct MobyWorld {
     pub turret: classes::turret::Mem,
     /// The Lava Gun's stream and burning pools (classes::lava_gun).
     pub lava: classes::lava_gun::Mem,
+    /// The Plasma Coil's balls, rays and arcs and its hand's arcs (classes::plasma_coil).
+    pub coil: classes::plasma_coil::Mem,
+    /// The Hoverbomb Gun's empty latch (classes::hoverbomb).
+    pub hoverbomb: classes::hoverbomb::Mem,
+    /// The Shield Charger's shield, its orbs, arcs and comets (classes::shield).
+    pub shield: classes::shield::Mem,
     /// The Bouncer's cooldown (classes::bouncer).
     pub bouncer: classes::bouncer::Mem,
+    /// The Zodiac's arcs (`0x25a8a0`, classes::zodiac).
+    pub zodiac: classes::zodiac::Arcs,
+    /// The camera's rows (`0x1b8f70`: forward, left, up) as the last moby loop saw them, for the particles that read
+    /// the view matrix `0x1b8c00` ([`MobyWorld::view_x`]).
+    pub cam_rows: [V3; 3],
     /// The targets' claims (`0x2312c0`, claims): the Seeker Gun's missiles' picks.
     pub claims: claims::Claims,
     /// The hand item's glows of this tick (`0x2a7e60`'s queue `0x18bea0`, drawn by Ratchet's first-list callback
@@ -777,6 +788,7 @@ impl MobyWorld {
     /// mode 4). Mobys created during the loop wait a tick.
     pub fn tick(&mut self, cam: V3, ctx: &mut Ctx) {
         self.frame = ctx.game.frame;
+        self.cam_rows = ctx.host.camera_rows();
         if !self.loaded {
             self.loaded = true;
             self.load_pass(ctx);
@@ -821,6 +833,9 @@ impl MobyWorld {
 
     /// `0x2e7920(callback, moby)`: the moby's draw callback runs after this tick (crate::fx).
     pub fn register_draw(&mut self, id: usize) { self.draws.push(id); }
+
+    /// The view matrix's first row (`0x1b8c00`, built by `0x2e4818` from the camera's rows: −left.x, −up.x, forward.x).
+    pub fn view_x(&self) -> V3 { [-self.cam_rows[1][0], -self.cam_rows[2][0], self.cam_rows[0][0]] }
     /// `0x2e7718(callback, moby)`: the moby's callback on the frame's first list (before the particles; crate::fx).
     pub fn register_draw_first(&mut self, id: usize) { self.draws_first.push(id); }
 

@@ -1,7 +1,8 @@
 //! Damage and death: the hit intake (L00 `0x2b2dd0`, the transitions' prologue: Ratchet's hit record with flag 1 or
 //! 8, the damage `0x2a4ef8` scaled by the armour, the knock-back `0x2b2d60`, the invincibility `0x189ffc`), the hurt
 //! 0x16 and the heavy knock-back 0x8c (group 7), the deaths 0x39 (on the ground), 0x74 (falling out of the level) and
-//! 0x79, and the death's bookkeeping `0x2b31f0` (the respawn request; the game's respawn is the engine's).
+//! 0x79, and the death's bookkeeping `0x2b31f0` (the respawn request; the game's respawn is the engine's). The Shield
+//! Charger's shield (`0x37fa58`, crate::moby::classes::shield) takes a hit's damage before the intake goes on.
 //!
 //! The other deaths and sinks: the quicksand 0x65 (group 0x19: sinking 1/240 a tick while less than half a metre per
 //! earlier sink is above him, else 1/60; ✕ after 10 + 7·n ticks jumps out with 0x66 for the first three; under 1.2
@@ -54,6 +55,10 @@ pub struct DamageBlock {
     pub fall_v: f32,
     /// `0x18c2bc`: the moby whose hit he took this tick (the enemies read it).
     pub hit_by: Option<usize>,
+    /// `$gp+0x3640` / `$gp+0x3644`: the Shield Charger's shield (crate::moby::classes::shield; 0 none) and the ticks
+    /// after a hit on it in which the next is taken whole.
+    pub shield: f32,
+    pub shield_wait: i32,
 }
 
 impl Hero {
@@ -86,8 +91,15 @@ impl Hero {
         let Some(h) = env.hit else { return false };
         if h.rec.tmpl.flags & 9 == 0 { return false; }
         self.damage.took = true;
+        // `0x37fad0` / `0x37fa58`: with the Shield Charger's shield up (and Ratchet himself), the shield takes the hit's
+        // damage first (crate::moby::classes::shield::absorb); all of it taken, no hit.
+        let mut rec = h.rec;
+        if self.damage.shield != 0.0 && self.mode == 0 {
+            let d = &mut self.damage;
+            rec.tmpl.damage = crate::moby::classes::shield::absorb(&mut d.shield, &mut d.shield_wait, rec.tmpl.damage);
+            if rec.tmpl.damage == 0.0 { return false; }
+        }
         self.damage.hit_by = h.rec.tmpl.source;
-        let rec = h.rec;
         // The knock-back direction: the template's (flag 1 of its count word) or away from the source.
         let mut dir = match (rec.tmpl.count & 1 != 0, h.source_pos) {
             (true, _) => [rec.tmpl.dir[0], rec.tmpl.dir[1], rec.tmpl.dir[2]],

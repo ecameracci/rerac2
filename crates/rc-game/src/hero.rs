@@ -243,6 +243,8 @@ pub struct Hero {
     pub drag_src: V3,
     /// `0x18bdd0`: the stick (d-pad below 0.25); `0x18c2d8` / `0x18c2dc`: its magnitude this / last tick.
     pub stick: [f32; 2],
+    /// `0x138288` / `0x13828c`: the left stick as the pad read left it (no d-pad; the Hoverbomb's steering).
+    pub pad_stick: [f32; 2],
     pub stick_mag: f32,
     pub stick_mag_prev: f32,
     /// `0x18a22c` / `0x18a22f`: the run keeps its last direction; quick turn.
@@ -431,7 +433,7 @@ impl Hero {
             cap_top_target: 0.8, cap_bottom_target: 0.7, cap_radius_target: 0.45, cap_hit: 0, contact_point: [0.0; 3],
             contact_normal: [0.0; 3], ground_point: [0.0; 3], ground_z: 0.0, height: 32.0, ground_normal: [0.0, 0.0, 1.0],
             slope: 0.0, last_ground_point: [0.0; 3], surface: -1, footstep: 0, grounded_ticks: 0, air_ticks: 0, f16c: 0, snap_vel: 0.0,
-            drag: [0.0; 3], drag_src: [0.0; 3], stick: [0.0; 2], stick_mag: 0.0, stick_mag_prev: 0.0, run_hold: 0,
+            drag: [0.0; 3], drag_src: [0.0; 3], stick: [0.0; 2], pad_stick: [0.0; 2], stick_mag: 0.0, stick_mag_prev: 0.0, run_hold: 0,
             quick_turn: 0, run_dir: [1.0, 0.0, 0.0], run_yaw: 0.0, anim_speed: 1.0, state: 0, substate: 0, group: 0,
             prev_state: 0, prev_group: 0, prev2_state: 0, prev2_group: 0, prev_timer: 0, cam_mode: 0, mode: 0, view_lock: 0, jump: JumpBlock { air_turn: 0.250_011_4, terminal: 0.833_333_3, ..JumpBlock::default() },
             pos_hist: [[0.0; 3]; HISTORY], pos_hist_idx: 0, pos_hist_count: 0, yaw_hist: [0.0; HISTORY], yaw_hist_idx: 0,
@@ -501,6 +503,7 @@ impl Hero {
         if self.strafe == 0 { self.posture.not_strafing += 1 } else { self.posture.not_strafing = 0 }
         self.stick_mag_prev = self.stick_magnitude();
         self.stick = [env.pad.lx.to_f32(), env.pad.ly.to_f32()];
+        self.pad_stick = self.stick;
         if (self.stick[0] * self.stick[0] + self.stick[1] * self.stick[1]).sqrt() < 0.25 {
             let b = env.pad.raw;
             let x = ((b >> 13) & 1) as i32 - ((b >> 15) & 1) as i32;

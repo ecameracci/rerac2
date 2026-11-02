@@ -592,7 +592,7 @@ fn glints(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 }
 
 /// The quads of a GS triangle strip (two triangles a quad, the last one alone doubled).
-fn strip(out: &mut Vec<FxQuad>, fx: usize, additive: bool, pts: &[(V3, [f32; 2], u32)]) {
+pub(crate) fn strip(out: &mut Vec<FxQuad>, fx: usize, additive: bool, pts: &[(V3, [f32; 2], u32)]) {
     let mut i = 0;
     while i + 2 < pts.len() {
         let c = [pts[i], pts[i + 1], pts[i + 2], pts[if i + 3 < pts.len() { i + 3 } else { i + 2 }]];
