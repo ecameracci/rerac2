@@ -678,6 +678,9 @@ impl Hero {
         let v = anim.view();
         if j.landed == 0 && self.air_ticks == 0 && j.descending != 0 && !early_double {
             self.jump.landed = 1;
+            // `0x2a6188`: the landing's footstep; 5 ticks of dust at the feet.
+            self.land_step = true;
+            self.posture.dust.arm(f32::from_bits(0x3c83_126f), f32::from_bits(0x3b03_126f), 5, 2, 0, 1);
             self.wall.count = 0;
             if self.stick_mag < 0.2 && 0.041_666_668 < self.speed { self.speed = 0.041_666_668; }
             if v.frame < j.f_apex - 1.5 { self.set_anim(anim, 7.0, v.seq_b, j.f_land as i32 + 2); }

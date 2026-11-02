@@ -926,6 +926,14 @@ fn tick(
                 let k = sys.slots.play(&def, 0, Some(owner), Some(p.hero.pos), None, 0x400, &listener(&p.camera), &mut rng);
                 if let Some(log) = sys.play_log.as_mut() { log.push((p.ticks, rc_game::audio::class_sounds::FOOTSTEP_LOG_CLASS, i as i32, 0, k)); }
             }
+            // `0x2a6188`: the landing's footstep, the left foot's at 0x32 (`(0x32 << 10) / 0x1e`, the walk's 0x1e).
+            if std::mem::take(&mut p.hero.land_step) {
+                let i = mobys.footstep_base + p.hero.footstep as usize * 4;
+                if let Some(def) = sys.data.sounds.level_defs.get(i).copied() {
+                    let owner = rc_game::audio::voices::Owner { id: h as u32, privileged: true };
+                    sys.slots.play(&def, 0, Some(owner), Some(p.hero.pos), None, (0x32 << 10) / 0x1e, &listener(&p.camera), &mut rng);
+                }
+            }
             sys.rng = rng;
         }
     }
@@ -965,6 +973,8 @@ fn tick(
         if ctx.hero.mode == 0 { rc_game::hero::items::item_pass(&mut mobys.world, &mut ctx) } else { rc_game::hero::body::body_pass(&mut mobys.world, &mut ctx) }
         // The swim's effects (crate::hero::water's requests of this tick), into the particle pool.
         rc_game::hero::water::fx_pass(&mobys.world, &mut ctx);
+        // The dust at his feet (rc_game::hero::posture, `0x2ac218`).
+        rc_game::hero::posture::dust_pass(&mobys.world, &mut ctx);
         // Ratchet's shadow and the casters' direction (rc_game::shadow_volumes).
         rc_game::shadow_volumes::hero_pass(&mut mobys.world, &mut ctx);
         // The casters MobyProc defers and their volumes, from the game camera (crate::shadow_render).

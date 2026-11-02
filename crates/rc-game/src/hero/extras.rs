@@ -193,6 +193,7 @@ impl Hero {
                 if self.vel[2] < 0.0 && self.grounded_ticks != 0 && (self.ground_moby.is_none() || self.ground_class == 0x8e2) && self.set_state(anim, env, 0, false) {
                     self.gear.floating = false;
                     self.set_anim(anim, 9.0, 7, 0x17);
+                    self.posture.dust.arm(f32::from_bits(0x3c83_126f), f32::from_bits(0x3b03_126f), 5, 2, 0, 1);
                     return None;
                 }
                 if self.gear.lift != 0.0 { return None; }

@@ -23,7 +23,7 @@
 //! (the standing use then keeps his sequence: crate::hero::items).
 //!
 //! Not ported: the wall test's hold-off `0x18a042` (no writer found), the lean on gravity frames and magnetic walkways
-//! (`0x2b7820`), the dust at the feet, the records of Clank on the back and of Clank's body (kinds 1..5).
+//! (`0x2b7820`), the records of Clank on the back and of Clank's body (kinds 1..5).
 
 use super::physics::*;
 use super::Hero;
@@ -192,6 +192,45 @@ pub struct Posture {
     pub blink_linked: bool,
     /// `0x18c2b0`: the moby the head looks at.
     pub look_at: Option<usize>,
+    /// The dust at the feet ([`FootDust`]) and this tick's puffs for [`dust_pass`].
+    pub dust: FootDust,
+    pub puffs: Option<FootDust>,
+}
+
+/// `0x18b250..0x18b25e`: the dust at the feet (`0x2d35e8` arms it, `0x2ac218` puffs it): the puff's size and its
+/// spread, the ticks left, the puffs at each foot a tick, the flags (1 the puffs spread along his rows, 0x80 none).
+#[derive(Clone, Copy, Debug, Default)]
+pub struct FootDust {
+    pub size: f32,
+    pub spread: f32,
+    pub ticks: i32,
+    pub count: i16,
+    pub flags: u8,
+}
+
+impl FootDust {
+    /// `0x2d35e8(size, spread, ticks, count, set, clear)`.
+    pub fn arm(&mut self, size: f32, spread: f32, ticks: i32, count: i16, set: u8, clear: u8) {
+        (self.size, self.spread, self.ticks, self.count) = (size, spread, ticks, count & 0xff);
+        self.flags = self.flags & !clear | set;
+    }
+}
+
+/// `0x2ac218`'s puffs, after the hero's update (with the swim's effects): each foot (joints 0x16 / 0x17) gets the
+/// tick's puffs (crate::particles::foot_dust), each of the size ± its spread, along his rows with flag 1.
+pub fn dust_pass(world: &crate::moby::MobyWorld, ctx: &mut crate::moby::Ctx) {
+    let Some(d) = ctx.hero.posture.puffs.take() else { return };
+    let Some(sys) = ctx.parts.as_deref_mut() else { return };
+    let Some(m) = ctx.hero_moby.and_then(|i| world.mobys.get(i)) else { return };
+    let rows = (d.flags & 1 != 0).then_some(m.rows);
+    let rng = &mut ctx.game.rng;
+    for j in [0x16, 0x17] {
+        let Some(at) = ctx.host.joint(m, j) else { continue };
+        for _ in 0..d.count {
+            let size = d.size + rng.randf(-d.spread, d.spread);
+            crate::particles::foot_dust::puff(sys, rng, size, at, rows);
+        }
+    }
 }
 
 impl Default for Posture {
@@ -212,6 +251,8 @@ impl Default for Posture {
             blink_every: 0,
             blink_linked: false,
             look_at: None,
+            dust: FootDust::default(),
+            puffs: None,
         }
     }
 }
@@ -289,7 +330,8 @@ impl Hero {
 
     /// `0x2ac218`: the feet hidden under the worn feet; the feet pitch and roll with the ground under them and the
     /// legs reach for it: each leg turns `atan2(height, 0.2)·1.2` (the left −10°..45°, the right −45°..10°), the foot
-    /// its roll less that, when a foot is more than 0.015 off or tilted more than 1° (not on a magnetic walkway).
+    /// its roll less that, when a foot is more than 0.015 off or tilted more than 1° (not on a magnetic walkway). Then
+    /// the dust at the feet ([`FootDust`]).
     fn feet_tilt(&mut self) {
         // His feet hidden in the worn feet (crate::hero::items::feet_pass): 0.01, every tick.
         if self.items.feet[0].is_some() {
@@ -297,6 +339,26 @@ impl Hero {
             self.posture.recs[rec::FOOT_R].scale = 0.01;
         }
         if self.feet_kept() { return; }
+        self.feet_lean();
+        // The dust: the skid's every tick (0.021, along his rows), the jump group's first 11 ticks landed (0.016).
+        let landed = self.jump.landed;
+        let (state, group) = (self.state, self.group);
+        let d = &mut self.posture.dust;
+        if d.flags & 0x80 != 0 {
+            d.ticks = 0;
+            return;
+        }
+        let small = f32::from_bits(0x3b03_126f);
+        if state == 3 { d.arm(f32::from_bits(0x3cac_0831), small, 1, 2, 1, 0); }
+        if group == 4 && landed != 0 && landed < 0xc { d.arm(f32::from_bits(0x3c83_126f), small, 1, 2, 0, 1); }
+        if 0 < d.ticks && d.count != 0 {
+            d.ticks -= 1;
+            self.posture.puffs = Some(*d);
+        }
+    }
+
+    /// `0x2ac218`'s lean of the feet and legs (the doc above).
+    fn feet_lean(&mut self) {
         let f = self.posture.feet;
         let deg = 0.017_453_294;
         let off = f.height.iter().any(|h| 0.015 < h.abs()) || f.pitch.iter().chain(f.roll.iter()).any(|a| deg < a.abs());

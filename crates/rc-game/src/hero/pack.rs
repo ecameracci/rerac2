@@ -84,6 +84,7 @@ impl Hero {
                 }
             } else if self.set_state(anim, env, 0, false) {
                 self.set_anim(anim, 9.0, 7, 0x17);
+                self.posture.dust.arm(f32::from_bits(0x3c83_126f), f32::from_bits(0x3b03_126f), 5, 2, 0, 1);
             }
             return None;
         }
@@ -97,6 +98,8 @@ impl Hero {
             } else {
                 // `0x1a7ddc`: the walk's landing frame.
                 self.set_anim(anim, 12.0, 4, 0x10);
+                // 5 ticks of dust at the feet, along his rows.
+                self.posture.dust.arm(f32::from_bits(0x3c83_126f), f32::from_bits(0x3b03_126f), 5, 2, 1, 0);
             }
         }
         None

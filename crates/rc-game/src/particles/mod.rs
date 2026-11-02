@@ -42,6 +42,7 @@
 pub mod ash;
 pub mod cinder;
 pub mod dust;
+pub mod foot_dust;
 pub mod lava;
 pub mod line;
 pub mod meteor;
@@ -1137,6 +1138,7 @@ pub fn update_parts(sys: &mut Particles, mobys: &crate::moby::MobyWorld, cam: [f
             EMBER => update_ember(sys, i, rng, mobys.frame),
             cinder::CINDER => cinder::update(sys, i, rng, mobys.frame),
             dust::DUST => dust::update(sys, i),
+            foot_dust::PUFF => foot_dust::update(sys, i),
             lava::SPARK => lava::update_spark(sys, i, aux.coll),
             lava::DROP => lava::update_drop(sys, i),
             line::LINE => line::update(sys, i),

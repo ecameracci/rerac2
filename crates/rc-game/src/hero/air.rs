@@ -14,7 +14,7 @@
 //! **Stuck in the air** (`0x18a022`, counted by `0x2c3330`): falling while the last 8 ticks moved him less than 1/60
 //! a tick; after 21 such ticks ✕ jumps (the ground's jump chooser) as if he stood.
 //!
-//! Not ported: the landing effects (`0x2a6188`) and the camera jolt (`0x2d35e8`).
+//! The landing's dust (`0x2d35e8`) is crate::hero::posture's; its footstep the jump's (`0x2a6188`).
 
 use super::physics::*;
 use super::states::Entry;
