@@ -33,12 +33,10 @@ const GATE_MAX: f32 = f32::from_bits(0x3d0e_fa37);
 /// 0x0d97 (`0x3ffe88`) / 0x0d95 (`0x3ffc20`): a gate half. Its pvars: `[0]` opens for Ratchet near across, `[4]` its
 /// turn speed, `[8]` opens for Ratchet near on a magnetic walkway.
 /// * **0**: with `[0]`: Ratchet within 8 across (`0x2f9718`) → 1; else with `[8]`: within 8 (`0x2f96e0`) on the
-///   walkway (`0x18a168` = 1) → 2; else (neither) its word `+0x98` 0, 3.
+///   walkway (`0x18a168` = 1) → 2; else (neither) no collision (`+0x98` 0), 3.
 /// * **1**: its yaw eased ([`GATE_ACCEL`]) toward 135° (0x0d95: −45°); **2**: toward 90° (−90°); **3**: nothing.
 /// * **4**: 11 ticks along its +y row a sixth a tick (0x0d95: −y), **5** 31 ticks still, **6** 11 ticks back, 0 (its
 ///   tick count `+0x96`, set directly; nothing here enters 4).
-///
-/// Not ported: the word `+0x98` (nothing the port has reads it).
 pub fn update_0d97(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let left = w.mobys[id].o_class == 0x0d95;
     let hero = ctx.hero.pos;
@@ -49,6 +47,7 @@ pub fn update_0d97(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         } else if m.pv_i(8) != 0 {
             if dist(m.pos, hero) < 8.0 && on_walkway(ctx) { m.state = 2; }
         } else {
+            m.has_collision = false;
             m.state = 3;
         }
     }

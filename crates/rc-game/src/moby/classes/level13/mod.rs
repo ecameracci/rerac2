@@ -4,6 +4,7 @@
 
 pub mod breakables;
 pub mod movers;
+pub mod props;
 
 use crate::hero::physics::V3;
 use crate::moby::MobyWorld;
@@ -18,6 +19,12 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         0x0d97 | 0x0d95 => Some(movers::update_0d97),
         0x0d65 => Some(movers::update_0d65),
         0x0cd8 => Some(movers::update_0cd8),
+        0x0b5c | 0x0b67 | 0x0b68 | 0x0b5b | 0x0b61 => Some(props::update_0b5c),
+        0x0dd1 | 0x0da3 | 0x0da1 => Some(props::update_0dd1),
+        0x0ef2 | 0x113c => Some(props::update_0ef2),
+        0x12ed => Some(props::update_12ed),
+        0x0f20 => Some(props::update_0f20),
+        0x040f => Some(props::update_040f),
         _ => None,
     }
 }
