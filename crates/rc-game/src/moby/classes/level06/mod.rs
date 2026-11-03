@@ -1,6 +1,25 @@
 //! Level 0x06's own classes (level 6; L06 addresses, the engine functions they call named by their L06 addresses with
 //! the L00 ones the port knows them by where they differ). Each class's update is registered in [`update_for`] and
 //! its draw callback, if any, in [`draw`]; crate::moby::classes::update_for and crate::fx ask these after their own.
+//!
+//! Not ported (level 6's other classes):
+//! * Waiting on a missing system (docs/plan/gaps.md): 0x0fc1 (`0x458888`) and 0x0fc0 (`0x458718`), effect-quad
+//!   trails (G-REN-004); the vent 0x0feb (`0x45da00`, particle type 0x53 `0x37fae8`) and 0x0fb2 / 0x0fd6 / 0x0fce /
+//!   0x0fcf / 0x0fe4 (`0x4581c8`) (G-PRT-001); 0x0eb1 (`0x451ad0`, items, G-WPN-002); 0x0bc7 (`0x422070`) and 0x0fe6
+//!   (`0x45bbc8`), the line test (G-CLS-005); the lift 0x0849 (`0x3fc598`), its stop on what is under it (the sphere
+//!   query `0x31f0c0`, G-CLS-013).
+//! * Large enemies and objects on the enemy framework, not reached in this pass: the critters 0x0db0 (`0x444828`, 87
+//!   placed: its helpers `0x444fe0` / `0x445388` / `0x4453c0` / `0x445710` and its draw `0x4458a8`), 0x0bba
+//!   (`0x41f460`, 40 placed) and the switch 0x0fdc (`0x4594e8`) that wakes them, the falling pole 0x12c4
+//!   (`0x466008`), 0x0ccf (`0x4318a0`).
+//! * Ratchet's: the ferry 0x0330 (`0x3e5460`, L11 `0x3b7340`: a ride on paths with its own controls), 0x0947
+//!   (`0x404c60`), 0x0b57 (`0x41b200`, Ratchet's state 0x37 and the level's scene functions `0x479xxx`), 0x0fc2
+//!   (`0x458a00`), 0x031a (`0x3e29d0`: a watcher of five mobys that hits what crosses its plane, `0x3e26d8`).
+//! * The draws: 0x093e (`0x404680`, L11 `0x3d19f8`: a screen layer drawn by `0x403ac0`), 0x08a0 (`0x401b40`, its
+//!   draw `0x401f00`).
+//! * The hints 0x0cdd (`0x4321e8`: help 0x9df / 0x9e0 / 0x9e1 / 0x9e2 / 0x9db / 0x9b5 by cuboids; it reads Ratchet's
+//!   `0x18c2d4`, the byte `0x1a7b27` and the table `0x21ecc4`, none mapped), 0x08a1 (`0x402450`: the table
+//!   `0x21ecc4` and the path points' `w`), 0x1240 (`0x465f18`: the level's table `0x1b21c4`, `0x47c358`).
 
 pub mod breakables;
 pub mod lifts;
