@@ -6,6 +6,7 @@ pub mod breakables;
 pub mod movers;
 pub mod powerline;
 pub mod props;
+pub mod targets;
 
 use crate::hero::physics::V3;
 use crate::moby::MobyWorld;
@@ -29,6 +30,8 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         0x0f20 => Some(props::update_0f20),
         0x040f => Some(props::update_040f),
         0x0efa => Some(props::update_0efa),
+        0x0c86 => Some(targets::update_0c86),
+        0x0c87 => Some(targets::update_0c87),
         0x0fec => Some(props::update_0fec),
         0x11b0 => Some(props::update_11b0),
         0x1225 => Some(props::update_1225),
