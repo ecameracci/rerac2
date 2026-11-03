@@ -7,8 +7,8 @@
 //!   trails (G-REN-004); the vent 0x0feb (`0x45da00`, particle type 0x53 `0x37fae8`) and 0x0fb2 / 0x0fd6 / 0x0fce /
 //!   0x0fcf / 0x0fe4 (`0x4581c8`) (G-PRT-001); 0x0eb1 (`0x451ad0`, items, G-WPN-002); 0x0bc7 (`0x422070`) and 0x0fe6
 //!   (`0x45bbc8`), the line test (G-CLS-005).
-//! * Large enemies and objects on the enemy framework, not reached in this pass: the falling pole 0x12c4
-//!   (`0x466008`), 0x0ccf (`0x4318a0`).
+//! * The challenge host 0x0ccf (`0x4318a0`): its talk (speech 0x1320 / 0x1321, the scene `0x3b3068`, the help
+//!   messages 0x4a / 0x4b / 0x4c, the bolt counts `0x295950` / `0x295954`; the dialogue system, G-UI-010).
 //! * Ratchet's: the ferry 0x0330 (`0x3e5460`, L11 `0x3b7340`: a ride on paths with its own controls), 0x0947
 //!   (`0x404c60`), 0x0b57 (`0x41b200`, Ratchet's state 0x37 and the level's scene functions `0x479xxx`), 0x0fc2
 //!   (`0x458a00`), 0x031a (`0x3e29d0`: a watcher of five mobys that hits what crosses its plane, `0x3e26d8`).
@@ -23,6 +23,7 @@ pub mod brawler;
 pub mod breakables;
 pub mod glowbug;
 pub mod lifts;
+pub mod pole;
 pub mod props;
 pub mod traffic;
 
@@ -68,6 +69,8 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         brawler::CLASS => Some(brawler::update_0bba),
         brawler::SWITCH_CLASS => Some(brawler::update_0fdc),
         arc_shot::CLASS => Some(arc_shot::update_0fe5),
+        pole::CLASS => Some(pole::update_12c4),
+        0x0307 => Some(pole::update_0307),
         _ => None,
     }
 }
