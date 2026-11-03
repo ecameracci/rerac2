@@ -3,10 +3,12 @@
 //! its draw callback, if any, in [`draw`]; crate::moby::classes::update_for and crate::fx ask these after their own.
 //!
 //! * [`movers`]: the floors, columns and blocks the Dynamo's targets and the hologram lift move.
+//! * [`beams`]: the electric fence 0x0ee0.
 //! * [`critters`]: the birds 0x1105.
 //! * [`stalks`]: the sparked stalks 0x10ea / 0x118c.
 //! * [`props`]: the small objects (the Hacker's gate, the help texts, the sparks, ...).
 
+pub mod beams;
 pub mod critters;
 pub mod movers;
 pub mod props;
@@ -29,6 +31,8 @@ pub struct Globals {
     pub g904c: i32,
     pub g9050: i32,
     pub g338: i32,
+    /// The electric fence's state (`$gp+0x3600..`, beams::Fence).
+    pub fence: beams::Fence,
 }
 
 /// The level's mission `mission` done (`0x19b2e8 + level·16`, bit 7).
@@ -57,6 +61,7 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         0x12c7 => Some(props::update_12c7),
         0x08e2 => Some(props::update_08e2),
         0x10ea | 0x118c => Some(stalks::update),
+        0x0ee0 => Some(beams::update),
         _ => None,
     }
 }
@@ -67,6 +72,7 @@ pub fn draw(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut crat
     match w.mobys[id].o_class {
         0x0dfd => props::draw_0dfd(w, id, &mut game.rng, cam, out),
         0x10ea | 0x118c => stalks::draw(w, id, &mut game.rng, cam, out),
+        0x0ee0 => beams::draw(w, id, cam, out),
         _ => return false,
     }
     true
