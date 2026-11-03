@@ -12,6 +12,7 @@ pub mod lifts;
 pub mod mine;
 pub mod props;
 pub mod tractor;
+pub mod walker;
 
 /// This level's class updates.
 pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
@@ -38,6 +39,7 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         0x0ee8 => Some(props::update_0ee8),
         0x0424 => Some(props::update_0424),
         0x0fab => Some(mine::update_0fab),
+        0x0fb4 => Some(walker::update_0fb4),
         // `0x38b400`: `jr ra`, as level 4's U293 classes.
         0x1354 => Some(super::level04::misc::update_empty),
         _ => None,
