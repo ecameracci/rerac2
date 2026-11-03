@@ -7,7 +7,6 @@
 //!   trails (G-REN-004); the vent 0x0feb (`0x45da00`, particle type 0x53 `0x37fae8`) and 0x0fb2 / 0x0fd6 / 0x0fce /
 //!   0x0fcf / 0x0fe4 (`0x4581c8`) (G-PRT-001); 0x0eb1 (`0x451ad0`, items, G-WPN-002); 0x0bc7 (`0x422070`) and 0x0fe6
 //!   (`0x45bbc8`), the line test (G-CLS-005).
-//! * Not reached yet: the lift 0x0849 (`0x3fc598`).
 //! * Large enemies and objects on the enemy framework, not reached in this pass: the falling pole 0x12c4
 //!   (`0x466008`), 0x0ccf (`0x4318a0`).
 //! * Ratchet's: the ferry 0x0330 (`0x3e5460`, L11 `0x3b7340`: a ride on paths with its own controls), 0x0947
@@ -64,6 +63,7 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         0x0c4b => Some(props::update_0c4b),
         0x0e8e => Some(props::update_0e8e),
         0x08c9 => Some(lifts::update_08c9),
+        0x0849 => Some(lifts::update_0849),
         glowbug::CLASS => Some(glowbug::update_0db0),
         brawler::CLASS => Some(brawler::update_0bba),
         brawler::SWITCH_CLASS => Some(brawler::update_0fdc),
