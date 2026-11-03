@@ -1,0 +1,182 @@
+//! Level 11's small objects (L11 addresses).
+//!
+//! * **0x117a** (`0x4748a0`, 2 placed; no Ghidra function): hidden ([`update_117a`]).
+//! * **0x117e** (`0x4748c8`, 1): the Hacker's gate ([`update_117e`]).
+//! * **0x123a** (`0x476340`, 1): the updraft's drain ([`update_123a`]).
+//! * **0x0c2d** (`0x414290`, 1): the level's help texts ([`update_0c2d`]).
+//! * **0x0dfd** (`0x458678`, 23): the drifting sparks ([`update_0dfd`] / [`draw_0dfd`]).
+
+use crate::hero::physics::{add, atan2, dist, dist2, sub_rot, V3};
+use crate::moby::{countdown, Ctx, MobyWorld};
+
+/// 0x117a (`0x4748a0`): on its first tick state 1 and mode | 0x41 (hidden, no animation).
+pub fn update_117a(w: &mut MobyWorld, id: usize, _ctx: &mut Ctx) {
+    let m = &mut w.mobys[id];
+    if m.state == 0 {
+        m.state = 1;
+        m.mode |= 0x41;
+    }
+}
+
+/// Ratchet's place for the gate's start (`$gp`-free constants at `0x474960..`): (363.18, 680.68, 155.73), yaw 2.356.
+const GATE_START: (V3, V3) = ([f32::from_bits(0x43b5_970a), f32::from_bits(0x442a_2b85), f32::from_bits(0x431b_bae1)], [0.0, 0.0, f32::from_bits(0x4016_cbe5)]);
+
+/// 0x117e (`0x4748c8`, 1 placed): the gate the Hacker's panel (crate::moby::classes::hacker_panel, its hooked moby)
+/// opens: its pvars `+0x00..+0x1c` the gate's mobys (the hidden 0x117a pair and the 0x0ee0 beams; −1 none), `+0x20`
+/// the hum's slot. **0**: with the Hacker had (`0x1a7b33`), its uid neither gone for good (`0x21fdc4`) nor counted
+/// (`0x19b4a8`) and its place in the loaded variant (`0x334048`): Ratchet put at [`GATE_START`] (`0x2d1a58(pos, rot, 0,
+/// 1)`, idle); then **1**. Each tick: on level 0xb with Ratchet within 32 across, the level's sound 0x1b past the split
+/// looped on Ratchet (`0x3750a8(0x1b, 6)`) while its slot does not play; farther, stopped. Hooked, or its uid gone for
+/// good or counted already: the gate's mobys deleted, its uid counted (`0x19b4a8`, at most 7), the hum stopped,
+/// deleted.
+///
+/// Not ported: the ship byte `0x152c26` = 1 (`0x37cdc8`) with Ratchet's place. The port starts the hum's slot at −1
+/// (its `sound_playing` tests the slot alone, not its owner).
+pub fn update_117e(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    let uid = w.mobys[id].uid;
+    if w.mobys[id].state == 0 {
+        w.mobys[id].set_pv_i(0x20, -1);
+        let g = &*ctx.game;
+        let had = g.items.get(0x33).is_some_and(|&b| b != 0);
+        let gone = g.uid_dead.get(uid.max(0) as usize).is_some_and(|&d| d != 0);
+        if had && !gone && g.uid_count(uid) == 0 && ctx.level.in_variant(w.mobys[id].pos, g.variant) {
+            ctx.hero.teleport(GATE_START.0, GATE_START.1);
+            ctx.hero.request_state(0, true);
+        }
+        w.mobys[id].state = 1;
+    }
+    let h = w.mobys[id].pv_i(0x20);
+    if dist2(w.mobys[id].pos, ctx.hero.pos) < 32.0 {
+        if ctx.game.level == 0xb && !(h != -1 && ctx.host.sound_playing(h)) {
+            let k = ctx.host.play_level_sound_after(ctx.hero_moby.and_then(|i| w.mobys.get(i)), 0x1b, 6);
+            w.mobys[id].set_pv_i(0x20, k);
+        }
+    } else {
+        if h != -1 && ctx.host.sound_playing(h) { ctx.host.stop_sound(h); }
+        w.mobys[id].set_pv_i(0x20, -1);
+    }
+    let gone = ctx.game.uid_dead.get(uid.max(0) as usize).is_some_and(|&d| d != 0);
+    if w.mobys[id].once & 4 == 0 && !gone && ctx.game.uid_count(uid) == 0 { return; }
+    for k in 0..8 {
+        let i = w.mobys[id].pv_i(4 * k);
+        if let Some(i) = usize::try_from(i).ok().filter(|&i| i < w.mobys.len()) { w.delete(i); }
+    }
+    ctx.game.count_uid(uid);
+    let h = w.mobys[id].pv_i(0x20);
+    if h != -1 && ctx.host.sound_playing(h) { ctx.host.stop_sound(h); }
+    w.mobys[id].set_pv_i(0x20, -1);
+    w.delete(id);
+}
+
+/// 0x123a (`0x476340`, 1 placed): Ratchet floating on an updraft (state 0x82) in its cuboid (`+0x00`) loses his lift
+/// ten times as fast: nine more frames off it (`0x300ee0(0x18a3d0)`, a sixtieth each, not below 0).
+pub fn update_123a(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    if !ctx.level.in_cuboid(w.mobys[id].pv_i(0), ctx.hero.pos) || ctx.hero.state != 0x82 { return; }
+    let lift = &mut ctx.hero.gear.lift;
+    for _ in 0..9 { *lift = if 1.0 / 60.0 < *lift { *lift - 1.0 / 60.0 } else { 0.0 }; }
+}
+
+/// `0x308a80(text, slot, kind, zone, off)`: L11's zone help, as L03's (crate::moby::classes::oozla::zone_help, whose
+/// kind 3 here asks while the slot's levels word lacks bit 31).
+fn zone_help(ctx: &mut Ctx, text: i32, slot: i32, kind: i32, zone: i32, off: i32) {
+    if kind != 3 { return super::super::oozla::zone_help(ctx, text, slot, kind, zone, off); }
+    let k = slot.max(0) as usize;
+    if ctx.game.help_counts.get(k).copied().unwrap_or(-1) == -1 { return; }
+    if off != -1 && ctx.level.in_cuboid(off, ctx.hero.pos) {
+        ctx.game.help_counts[k] = -1;
+        return;
+    }
+    if !ctx.level.in_cuboid(zone, ctx.hero.pos) || (ctx.game.help_levels[k] as i32) < 0 { return; }
+    ctx.game.help(text, slot);
+}
+
+/// 0x0c2d (`0x414290`, 1 placed): the level's help texts. Its pvars: `+0x00` a cuboid, `+0x04` / `+0x0c` two zones,
+/// `+0x08` / `+0x10` two timers (420 and 300 ticks). **0**: update distance 0xff, the timers, **1**. **1** each tick:
+/// with item 8 had, 0x9ff (slot 0x56, kind 3) in `+0x04`; with the arena on (`0x1a9010`) after the second frame the
+/// slot 0x56 off; Ratchet in `+0x00` with the timer out, 0xa00 (slot 0x57; `0x3076b8`) and the timer again; with the
+/// Charge Boots (0x36), 0xa03 (slot 0x5a, kind 0) in `+0x0c`; with item 0x13 and the slot 0x94 never shown, 0xa3d
+/// (slot 0x94) when the second timer runs out (once).
+///
+/// Not ported: the halfword `0x194158` the 0xa00 help also waits on (nothing in the code writes it; taken as 0).
+pub fn update_0c2d(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    let m = &mut w.mobys[id];
+    if m.state == 0 {
+        m.state = 1;
+        m.update_dist = 0xff;
+        m.set_pv_i(8, 0x1a4);
+        m.set_pv_i(0x10, 300);
+    }
+    if m.state != 1 { return; }
+    let item = |ctx: &Ctx, k: usize| ctx.game.items.get(k).is_some_and(|&b| b != 0);
+    if item(ctx, 8) { zone_help(ctx, 0x9ff, 0x56, 3, w.mobys[id].pv_i(4), -1); }
+    if ctx.game.arena_on && 2 < ctx.game.frame { ctx.game.help_counts[0x56] = -1; }
+    if ctx.level.in_cuboid(w.mobys[id].pv_i(0), ctx.hero.pos) {
+        let m = &mut w.mobys[id];
+        let mut t = m.pv_i(8);
+        let out = countdown(&mut t);
+        m.set_pv_i(8, t);
+        if out {
+            ctx.game.help(0xa00, 0x57);
+            w.mobys[id].set_pv_i(8, 0x1a4);
+        }
+    }
+    if item(ctx, 0x36) { zone_help(ctx, 0xa03, 0x5a, 0, w.mobys[id].pv_i(0xc), -1); }
+    if item(ctx, 0x13) && ctx.game.help_counts.get(0x94).copied() == Some(0) {
+        let m = &mut w.mobys[id];
+        let mut t = m.pv_i(0x10);
+        let out = countdown(&mut t);
+        m.set_pv_i(0x10, t);
+        if out { ctx.game.help(0xa3d, 0x94); }
+    }
+}
+
+/// `0x337298(r, yaw, pitch, out)`: the point `r` away at the yaw and pitch.
+fn polar(r: f32, yaw: f32, pitch: f32) -> V3 { [yaw.cos() * r * pitch.cos(), yaw.sin() * r * pitch.cos(), pitch.sin() * r] }
+
+/// 0x0dfd (`0x458678`, 23 placed): sparks drifting round it. Its pvars (floats): `+0x00..` up to 8 points (16 bytes
+/// each), `+0x80` how many (at most 8), `+0x84` / `+0x88` the nearest and farthest, `+0x8c` / `+0x90` the highest and
+/// lowest pitch, `+0x94` / `+0x98` the distance's drift (a second), `+0x9c` the turn (°/tick), `+0xa0` / `+0xa4` the
+/// pitch's drift (°). **0**: each point at a random distance (`randf`) a random yaw and pitch (`0x32de28`) from it, **1**.
+/// **1**: its draw ([`draw_0dfd`], `0x4588f8`); each point turned by the turn about it, its pitch drifted
+/// (`0x32ddc0`, crate::rng::Rng::randf_signed) and held to the range, its distance drifted and held to the range.
+pub fn update_0dfd(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    let rng = &mut ctx.game.rng;
+    let m = &mut w.mobys[id];
+    let deg = 0.017_453_294;
+    if m.state == 0 {
+        if 8 < m.pv_i(0x80) { m.set_pv_i(0x80, 8); }
+        m.state = 1;
+        for k in 0..m.pv_i(0x80).max(0) as usize {
+            let r = rng.randf(m.pv_f(0x84), m.pv_f(0x88));
+            let (yaw, pitch) = (rng.rand_angle(), rng.rand_angle());
+            let p = add(polar(r, yaw, pitch), m.pos);
+            m.set_pv_v(0x10 * k, p);
+        }
+    }
+    if m.state != 1 { return; }
+    w.register_draw(id);
+    let m = &mut w.mobys[id];
+    for k in 0..m.pv_i(0x80).max(0) as usize {
+        let (o, p) = (m.pos, m.pv_v(0x10 * k));
+        let yaw = sub_rot(atan2(p[0] - o[0], p[1] - o[1]), m.pv_f(0x9c) * deg);
+        let pitch = atan2(dist2(o, p), p[2] - o[2]);
+        let drift = rng.randf_signed(m.pv_f(0xa4), m.pv_f(0xa0));
+        let pitch = sub_rot(pitch, drift * deg).min(m.pv_f(0x8c)).max(m.pv_f(0x90));
+        let grow = rng.randf_signed(m.pv_f(0x98) / 60.0, m.pv_f(0x94) / 60.0);
+        let r = (dist(o, p) + grow).min(m.pv_f(0x88)).max(m.pv_f(0x84));
+        m.set_pv_v(0x10 * k, add(polar(r, yaw, pitch), o));
+    }
+}
+
+/// `0x4588f8`: 0x0dfd's sparks — at each point two sprites of FX 0x31 (`$gp+0x2e24`) facing the camera, pushed 0.08
+/// toward it, each at a random roll (`0x2edf78`, crate::fx::sprite): 0.2 across in 0x3f106060 (`$gp+0x2e2c` /
+/// `+0x2e28`), then 0.08 in 0x80808080, additive.
+pub fn draw_0dfd(w: &MobyWorld, id: usize, rng: &mut crate::rng::Rng, cam: V3, out: &mut Vec<crate::fx::FxQuad>) {
+    let m = &w.mobys[id];
+    for k in 0..m.pv_i(0x80).clamp(0, 8) as usize {
+        let p = m.pv_v(0x10 * k);
+        let push = f32::from_bits(0x3da3_d70a);
+        crate::fx::sprite(out, 0.2, push, rng.rand_angle(), p, cam, 0x31, 0x3f10_6060, true);
+        crate::fx::sprite(out, 0.2 * 0.4, push, rng.rand_angle(), p, cam, 0x31, 0x8080_8080, true);
+    }
+}

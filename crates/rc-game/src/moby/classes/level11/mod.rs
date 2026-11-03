@@ -3,8 +3,10 @@
 //! its draw callback, if any, in [`draw`]; crate::moby::classes::update_for and crate::fx ask these after their own.
 //!
 //! * [`movers`]: the floors, columns and blocks the Dynamo's targets and the hologram lift move.
+//! * [`props`]: the small objects (the Hacker's gate, the help texts, the sparks, ...).
 
 pub mod movers;
+pub mod props;
 
 use crate::hero::physics::V3;
 use crate::moby::{Ctx, MobyWorld};
@@ -34,6 +36,11 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         0x0c7a => Some(movers::update_0c7a),
         0x0c78 | 0x0b71 | 0x0b72 | 0x0b73 | 0x0b74 => Some(movers::update_slider),
         0x0a1f => Some(movers::update_0a1f),
+        0x117a => Some(props::update_117a),
+        0x117e => Some(props::update_117e),
+        0x123a => Some(props::update_123a),
+        0x0c2d => Some(props::update_0c2d),
+        0x0dfd => Some(props::update_0dfd),
         _ => None,
     }
 }
@@ -42,6 +49,8 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
 #[allow(clippy::too_many_arguments, unused_variables)]
 pub fn draw(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut crate::game::GameState, hero_state: i32, view: &crate::particles::BSphereView, cam: V3, id: usize, first: bool, out: &mut Vec<crate::fx::FxQuad>, frame: &mut Vec<crate::fx::FrameQuad>) -> bool {
     match w.mobys[id].o_class {
-        _ => false,
+        0x0dfd => props::draw_0dfd(w, id, &mut game.rng, cam, out),
+        _ => return false,
     }
+    true
 }
