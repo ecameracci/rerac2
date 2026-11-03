@@ -6,6 +6,7 @@ use crate::hero::physics::V3;
 use crate::moby::MobyWorld;
 
 pub mod breakables;
+pub mod field;
 pub mod lifts;
 pub mod props;
 pub mod tractor;
@@ -27,6 +28,7 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         0x0fd9 => Some(lifts::update_0fd9),
         0x0fc6 | 0x0fc7 | 0x0fc8 => Some(tractor::update_0fc6),
         0x0f6a => Some(tractor::update_0f6a),
+        0x0f00 => Some(field::update_0f00),
         // `0x38b400`: `jr ra`, as level 4's U293 classes.
         0x1354 => Some(super::level04::misc::update_empty),
         _ => None,
