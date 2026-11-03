@@ -31,6 +31,8 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         0x0f6a => Some(tractor::update_0f6a),
         0x0f00 => Some(field::update_0f00),
         0x086a => Some(head::update_086a),
+        0x117b => Some(props::update_117b),
+        0x0ee8 => Some(props::update_0ee8),
         // `0x38b400`: `jr ra`, as level 4's U293 classes.
         0x1354 => Some(super::level04::misc::update_empty),
         _ => None,

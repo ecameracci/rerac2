@@ -140,3 +140,23 @@ pub fn update_1351(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         _ => {}
     }
 }
+
+/// 0x117b (`0x426910`, one): a flag cuboid. **0**: its cuboid `+0x68`[0] (−1 none) with Ratchet in it (`0x325270`): the
+/// flag byte `0x1395db` set, 1.
+pub fn update_117b(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    let c = w.mobys[id].pv_i(0);
+    if w.mobys[id].state == 0 && c != -1 && ctx.level.in_cuboid(c, ctx.hero.pos) {
+        if let Some(f) = ctx.game.flags.get_mut(0x23) { *f = 1; }
+        w.mobys[id].set_state(1, -1);
+    }
+}
+
+/// 0x0ee8 (`0x413908`, one): **0**: hooked (`0x32eb40`) → 1. **1**: up 5 a second until 160 high.
+pub fn update_0ee8(w: &mut MobyWorld, id: usize, _ctx: &mut Ctx) {
+    let m = &mut w.mobys[id];
+    match m.state {
+        0 => if m.once & 4 != 0 { m.set_state(1, -1) },
+        1 => if m.pos[2] < 160.0 { m.pos[2] += f32::from_bits(0x3daa_aaab) },
+        _ => {}
+    }
+}
