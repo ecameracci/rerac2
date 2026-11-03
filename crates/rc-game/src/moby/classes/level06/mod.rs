@@ -8,8 +8,7 @@
 //!   0x0fcf / 0x0fe4 (`0x4581c8`) (G-PRT-001); 0x0eb1 (`0x451ad0`, items, G-WPN-002); 0x0bc7 (`0x422070`) and 0x0fe6
 //!   (`0x45bbc8`), the line test (G-CLS-005); the lift 0x0849 (`0x3fc598`), its stop on what is under it (the sphere
 //!   query `0x31f0c0`, G-CLS-013).
-//! * Large enemies and objects on the enemy framework, not reached in this pass: the critters 0x0db0 (`0x444828`, 87
-//!   placed: its helpers `0x444fe0` / `0x445388` / `0x4453c0` / `0x445710` and its draw `0x4458a8`), 0x0bba
+//! * Large enemies and objects on the enemy framework, not reached in this pass: the critters 0x0bba
 //!   (`0x41f460`, 40 placed) and the switch 0x0fdc (`0x4594e8`) that wakes them, the falling pole 0x12c4
 //!   (`0x466008`), 0x0ccf (`0x4318a0`).
 //! * Ratchet's: the ferry 0x0330 (`0x3e5460`, L11 `0x3b7340`: a ride on paths with its own controls), 0x0947
@@ -22,6 +21,7 @@
 //!   `0x21ecc4` and the path points' `w`), 0x1240 (`0x465f18`: the level's table `0x1b21c4`, `0x47c358`).
 
 pub mod breakables;
+pub mod glowbug;
 pub mod lifts;
 pub mod props;
 pub mod traffic;
@@ -51,6 +51,7 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         0x0c4b => Some(props::update_0c4b),
         0x0e8e => Some(props::update_0e8e),
         0x08c9 => Some(lifts::update_08c9),
+        glowbug::CLASS => Some(glowbug::update_0db0),
         _ => None,
     }
 }
@@ -59,6 +60,7 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
 #[allow(clippy::too_many_arguments, unused_variables)]
 pub fn draw(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut crate::game::GameState, hero_state: i32, view: &crate::particles::BSphereView, cam: V3, id: usize, first: bool, out: &mut Vec<crate::fx::FxQuad>, frame: &mut Vec<crate::fx::FrameQuad>) -> bool {
     match w.mobys[id].o_class {
+        glowbug::CLASS => { glowbug::draw(w, id, host, cam, out); true }
         _ => false,
     }
 }
