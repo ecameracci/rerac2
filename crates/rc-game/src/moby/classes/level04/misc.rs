@@ -239,15 +239,17 @@ const F61_SPIN: (f32, f32) = (90.0, 360.0);
 const F61_H: [f32; 8] = [-8.0, -2.0, 6.0, 0.0, 8.0, 2.0, 12.0, 0.0];
 
 /// 0x0f61 (`0x44c268`, 4 placed): a hidden breakable. **0**: not drawn (`+0x31` = 0), mode | 1; 1. **1**: a hit
-/// with the flags 0x4010000 while `+0x68`[0] = 0 breaks it (2); the record let go. **2**: its pieces (`0x34e7b8`,
-/// crate::moby::shards::throw_all: [`F61_H`], spin / gravity as above, all pointed, its sound 0, flags 1: no bolts of
+/// with the flags 0x4010000 while `+0x68`[0] = 0 breaks it (2); the record let go. **2**: its pieces (`0x34e7b8`;
+/// see below: [`F61_H`], spin / gravity as above, all pointed, its sound 0, flags 1: no bolts of
 /// their own), five times the level's bolts (`0x3499a8`), and at 4 up its frame (`0x3484d0`) the explosion three
 /// times (`0x342128` = L00 `0x320538`, crate::moby::blast::explode: flashes 3 / 1 past 9, size 2.25, light 15, 50
 /// embers, 10 billows, 10 flares, the shake, 7 debris; then twice 5 embers, a billow and a flare with the colour
 /// shifts 1 and 2, flags 0x810001); deleted.
 ///
 /// Not ported: the tie group `+0x68`[1] its break hides (`$gp−0x5fdc`'s lists, the records `0x1b2b54` + 0x20·i,
-/// `+0x1e` | 4).
+/// `+0x1e` | 4); `0x34e7b8` gives each piece its velocity by its place in the pieces' box (x across `h[0]..h[4]` from
+/// the box's one side to the other, y and z alike, through its rows, × 0.25..1) — here the pieces take
+/// crate::moby::shards::throw_all's (`0x34e4e0`) random velocities in the same ranges.
 pub fn update_0f61(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     match w.mobys[id].state {
         0 => {
@@ -404,4 +406,80 @@ pub fn update_0f9c(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     }
     w.clear_hit(id);
     w.delete(id);
+}
+
+/// 0x0f71 (`0x44d438`, 33 placed; Ghidra has no function there): a lamp. **0**: its glow (`0x362ba0` = L00 `0x33f550`,
+/// crate::particles::glow: 5250000 × its scale, pulled 15 × it, at (−21.5, 0, 0) × its scale in its frame, `0x40208080`,
+/// lasting; its handle `+0x68`[1]); 1. **1**: a hit with the flags 0x4010000 while `+0x68`[0] = 0 breaks it (2); the
+/// record let go. **2**: its pieces (`0x34e4e0`, crate::moby::shards::throw_all: x / y −5..5, z 5..10, spin 90..360,
+/// gravity 10..20, all pointed, its sound 0, not through its rows, the level's bolts), 45 puffs of smoke
+/// (`0x30dbb0`, crate::particles::staged_box: out of the line from (−15, 0, 0), drifting (−10, −4, −4)..(−3, 5, 4) a
+/// second, kind 0), a blast at its place (`0x433d50` = L00 `0x3f8348(5 × its scale, 20, pos, 0, 0x19, 0x14, 0x14,
+/// 0x14, 0x2d, 1, 1, ...)`, crate::moby::blast::burst: no shake, its light; the head point it works out first, (−21.5,
+/// 0, 0) through its frame, is not used); deleted.
+pub fn update_0f71(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    match w.mobys[id].state {
+        0 => {
+            let m = &w.mobys[id];
+            let (s, pos) = (m.scale, m.pos);
+            let h = ctx.parts.as_deref_mut().and_then(|sys| crate::particles::glow(sys, &mut ctx.game.rng, s * 5_250_000.0, s * 15.0, [-21.5 * s, 0.0, 0.0], id, pos, -1, false, 0x4020_8080, -1));
+            let m = &mut w.mobys[id];
+            m.set_pv_i(4, h.map_or(0, |h| h as i32));
+            m.set_state(1, -1);
+        }
+        1 => {
+            if w.hit_message(id).is_some_and(|h| h.tmpl.flags & 0x0401_0000 != 0) && w.mobys[id].pv_i(0) == 0 { w.mobys[id].set_state(2, -1); }
+            w.clear_hit(id);
+        }
+        2 => {
+            crate::moby::shards::throw_all(w, id, ctx, [-5.0, -5.0, 5.0, 0.0, 5.0, 5.0, 10.0, 0.0], (90.0, 360.0), (10.0, 20.0), 0xffff, 0, -1, 8, 0xffff);
+            let m = &w.mobys[id];
+            let (rows, pos, s) = (m.rows, m.pos, m.scale);
+            if let Some(sys) = ctx.parts.as_deref_mut() {
+                crate::particles::staged_box(sys, &mut ctx.game.rng, &rows, pos, s, [-15.0, 0.0, 0.0], [-15.0, 0.0, 0.0], [-10.0, -4.0, -4.0], [-3.0, 5.0, 4.0], 0x2d, 0);
+            }
+            let b = crate::moby::blast::Blast { size: 5.0 * s, bursts: [0x19, 0x14, 0x14], puffs: 0x14, streaks: 0x2d, light: true, shake: false };
+            crate::moby::blast::burst(w, ctx, pos, &b);
+            w.delete(id);
+        }
+        _ => {}
+    }
+}
+
+/// 0x0c17's timer (the level's word `$gp+0x1ce8`; one placed, so kept in its pvars).
+const C17_TIMER: usize = 0x100;
+
+/// 0x0c17 (`0x423960`, one placed): a burning spot. Every tick a hit sphere of 1 at its place (`0x33ed50`: 1 damage,
+/// push 1, flags 0x10001, kind bytes 5 / 1); the sphere's world-and-moby test (`0x3000e0` = L00 `0x2df8d8(1, pos, 1,
+/// m)`) meeting Ratchet first starts 60 ticks (unless running) of smoke off him: each tick, points through his body
+/// (`0x31fa80` → `0x31e100(14, hero, 20, ·, 0xffff)`, crate::moby::shards::random_points), from each a trail puff
+/// (`0x332c10`, crate::particles::trail: 0.03 a random way and 0.015 up a tick, `0x7000a0ff` to `0x000000ff`, 20..35
+/// ticks, 30 growing 40..60, additive); the timer down.
+pub fn update_0c17(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    let pos = w.mobys[id].pos;
+    crate::moby::ai::attack_sphere(w, id, ctx, 1.0, 1.0, 1.0, pos, 0x10001, 5, 1, 0);
+    let touched = ctx.coll.and_then(|c| crate::collision::coll_sphere_m(c, ctx.scene, pos, 1.0, crate::collision::QueryFlags(1), Some(id))).and_then(|o| o.moby);
+    let mut t = w.mobys[id].pv_i(C17_TIMER);
+    if touched.is_some() && touched == ctx.hero_moby && t <= 0 { t = 0x3c; }
+    if t < 1 {
+        w.mobys[id].set_pv_i(C17_TIMER, t);
+        return;
+    }
+    if let Some(h) = ctx.hero_moby {
+        let pts = crate::moby::shards::random_points(w, h, ctx, 14.0, 0x14, 0xffff);
+        if let Some(sys) = ctx.parts.as_deref_mut() {
+            let rng = &mut ctx.game.rng;
+            for p in pts {
+                let (yaw, pitch) = (rng.rand_angle(), rng.rand_angle());
+                let r = f32::from_bits(0x3cf5_c290);
+                let mut v = [yaw.cos() * r * pitch.cos(), yaw.sin() * r * pitch.cos(), pitch.sin() * r];
+                v[2] += f32::from_bits(0x3c75_c290);
+                let life = rng.rand_range(0x14, 0x23);
+                let grow = rng.rand_range(0x28, 0x3c) as i16;
+                crate::particles::trail(sys, rng, p, v, 0x7000_a0ff, 0xff, life, 0x1e, grow, true);
+            }
+        }
+    }
+    crate::moby::countdown(&mut t);
+    w.mobys[id].set_pv_i(C17_TIMER, t);
 }
