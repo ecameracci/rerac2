@@ -7,6 +7,7 @@ use crate::moby::MobyWorld;
 
 pub mod beast;
 pub mod misc;
+pub mod platforms;
 pub mod rider;
 
 /// This level's class updates.
@@ -18,6 +19,10 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         0x1293 => Some(misc::update_1293),
         0x0a99 => Some(misc::update_0a99),
         0x0ab8 => Some(misc::update_0ab8),
+        0x0cfd => Some(misc::update_0cfd),
+        0x0f61 => Some(misc::update_0f61),
+        0x0968 => Some(platforms::update_0968),
+        0x09eb => Some(platforms::update_09eb),
         _ => None,
     }
 }
