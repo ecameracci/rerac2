@@ -31,7 +31,8 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         rider::CLASS => Some(rider::update),
         beast::CLASS => Some(beast::update),
         skitter::CLASS => Some(skitter::update),
-        launcher::CLASS => Some(launcher::update_0a58),
+        // Level 6's 0x0a50 is the same unit (L06 `0x40a4c8`).
+        launcher::CLASS | 0x0a50 => Some(launcher::update_0a58),
         launcher::CARRIER => Some(launcher::update_0e44),
         0x0969 | 0x0e1b | 0x0e1c => Some(misc::update_empty),
         0x1293 => Some(misc::update_1293),
