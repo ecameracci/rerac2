@@ -9,6 +9,7 @@
 //! * **0x02ee** ([`update_02ee`], `0x3e22c0`, 1 placed): a planet's coordinates.
 //! * **0x07ef** ([`update_07ef`], `0x3f5e50`, 1 placed): deletes itself.
 //! * **0x0c4b** ([`update_0c4b`], `0x42cdf0`, 1 placed): opens and closes when its group pokes it.
+//! * **0x0e8e** ([`update_0e8e`], `0x44c848`, 1 placed): sets two flag bytes when Ratchet comes in.
 
 use crate::hero::physics::add_rot;
 use crate::moby::{Ctx, MobyWorld};
@@ -318,4 +319,17 @@ pub fn update_0c4b(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         },
         _ => {}
     }
+}
+
+/// 0x0e8e (`0x44c848`, 1 placed): in state 0, Ratchet in its cuboid `+0x68`[0] (−1 none; `0x3622d0`) sets the
+/// game's flag bytes `0x1395cb` and `0x1395cc` (crate::game::GameState::flags `[0x13]` / `[0x14]`), 1. (Its two
+/// debug prints are not ported.)
+pub fn update_0e8e(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    let m = &w.mobys[id];
+    let c = m.pv_i(0);
+    if m.state != 0 || c == -1 || !ctx.level.in_cuboid(c, ctx.hero.pos) { return; }
+    for k in [0x13, 0x14] {
+        if let Some(b) = ctx.game.flags.get_mut(k) { *b = 1; }
+    }
+    w.mobys[id].set_state(1, -1);
 }

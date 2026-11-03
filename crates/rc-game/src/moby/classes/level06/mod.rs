@@ -3,6 +3,7 @@
 //! its draw callback, if any, in [`draw`]; crate::moby::classes::update_for and crate::fx ask these after their own.
 
 pub mod breakables;
+pub mod lifts;
 pub mod props;
 pub mod traffic;
 
@@ -29,6 +30,8 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         0x02ee => Some(props::update_02ee),
         0x07ef => Some(props::update_07ef),
         0x0c4b => Some(props::update_0c4b),
+        0x0e8e => Some(props::update_0e8e),
+        0x08c9 => Some(lifts::update_08c9),
         _ => None,
     }
 }
