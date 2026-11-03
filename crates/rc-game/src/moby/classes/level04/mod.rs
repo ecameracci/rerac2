@@ -5,7 +5,7 @@
 //! Not ported yet (level 4's own list; docs/plan/gaps.md has the systems):
 //! * **0x0bbc** (`0x41b020`, Ratchet's hoverbike), **0x0474** / **0x0cef** (`0x3c9760`, its flames), **0x0b2d** (`0x405aa0`, the
 //!   racers): the hoverbike race (G-LVL-010).
-//! * **0x0960** (`0x3e9320`): its particles (G-PRT-001). **0x0d61** (`0x43a100`): the reward items (G-WPN-002).
+//! * **0x0960** (`0x3e9320`): a liquid surface's grid and ripples (G-REN-009).
 //! * **0x0c38** (`0x424978`), **0x0d3e** (`0x4362f0`), **0x0da8** (`0x43b090`): NPCs on the talk prompt (G-UI-010).
 //! * **0x0c26** (`0x423a38`): the level's help-text controller (help texts 0x9b5..0x9de and 0xa3c on its cuboids,
 //!   over many of Ratchet's and the game's words not yet named).
@@ -43,6 +43,7 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         0x1157 => Some(misc::update_1157),
         0x123f => Some(misc::update_123f),
         0x0d8f => Some(misc::update_0d8f),
+        0x0d61 => Some(misc::update_0d61),
         0x0f9c => Some(misc::update_0f9c),
         0x0f71 => Some(misc::update_0f71),
         0x0c17 => Some(misc::update_0c17),

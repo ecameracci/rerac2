@@ -483,3 +483,43 @@ pub fn update_0c17(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     crate::moby::countdown(&mut t);
     w.mobys[id].set_pv_i(C17_TIMER, t);
 }
+
+/// `0x33e388(group, −1)`: the group's live members (not deleted, under state 0x80).
+fn live_members(w: &MobyWorld, g: i32) -> usize {
+    usize::try_from(g).ok().and_then(|g| w.groups.get(g)).map_or(0, |l| l.iter().filter(|&&k| w.mobys.get(k as usize).is_some_and(|m| m.state < 0x80)).count())
+}
+
+/// 0x0d61 (`0x43a100`, three placed): a barrier that sinks out of the way once its groups (`+0x68`[0..4]) are
+/// cleared. **0**: Ratchet's colour words, mode | 0x800, 1. **1**: any of its groups with a live member keeps it
+/// (with `+0x68`[4] in the challenge mode only its first group does) unless its mission's bit 0x80 is set; else its
+/// class sound 0, 2. **2**: down 17 a second while at or over z 30; under it, 4.
+pub fn update_0d61(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    if w.mobys[id].state == 0 {
+        if let Some(h) = ctx.hero_moby.and_then(|h| w.mobys.get(h)) {
+            let (l, a) = (h.light, h.ambient);
+            let m = &mut w.mobys[id];
+            m.light = l;
+            m.ambient = a;
+        }
+        let m = &mut w.mobys[id];
+        m.mode |= 0x800;
+        m.state = 1;
+    }
+    if w.mobys[id].state == 1 {
+        let m = &w.mobys[id];
+        let groups: Vec<i32> = (0..4).map(|k| m.pv_i(4 * k)).collect();
+        let mut held = groups.iter().any(|&g| live_members(w, g) != 0);
+        if m.pv_i(0x10) != 0 && ctx.game.challenge && live_members(w, groups[0]) == 0 { held = false; }
+        let level = ctx.game.level.max(0) as usize;
+        let done = ctx.game.missions.get(level * 0x10 + m.mission as usize).is_some_and(|b| b & 0x80 != 0);
+        if !held || done {
+            ctx.host.play_sound(&w.mobys[id], 0, 0);
+            w.mobys[id].state = 2;
+        }
+    }
+    if w.mobys[id].state == 2 {
+        let m = &mut w.mobys[id];
+        if 30.0 <= m.pos[2] { m.pos[2] -= f32::from_bits(0x3e91_1112); }
+        if m.pos[2] < 30.0 { m.state = 4; }
+    }
+}
