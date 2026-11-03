@@ -582,6 +582,11 @@ pub(crate) fn capsule_tri(fl: u32, c_rel: V3, h: F, v0: V3, v1: V3, v2: V3, best
 /// [`coll_sphere`] with the moby pass (`a2 = ignore`): the world mesh (unless
 /// [`QueryFlags::SKIP_WORLD`]), then the mobys of `scene` sharing the running best.
 pub(crate) fn coll_sphere_m(mesh: &Collision, scene: Option<&MobyScene>, centre: [f32; 3], radius: f32, flags: QueryFlags, ignore: Option<usize>) -> Option<CollOutput> {
+    coll_sphere_live(mesh, scene, centre, radius, flags, ignore, &|_| true)
+}
+
+/// [`coll_sphere_m`] against the mobys as they are now (as [`coll_line_live`]).
+pub(crate) fn coll_sphere_live(mesh: &Collision, scene: Option<&MobyScene>, centre: [f32; 3], radius: f32, flags: QueryFlags, ignore: Option<usize>, live: &dyn Fn(usize) -> bool) -> Option<CollOutput> {
     let fl = flags.0;
     let vol = Volume::new(centre, radius, None)?;
     let mut best_d = mul(vol.rr, BEST_SHRINK);
@@ -601,7 +606,7 @@ pub(crate) fn coll_sphere_m(mesh: &Collision, scene: Option<&MobyScene>, centre:
         }
     }
     if let Some(sc) = scene {
-        best = mobys::volume_pass(sc, fl, &vol, None, ignore, &mut best_d, best);
+        best = mobys::volume_pass(sc, fl, &vol, None, ignore, live, &mut best_d, best);
     }
     best.map(|b| output(b, best_d, Some(vol.pushed(&b, best_d, false))))
 }
@@ -628,7 +633,7 @@ pub(crate) fn coll_capsule_m(mesh: &Collision, scene: Option<&MobyScene>, base: 
         }
     }
     if let Some(sc) = scene {
-        best = mobys::volume_pass(sc, fl, &vol, Some(h), ignore, &mut best_d, best);
+        best = mobys::volume_pass(sc, fl, &vol, Some(h), ignore, &|_| true, &mut best_d, best);
     }
     best.map(|b| output(b, best_d, Some(vol.pushed(&b, best_d, true))))
 }

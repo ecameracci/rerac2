@@ -380,7 +380,7 @@ fn prim_best(i: usize, point: V3, normal: V3, prev: Option<&Best>, id: usize) ->
 
 /// The moby pass of the sphere (`h = None`) and capsule kernels, after the world pass.
 #[allow(clippy::too_many_arguments)]
-pub(super) fn volume_pass(sc: &MobyScene, fl: u32, vol: &Volume, h: Option<F>, ignore: Option<usize>, best_d: &mut F, mut best: Option<Best>) -> Option<Best> {
+pub(super) fn volume_pass(sc: &MobyScene, fl: u32, vol: &Volume, h: Option<F>, ignore: Option<usize>, live: &dyn Fn(usize) -> bool, best_d: &mut F, mut best: Option<Best>) -> Option<Best> {
     let c = vol.c1024;
     let r = vol.r1024;
     let lo = [0, 1].map(|k| (ftoi0(vol.lo1024[k]) as u32) >> 14);
@@ -390,7 +390,7 @@ pub(super) fn volume_pass(sc: &MobyScene, fl: u32, vol: &Volume, h: Option<F>, i
         for x in lo[0]..=hi[0] {
             for &idx in sc.grid.cell(x, y) {
                 let id = idx as usize;
-                if Some(id) == ignore { continue; }
+                if Some(id) == ignore || !live(id) { continue; }
                 let Some(m) = sc.mobys.moby(id) else { continue };
                 if stamped.contains(&id) || !m.collision { continue; }
                 let bs = m.bsphere;

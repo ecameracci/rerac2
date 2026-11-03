@@ -227,7 +227,10 @@ fn push_out(w: &mut MobyWorld, id: usize, ctx: &Ctx) -> bool {
     let up = [0.0, 0.0, h + r];
     let c = add(m.pos, up);
     let flags = if m.pv_i(o + 0x38) & 2 != 0 { 6 } else { 4 };
-    let Some(hit) = ctx.coll.and_then(|cl| crate::collision::coll_sphere_m(cl, ctx.scene, c, r, crate::collision::QueryFlags(flags), Some(id))) else { return false };
+    // Against the mobys as they are now: a part whose collision its owner turned off for its update (as the
+    // original's kernels read the live `+0x98`) does not push it.
+    let live = |k: usize| w.mobys.get(k).is_some_and(|m| m.has_collision && m.state < 0xfd);
+    let Some(hit) = ctx.coll.and_then(|cl| crate::collision::coll_sphere_live(cl, ctx.scene, c, r, crate::collision::QueryFlags(flags), Some(id), &live)) else { return false };
     let m = &mut w.mobys[id];
     set_link(m, o + 0x84, hit.moby);
     m.set_pv_v(o + 0x60, hit.point);

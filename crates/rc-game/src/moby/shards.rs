@@ -148,7 +148,7 @@ pub fn spawn_ball(w: &mut MobyWorld, ctx: &mut Ctx, o_class: i16, src: Option<us
 }
 
 #[allow(clippy::too_many_arguments)]
-fn spawn(w: &mut MobyWorld, ctx: &mut Ctx, o_class: i16, src: Option<usize>, pos: V3, rot: V3, rows: Option<[V3; 3]>, spin: f32, gravity: f32, piece: u8, vel: V3, sound: u8, body: u8) -> Option<usize> {
+pub(crate) fn spawn(w: &mut MobyWorld, ctx: &mut Ctx, o_class: i16, src: Option<usize>, pos: V3, rot: V3, rows: Option<[V3; 3]>, spin: f32, gravity: f32, piece: u8, vel: V3, sound: u8, body: u8) -> Option<usize> {
     let info = w.class(o_class)?;
     let class_scale = info.scale;
     let (centre, n, radius) = if body == 0 {

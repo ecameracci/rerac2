@@ -52,7 +52,6 @@ use crate::moby::{ai, mode, Ctx, MobyWorld};
 
 const HEALTH: usize = 0x20;
 const FLASH: usize = 0x50;
-const REACT: usize = 0x60;
 const T_MOBY: usize = 0x120;
 const AREA: usize = 0x130;
 const RAISED: usize = 0x13c;
