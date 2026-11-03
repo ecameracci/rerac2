@@ -4,11 +4,13 @@
 //!
 //! * [`movers`]: the floors, columns and blocks the Dynamo's targets and the hologram lift move.
 //! * [`critters`]: the birds 0x1105.
+//! * [`stalks`]: the sparked stalks 0x10ea / 0x118c.
 //! * [`props`]: the small objects (the Hacker's gate, the help texts, the sparks, ...).
 
 pub mod critters;
 pub mod movers;
 pub mod props;
+pub mod stalks;
 
 use crate::hero::physics::V3;
 use crate::moby::{Ctx, MobyWorld};
@@ -54,6 +56,7 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         0x1105 => Some(critters::update_1105),
         0x12c7 => Some(props::update_12c7),
         0x08e2 => Some(props::update_08e2),
+        0x10ea | 0x118c => Some(stalks::update),
         _ => None,
     }
 }
@@ -63,6 +66,7 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
 pub fn draw(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut crate::game::GameState, hero_state: i32, view: &crate::particles::BSphereView, cam: V3, id: usize, first: bool, out: &mut Vec<crate::fx::FxQuad>, frame: &mut Vec<crate::fx::FrameQuad>) -> bool {
     match w.mobys[id].o_class {
         0x0dfd => props::draw_0dfd(w, id, &mut game.rng, cam, out),
+        0x10ea | 0x118c => stalks::draw(w, id, &mut game.rng, cam, out),
         _ => return false,
     }
     true
