@@ -418,10 +418,11 @@ fn one(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut crate::ga
         crate::moby::classes::endako_c::SENTRY => crate::moby::classes::endako_c::draw_beam(w, id, game.frame, cam, out),
         // The levels' own (their modules' draws).
         _ => {
-            use crate::moby::classes::{level04, level06, level11};
+            use crate::moby::classes::{level04, level06, level11, level13};
             let _ = level04::draw(w, host, game, hero_state, view, cam, id, first, out, frame)
                 || level06::draw(w, host, game, hero_state, view, cam, id, first, out, frame)
-                || level11::draw(w, host, game, hero_state, view, cam, id, first, out, frame);
+                || level11::draw(w, host, game, hero_state, view, cam, id, first, out, frame)
+                || level13::draw(w, host, game, hero_state, view, cam, id, first, out, frame);
         }
     }
 }
