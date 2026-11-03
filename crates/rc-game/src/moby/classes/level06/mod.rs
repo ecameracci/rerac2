@@ -10,9 +10,11 @@
 //! * The challenge host 0x0ccf (`0x4318a0`): its talk (speech 0x1320 / 0x1321, the scene `0x3b3068`, the help
 //!   messages 0x4a / 0x4b / 0x4c, the bolt counts `0x295950` / `0x295954`; the dialogue system, G-UI-010).
 //! * Ratchet's: the ferry 0x0330 (`0x3e5460`, L11 `0x3b7340`: a ride on paths with its own controls), 0x0947
-//!   (`0x404c60`), 0x0b57 (`0x41b200`, Ratchet's state 0x37 and the level's scene functions `0x479xxx`).
-//! * The draws: 0x093e (`0x404680`, L11 `0x3d19f8`: a screen layer drawn by `0x403ac0`), 0x08a0 (`0x401b40`, its
-//!   draw `0x401f00`).
+//!   (`0x404c60`: a swimmer that grabs Ratchet in the water, his state 0x12, and throws him out, his state 0x6f
+//!   `0x2f96e8`), 0x0b57 (`0x41b200`, Ratchet's state 0x37 and the level's scene functions `0x479xxx`).
+//! * The draws: 0x093e (`0x404680`, L11 `0x3d19f8`: a screen layer drawn by `0x403ac0`), 0x08a0 (`0x401b40`:
+//!   nine shuffled symbols in a column, its draw `0x401f00` reading the table in its moby `+0x68`[3]'s pvars,
+//!   `+0x2c00` / `+0x12de0`).
 //! * The hints 0x0cdd (`0x4321e8`: help 0x9df / 0x9e0 / 0x9e1 / 0x9e2 / 0x9db / 0x9b5 by cuboids; it reads Ratchet's
 //!   `0x18c2d4`, the byte `0x1a7b27` and the table `0x21ecc4`, none mapped), 0x08a1 (`0x402450`: the table
 //!   `0x21ecc4` and the path points' `w`), 0x1240 (`0x465f18`: the level's table `0x1b21c4`, `0x47c358`).
