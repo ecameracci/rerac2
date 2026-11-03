@@ -7,6 +7,7 @@
 //! * **0x0dfd** (`0x458678`, 23): the drifting sparks ([`update_0dfd`] / [`draw_0dfd`]).
 //! * **0x12c7** (`0x399768`, 1): the level's skill points ([`update_12c7`]).
 //! * **0x08e2** (`0x3d0750`, 1): the updraft pad ([`update_08e2`]).
+//! * **0x0e49** (`0x45d080`, 1): the light shafts ([`update_0e49`] / [`draw_0e49`]).
 
 use crate::hero::physics::{add, atan2, dist, dist2, sub_rot, V3};
 use crate::moby::{countdown, Ctx, MobyWorld};
@@ -275,4 +276,72 @@ pub fn update_08e2(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     m.set_pv_f(4, a);
     let v = ((a.sin() * 128.0) as i32).clamp(0x20, 0x80) as u32;
     m.glow = if has { v << 8 } else { v } | 0x8000_0000;
+}
+
+/// 0x0e49 (`0x45d080`, 1 placed): the light shafts, a ring of two cones turning slowly about its first row. Not while
+/// the arena's chunk is in (`0x1caec0`). Its pvars: `+0x00` the alpha added to the cones (`+0x08` << 24), `+0x04`
+/// its step, `+0x08` its level. **0**: update distance 0xff, step 1, level 1, **1**. **1**: every 45 ticks in the
+/// state the step turns about (the level going 1..46 and back); the draw once a frame (`$gp+0x1764`, the first list
+/// `0x2f9490`; [`draw_0e49`]).
+pub fn update_0e49(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    if ctx.game.variant != 0 { return; }
+    let m = &mut w.mobys[id];
+    match m.state {
+        0 => {
+            m.update_dist = 0xff;
+            m.set_state(1, -1);
+            m.set_pv_i(4, 1);
+            m.set_pv_i(0, 0x100_0000);
+            m.set_pv_i(8, 1);
+        }
+        1 => {
+            if 0x2d <= m.state_ticks as u16 {
+                m.state_ticks = 0;
+                m.set_pv_i(4, -m.pv_i(4));
+            }
+            let l = m.pv_i(8) + m.pv_i(4);
+            m.set_pv_i(8, l);
+            m.set_pv_i(0, l << 24);
+            if w.level11.shafts_frame != ctx.game.frame {
+                w.level11.shafts_frame = ctx.game.frame;
+                w.register_draw_first(id);
+            }
+        }
+        _ => {}
+    }
+    let m = &mut w.mobys[id];
+    if m.state_ticks != -1 { m.state_ticks = m.state_ticks.wrapping_add(1); }
+}
+
+/// `0x45d180`: 0x0e49's cones. Its frame (its angles' rows at its place) turned about its first row by a turn every
+/// 600 frames (`frame % 600`) when the sphere 30 out along that row (radius 30) is in view within 512 (`0x3024c8`).
+/// Two quads of FX 5, additive (`0x2ff128`): corners (2, 0, 17.1) / (30, 0, 12.4) in 0x10101820, and (2, 0, 13.7) /
+/// (50, 0, 7.2) in 0x20102020 (`$gp+0x30e0..0x31a0`), each colour plus `+0x00`; ST (0.1, 0.5), (0.23, 1), (0.77, 0.5),
+/// (0.77, 1). Sixteen times: the first pair (the second, on odd steps) of each turned 60° about x in its frame, both
+/// quads drawn (`0x2fd670`, through the frame).
+pub fn draw_0e49(w: &MobyWorld, id: usize, frame: i32, view: &crate::particles::BSphereView, out: &mut Vec<crate::fx::FxQuad>) {
+    use crate::hero::physics::euler_rows;
+    let m = &w.mobys[id];
+    let th = (frame.rem_euclid(600)) as f32 * f32::from_bits(0x3ada_740e) * 2.0 * std::f32::consts::PI - std::f32::consts::PI;
+    let rows = euler_rows(m.rot);
+    let through = |v: V3, r: &[V3; 3]| -> V3 { std::array::from_fn(|k| v[0] * r[0][k] + v[1] * r[1][k] + v[2] * r[2][k]) };
+    let centre = add(m.pos, crate::hero::physics::scale(rows[0], 30.0));
+    let spin = if view.culled(512.0, [centre[0], centre[1], centre[2], 30.0]) { euler_rows([0.0; 3]) } else { euler_rows([th, 0.0, 0.0]) };
+    let world = |v: V3| add(m.pos, through(through(v, &spin), &rows));
+    // `R30·R30` (`0x301a78` of 30°, `0x301e00`).
+    let r60 = euler_rows([f32::from_bits(0x3f06_0a92) * 2.0, 0.0, 0.0]);
+    let add_a = |c: u32| c.wrapping_add(m.pv_i(0) as u32);
+    let st = [[0.1, 0.5], [0.23, 1.0], [0.77, 0.5], [0.77, 1.0]];
+    let mut quads = [
+        ([[2.0, 0.0, 17.1], [30.0, 0.0, 12.4], [2.0, 0.0, 17.1], [30.0, 0.0, 12.4]], add_a(0x1010_1820)),
+        ([[2.0, 0.0, 13.7], [50.0, 0.0, 7.2], [2.0, 0.0, 13.7], [50.0, 0.0, 7.2]], add_a(0x2010_2020)),
+    ];
+    for i in 0..16 {
+        let k = if i & 1 == 0 { 0 } else { 2 };
+        for (c, rgba) in quads.iter_mut() {
+            c[k] = through(c[k], &r60);
+            c[k + 1] = through(c[k + 1], &r60);
+            out.push(crate::fx::FxQuad { fx: 5, additive: true, corners: c.map(world), st, rgba: [*rgba; 4] });
+        }
+    }
 }

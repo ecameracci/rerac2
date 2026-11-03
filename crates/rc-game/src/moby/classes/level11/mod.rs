@@ -33,6 +33,8 @@ pub struct Globals {
     pub g338: i32,
     /// The electric fence's state (`$gp+0x3600..`, beams::Fence).
     pub fence: beams::Fence,
+    /// `$gp+0x1764`: the frame the light shafts' draw was last asked for (props::update_0e49).
+    pub shafts_frame: i32,
 }
 
 /// The level's mission `mission` done (`0x19b2e8 + level·16`, bit 7).
@@ -62,6 +64,7 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         0x08e2 => Some(props::update_08e2),
         0x10ea | 0x118c => Some(stalks::update),
         0x0ee0 => Some(beams::update),
+        0x0e49 => Some(props::update_0e49),
         _ => None,
     }
 }
@@ -73,6 +76,7 @@ pub fn draw(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut crat
         0x0dfd => props::draw_0dfd(w, id, &mut game.rng, cam, out),
         0x10ea | 0x118c => stalks::draw(w, id, &mut game.rng, cam, out),
         0x0ee0 => beams::draw(w, id, cam, out),
+        0x0e49 => props::draw_0e49(w, id, game.frame, view, out),
         _ => return false,
     }
     true
