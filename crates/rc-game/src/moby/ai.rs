@@ -449,6 +449,21 @@ pub fn move_step(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, yaw: f32, goal: V3
     w.mobys[id].pv_i(o + 0x94)
 }
 
+/// `0x33fa98(m, v)` (L11; no L00 twin found): the move by the velocity `v` alone — the movement block's velocity and
+/// its speed across (`+0xb0`, `0x301370`) set, the move with its push-outs (`0x33fef8`, [`move_body`]) from where it
+/// is, no floor, no ground and no flags of its own (the block's last flags returned; 8 without the block).
+pub fn move_by(w: &mut MobyWorld, id: usize, ctx: &Ctx, v: V3) -> i32 {
+    let m = &mut w.mobys[id];
+    if m.pv_i(0x18) == 0 { return 8; }
+    let o = mv(m);
+    m.set_pv_v(o + 0xa0, v);
+    m.set_pv_f(o + 0xb0, len2(v));
+    let from = m.pos;
+    move_body(w, id, ctx, from);
+    w.changed = true;
+    w.mobys[id].pv_i(o + 0x94)
+}
+
 /// `0x32cc30(offset, m, goal)`: the move toward the goal, its yaw turned by `offset` and the weave (`+0xdc`, its
 /// side swapped every `+0xe2..+0xe4` ticks).
 pub fn move_toward(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, offset: f32, goal: V3) -> i32 {

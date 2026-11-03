@@ -3,8 +3,10 @@
 //! its draw callback, if any, in [`draw`]; crate::moby::classes::update_for and crate::fx ask these after their own.
 //!
 //! * [`movers`]: the floors, columns and blocks the Dynamo's targets and the hologram lift move.
+//! * [`critters`]: the birds 0x1105.
 //! * [`props`]: the small objects (the Hacker's gate, the help texts, the sparks, ...).
 
+pub mod critters;
 pub mod movers;
 pub mod props;
 
@@ -18,6 +20,8 @@ pub struct Globals {
     pub wave: i32,
     /// `$gp+0x1d78`: cleared by the sinking floor's set-up (nothing here reads it).
     pub g1d78: i32,
+    /// `$gp−0x334` (`0x1aecbc`): the birds 0x1105 killed (nothing here reads it).
+    pub bird_kills: i32,
 }
 
 /// The level's mission `mission` done (`0x19b2e8 + level·16`, bit 7).
@@ -41,6 +45,7 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         0x123a => Some(props::update_123a),
         0x0c2d => Some(props::update_0c2d),
         0x0dfd => Some(props::update_0dfd),
+        0x1105 => Some(critters::update_1105),
         _ => None,
     }
 }
