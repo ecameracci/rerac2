@@ -3,7 +3,6 @@
 //! its draw callback, if any, in [`draw`]; crate::moby::classes::update_for and crate::fx ask these after their own.
 //!
 //! Not ported yet (level 4's own list; docs/plan/gaps.md has the systems):
-//! * **0x0fb6** (`0x44dd48`, 118 placed): a critter riding floor mobys with its own collision sphere (G-CLS-005).
 //! * **0x0b2d** (`0x405aa0`), **0x0474** / **0x0cef** (`0x3c9760`), **0x0bbc** (`0x41b020`): the level chunks (G-LVL-007).
 //! * **0x0960** (`0x3e9320`): its particles (G-PRT-001). **0x0d61** (`0x43a100`): the reward items (G-WPN-002).
 //! * **0x0c38** (`0x424978`), **0x0d3e** (`0x4362f0`), **0x0da8** (`0x43b090`): NPCs on the talk prompt (G-UI-010).
@@ -22,6 +21,7 @@ pub mod beast;
 pub mod misc;
 pub mod platforms;
 pub mod rider;
+pub mod skitter;
 pub mod tie_wave;
 
 /// This level's class updates.
@@ -29,6 +29,7 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
     match o_class {
         rider::CLASS => Some(rider::update),
         beast::CLASS => Some(beast::update),
+        skitter::CLASS => Some(skitter::update),
         0x0969 | 0x0e1b | 0x0e1c => Some(misc::update_empty),
         0x1293 => Some(misc::update_1293),
         0x0a99 => Some(misc::update_0a99),

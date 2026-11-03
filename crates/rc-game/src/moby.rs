@@ -40,6 +40,7 @@ pub mod attach;
 pub mod blast;
 pub mod bolts;
 pub mod claims;
+pub mod crawler;
 pub mod floater;
 pub mod hits;
 pub mod platform;
