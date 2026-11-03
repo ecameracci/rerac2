@@ -160,3 +160,39 @@ pub fn update_0ee8(w: &mut MobyWorld, id: usize, _ctx: &mut Ctx) {
         _ => {}
     }
 }
+
+/// 0x0424 (`0x3a8210`, one): a pulsing red lamp. **0**: its phase `+0x68`[0] from degrees, 1. **1**: the phase on
+/// `$gp+0x654` (180°) a second; its colour between 0xc0 and 0x20 (`$gp+0x64c` / `+0x650`, `0x2f36e8`) by
+/// `sin · 0.5 + 0.5`, its ambient (`0x316d58`: the colour's bytes 0, 2 and 3), its glow word `[1]` the colour at alpha
+/// 0x20 (levels 0 and 0x12) or 0x38; in a group, the group's glows drawn ([`draw_0424`], `0x3a81c0` → `0x3a80e0`).
+pub fn update_0424(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    let m = &mut w.mobys[id];
+    match m.state {
+        0 => {
+            let a = m.pv_f(0).to_radians();
+            m.set_pv_f(0, a);
+            m.state = 1;
+        }
+        1 => {
+            let a = add_rot(m.pv_f(0), 180.0 * 0.000_290_888_25);
+            m.set_pv_f(0, a);
+            let c = crate::hud::lerp_rgba(a.sin() * 0.5 + 0.5, 0xc0, 0x20);
+            let alpha = if matches!(ctx.game.level, 0 | 0x12) { 0x2000_0000 } else { 0x3800_0000 };
+            m.set_pv_i(4, (alpha | c & 0xff_ffff) as i32);
+            m.ambient = [c as u8, (c >> 16) as u8, (c >> 24) as u8];
+            if m.group != -1 { w.register_draw(id); }
+        }
+        _ => {}
+    }
+}
+
+/// `0x3a80e0`'s glow for one lamp (the game draws the group's drawn lamps of its class from one of them): a glow
+/// sprite (`0x32a400` = L00 `0x326d60`: FX 0xb, added, 0.5 toward the camera) of 1.2 (1.0 on levels 0 and 0x12) × its
+/// scale's share of its class's, in its glow word.
+pub fn draw_0424(w: &MobyWorld, id: usize, level: i32, cam: crate::hero::physics::V3, out: &mut Vec<crate::fx::FxQuad>) {
+    let m = &w.mobys[id];
+    if m.drawn == 0 { return; }
+    let base = w.class(m.o_class).map_or(1.0, |c| c.scale);
+    let k = if matches!(level, 0 | 0x12) { 1.0 } else { 1.2 };
+    crate::fx::sprite(out, k * m.scale / base, 0.5, 0.0, m.pos, cam, 0xb, m.pv_i(4) as u32, true);
+}
