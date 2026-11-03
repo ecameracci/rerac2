@@ -5,12 +5,19 @@
 use crate::hero::physics::V3;
 use crate::moby::MobyWorld;
 
+pub mod beast;
+pub mod misc;
 pub mod rider;
 
 /// This level's class updates.
 pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
     match o_class {
         rider::CLASS => Some(rider::update),
+        beast::CLASS => Some(beast::update),
+        0x0969 | 0x0e1b | 0x0e1c => Some(misc::update_empty),
+        0x1293 => Some(misc::update_1293),
+        0x0a99 => Some(misc::update_0a99),
+        0x0ab8 => Some(misc::update_0ab8),
         _ => None,
     }
 }
@@ -19,6 +26,7 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
 #[allow(clippy::too_many_arguments, unused_variables)]
 pub fn draw(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut crate::game::GameState, hero_state: i32, view: &crate::particles::BSphereView, cam: V3, id: usize, first: bool, out: &mut Vec<crate::fx::FxQuad>, frame: &mut Vec<crate::fx::FrameQuad>) -> bool {
     match w.mobys[id].o_class {
+        beast::CLASS => { beast::draw(w, id, cam, out); true }
         _ => false,
     }
 }
