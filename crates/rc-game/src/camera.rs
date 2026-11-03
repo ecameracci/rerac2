@@ -1659,7 +1659,7 @@ impl FollowCamera {
 /// `0x31ed78(target, a, b, max, x, v)`: `x` toward `target` at a speed `v` that brakes by `b` a tick against the way
 /// to go, eases off by `b` (1.1·`b` when it would overshoot less) within its stopping distance `v²/2b`, else heads for
 /// √(2b·|d|) (at most `max`) by `a` a tick (`0x31eb18`); `x` lands on the target once the step reaches it.
-fn approach(target: f32, a: f32, b: f32, max: f32, x: &mut f32, v: &mut f32) {
+pub(crate) fn approach(target: f32, a: f32, b: f32, max: f32, x: &mut f32, v: &mut f32) {
     let d = target - *x;
     if *v == 0.0 && d == 0.0 { return; }
     let toward = |v: &mut f32, goal: f32, step: f32| *v += (goal - *v).clamp(-step, step);

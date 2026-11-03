@@ -9,6 +9,7 @@ pub mod breakables;
 pub mod field;
 pub mod head;
 pub mod lifts;
+pub mod mine;
 pub mod props;
 pub mod tractor;
 
@@ -36,6 +37,7 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         0x117b => Some(props::update_117b),
         0x0ee8 => Some(props::update_0ee8),
         0x0424 => Some(props::update_0424),
+        0x0fab => Some(mine::update_0fab),
         // `0x38b400`: `jr ra`, as level 4's U293 classes.
         0x1354 => Some(super::level04::misc::update_empty),
         _ => None,
@@ -48,6 +50,10 @@ pub fn draw(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut crat
     match w.mobys[id].o_class {
         0x0424 => {
             props::draw_0424(w, id, game.level, cam, out);
+            true
+        }
+        0x0fab => {
+            mine::draw(w, id, out);
             true
         }
         _ => false,
