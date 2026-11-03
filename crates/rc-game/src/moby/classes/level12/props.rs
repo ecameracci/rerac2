@@ -4,11 +4,13 @@
 //! * **0x0f69** ([`update_0f69`], `0x4177e8`, 22 placed): a wheel turning 1° a tick.
 //! * **0x087f** ([`update_087f`], `0x3c0aa8`, 16 placed): the same turn with its looped sound; a hit deletes it.
 //! * **0x115f** ([`update_115f`], `0x4254e0`, 2 placed): pulses the glow of its group and of up to four mobys.
+//! * **0x1351** ([`update_1351`], `0x38b1e8`, 45 placed): a conveyor: its platform block moves its riders.
 //!
 //! The engine functions: `0x2f3548` = L00 `0x2efe60` (crate::hero::physics::add_rot), `0x365ed8` = L00 `0x3605f0`
 //! the class sound, `0x321700` = L00 `0x31dce8` the hit test, `0x3150e0` the delete, `0x320328` = L00 `0x31c8e0`
 //! (crate::moby::classes::props::group_alive), `0x32a698` the pulse ([`pulse`]: `0x2f2b48` = L00 `0x2ef460` the sine,
-//! `0x2f36e8` = L00 `0x2f0000` crate::hud::lerp_rgba).
+//! `0x2f36e8` = L00 `0x2f0000` crate::hud::lerp_rgba), `0x325a70` = L00 `0x322058` (crate::moby::platform::ride),
+//! `0x326080` = L00 `0x322668` (crate::moby::platform::write), `0x2f2820` = L00 `0x2ef138` (set_len).
 
 use crate::hero::physics::add_rot;
 use crate::moby::{Ctx, MobyWorld};
@@ -88,5 +90,53 @@ pub fn update_115f(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     list.extend((0..n.clamp(0, 4) as usize).filter_map(|k| usize::try_from(m.pv_i(0x30 + 4 * k)).ok()));
     for i in list {
         if let Some(o) = w.mobys.get_mut(i) { if o.drawn != 0 { o.glow = glow; } }
+    }
+}
+
+/// 0x1351 (`0x38b1e8`, 45 placed): a conveyor, its platform block at `+0x68`[0x20], `[0xe0]` a moby it rides (−1
+/// none). **0**: the block's flag 4 (a rider's place follows its move), `+0x7c` = 3 (its pieces 0 and 1 drawn on
+/// top), 1. **1**: without the moby, or while that moby is not in state 2 (`0x41f840`): the block's move its second
+/// row at −2/60 (`$gp−0xe0` = 2 a second, `0x2f2820`), its playback speed 2 (`$gp−0xdc`). Riding it: its place after
+/// the moby's move (`0x325a70`), `d` that move across along `(sin yaw, −cos yaw)`, the block written (`0x326080`)
+/// with the move `0.1·d` along `(cos yaw, sin yaw)` and no turn; its playback speed `60·d`. Ratchet standing on it
+/// is carried by the block's move (crate::moby::carry_hero).
+pub fn update_1351(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    use crate::hero::physics::{dot, set_len, sub};
+    const BLOCK: usize = 0x20;
+    match w.mobys[id].state {
+        0 => {
+            let m = &mut w.mobys[id];
+            m.set_pv_i(BLOCK + 0x3c, m.pv_i(BLOCK + 0x3c) | 4);
+            m.bangles = 3;
+            m.set_state(1, -1);
+        }
+        1 => {
+            let p = usize::try_from(w.mobys[id].pv_i(0xe0)).ok().filter(|&p| w.mobys.get(p).is_some_and(|pm| pm.state == 2));
+            let ride = p.and_then(|p| { let m = &w.mobys[id]; crate::moby::platform::ride(w, p, m.pos, m.rot) });
+            let m = &mut w.mobys[id];
+            match ride {
+                None => {
+                    m.set_pv_v(BLOCK + 0x10, set_len(m.rows[1], -2.0 * 0.016_666_668));
+                    ctx.host.set_anim_speed(m, 2.0);
+                    // Ratchet on it: crate::moby::carry_hero stands in for his read of the block.
+                    let (pos, yaw, mv) = (m.pos, m.rot[2], m.pv_v(BLOCK + 0x10));
+                    crate::moby::carry_hero(ctx, id, pos, yaw, crate::hero::physics::add(pos, mv), yaw);
+                }
+                Some((pos, _)) => {
+                    let mut v = sub(pos, m.pos);
+                    v[2] = 0.0;
+                    let yaw = m.rot[2];
+                    let a = yaw + f32::from_bits(0x4096_cbe5);
+                    let d = dot(v, [a.cos(), a.sin(), 0.0]);
+                    let mv = [yaw.cos() * d * 0.1, yaw.sin() * d * 0.1, 0.0];
+                    let rot = m.rot;
+                    crate::moby::platform::write(m, BLOCK, mv, rot, rot);
+                    ctx.host.set_anim_speed(m, d * f32::from_bits(0x426f_ffff));
+                    let (pos, yaw) = (m.pos, m.rot[2]);
+                    crate::moby::carry_hero(ctx, id, pos, yaw, crate::hero::physics::add(pos, mv), yaw);
+                }
+            }
+        }
+        _ => {}
     }
 }

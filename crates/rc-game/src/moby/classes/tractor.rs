@@ -32,8 +32,9 @@ use crate::hero::physics::{add, dist, dot, len, scale, set_len, sub, V3};
 use crate::moby::{carry_hero, mode, Ctx, MobyWorld};
 
 /// The boxes' classes (Maktar's 0x0e2a too), and the other things it picks (Maktar's bomb 0x09c8,
-/// crate::moby::classes::maktar; its critter 0x09bc, crate::moby::classes::maktar_pads).
-const BOXES: [i16; 5] = [0x0acb, 0x0acc, 0x0e2a, crate::moby::classes::maktar::BOMB, crate::moby::classes::maktar_pads::CRITTER];
+/// crate::moby::classes::maktar; its critter 0x09bc, crate::moby::classes::maktar_pads; level 12's 0x0fc4..0x0fc8,
+/// crate::moby::classes::level12::tractor).
+const BOXES: [i16; 10] = [0x0acb, 0x0acc, 0x0e2a, crate::moby::classes::maktar::BOMB, crate::moby::classes::maktar_pads::CRITTER, 0x0fc4, 0x0fc5, 0x0fc6, 0x0fc7, 0x0fc8];
 /// The beam's pvar holding its target + 1 (the port's `0x18a3e0`).
 const TARGET: usize = 0x60;
 
