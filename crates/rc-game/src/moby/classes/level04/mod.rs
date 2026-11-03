@@ -3,12 +3,12 @@
 //! its draw callback, if any, in [`draw`]; crate::moby::classes::update_for and crate::fx ask these after their own.
 //!
 //! Not ported yet (level 4's own list; docs/plan/gaps.md has the systems):
-//! * **0x0b2d** (`0x405aa0`), **0x0474** / **0x0cef** (`0x3c9760`), **0x0bbc** (`0x41b020`): the level chunks (G-LVL-007).
+//! * **0x0bbc** (`0x41b020`, Ratchet's hoverbike), **0x0474** / **0x0cef** (`0x3c9760`, its flames), **0x0b2d** (`0x405aa0`, the
+//!   racers): the hoverbike race (G-LVL-010).
 //! * **0x0960** (`0x3e9320`): its particles (G-PRT-001). **0x0d61** (`0x43a100`): the reward items (G-WPN-002).
 //! * **0x0c38** (`0x424978`), **0x0d3e** (`0x4362f0`), **0x0da8** (`0x43b090`): NPCs on the talk prompt (G-UI-010).
 //! * **0x0c26** (`0x423a38`): the level's help-text controller (help texts 0x9b5..0x9de and 0xa3c on its cuboids,
 //!   over many of Ratchet's and the game's words not yet named).
-//! * **0x0a58** (`0x3ef548`; level 6's 0x0a50 in the same unit): a spawner that lobs its mobys out on arcs.
 //! * **0x02f8** (`0x3c4f80`), **0x0b37** (`0x4084c0`), **0x0b54** (`0x409440`): draw-callback effects (strips and
 //!   particle fountains from the level's `$gp` tables).
 //! * **0x0329** (`0x3c83c8`): it only sets level words (`0x1b2e70..`, `$gp+0x518` scrolled) that nothing ported reads.
@@ -18,6 +18,7 @@ use crate::moby::MobyWorld;
 
 pub mod ambush;
 pub mod beast;
+pub mod launcher;
 pub mod misc;
 pub mod platforms;
 pub mod rider;
@@ -30,6 +31,8 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         rider::CLASS => Some(rider::update),
         beast::CLASS => Some(beast::update),
         skitter::CLASS => Some(skitter::update),
+        launcher::CLASS => Some(launcher::update_0a58),
+        launcher::CARRIER => Some(launcher::update_0e44),
         0x0969 | 0x0e1b | 0x0e1c => Some(misc::update_empty),
         0x1293 => Some(misc::update_1293),
         0x0a99 => Some(misc::update_0a99),
@@ -61,6 +64,7 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
 pub fn draw(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut crate::game::GameState, hero_state: i32, view: &crate::particles::BSphereView, cam: V3, id: usize, first: bool, out: &mut Vec<crate::fx::FxQuad>, frame: &mut Vec<crate::fx::FrameQuad>) -> bool {
     match w.mobys[id].o_class {
         beast::CLASS => { beast::draw(w, id, cam, out); true }
+        launcher::CARRIER => { launcher::draw(w, id, game, cam, out); true }
         _ => false,
     }
 }
