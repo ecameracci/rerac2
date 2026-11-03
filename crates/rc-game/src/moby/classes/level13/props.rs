@@ -10,6 +10,10 @@
 //! * **0x12ed** ([`update_12ed`], `0x38d8b8`, 1 placed): two cuboids that each ask for their music.
 //! * **0x0f20** ([`update_0f20`], `0x38d770`, 1 placed): hides the level's enemies in its scene 3.
 //! * **0x040f** ([`update_040f`], `0x38d600`, 2 placed): cuboids that kill Ratchet.
+//! * **0x0efa** ([`update_0efa`], `0x41c6f0`, 3 placed): two cuboids that set the death height.
+//! * **0x0fec** ([`update_0fec`], `0x41eea0`, 1 placed): shown out of the scenes.
+//! * **0x11b0** ([`update_11b0`], `0x425c00`, 1 placed): flag bytes set by cuboids.
+//! * **0x1225** ([`update_1225`], `0x427c88`, 1 placed): gone with another moby once its mission is done.
 //!
 //! The engine functions: `0x2fa528` add_rot, `0x36a110` the class sound, `0x328ff0` = L00 `0x31ed78`
 //! (crate::hero::physics::ease), `0x32b7c0` = L00 `0x321858` (crate::level::LevelData::in_cuboid), `0x3387a8` the music
@@ -148,5 +152,60 @@ pub fn update_040f(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             }
         }
         _ => {}
+    }
+}
+
+/// 0x0efa (`0x41c6f0`, 3 placed): its pvars `[0]` / `[4]` two cuboids. Ratchet in the first (`0x32b7c0`): the
+/// level's death height (`0x1b24e8` = L00 `0x1b1a68`) 30; in the second 95.
+pub fn update_0efa(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    let m = &w.mobys[id];
+    let p = ctx.hero.pos;
+    if ctx.level.in_cuboid(m.pv_i(0), p) { ctx.game.death_z = Some(30.0); }
+    if ctx.level.in_cuboid(m.pv_i(4), p) { ctx.game.death_z = Some(95.0); }
+}
+
+/// 0x0fec (`0x41eea0`, 1 placed): on level 13 (`0x1a79f8` = 0xd) only shown by the scenes: while one plays
+/// (`0x1a8f00` = 2) without collision (`+0x98` 0), hidden and not a target (mode `& 0xefff | 0x41`); else shown, a
+/// target (mode `& 0xffbe | 0x1000`) with its class's collision.
+///
+/// Not ported: its other levels' part (a talker on paths with its sequences, `0x41f318` … `0x41f6b0`), never run here.
+pub fn update_0fec(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    if ctx.game.level != 0xd { return; }
+    let coll = w.class(w.mobys[id].o_class).is_some_and(|c| c.has_collision);
+    let m = &mut w.mobys[id];
+    if ctx.game.scenes.mode != crate::scene::SCENE {
+        m.mode = (m.mode & 0xffbe) | 0x1000;
+        m.has_collision = coll;
+    } else {
+        m.has_collision = false;
+        m.mode = (m.mode & 0xefff) | 0x41;
+    }
+}
+
+/// 0x11b0 (`0x425c00`, 1 placed): its pvars `[0..0x10]` four cuboids, `[0x10]` a moby. Ratchet in cuboid `[8]` /
+/// `[0xc]` / `[0]` / `[4]` (`0x32b7c0`) sets the flag byte `0x1395dd` / `0x1395dc` / `0x1395df` / `0x1395e0`
+/// (crate::game::GameState::flags), the moby in its state 2 `0x1395de`.
+pub fn update_11b0(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    let m = &w.mobys[id];
+    let p = ctx.hero.pos;
+    for (off, flag) in [(8, 0x25), (0xc, 0x24), (0, 0x27), (4, 0x28)] {
+        if ctx.level.in_cuboid(m.pv_i(off), p) {
+            if let Some(b) = ctx.game.flags.get_mut(flag) { *b = 1; }
+        }
+    }
+    let lit = usize::try_from(m.pv_i(0x10)).ok().and_then(|i| w.mobys.get(i)).is_some_and(|o| o.state == 2);
+    if lit {
+        if let Some(b) = ctx.game.flags.get_mut(0x26) { *b = 1; }
+    }
+}
+
+/// 0x1225 (`0x427c88`, 1 placed): once its mission is done on this level (`0x19b2e8 + level·0x10 + +0xb0`, bit 7),
+/// the moby `[0]` and it deleted.
+pub fn update_1225(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    let m = &w.mobys[id];
+    let k = ctx.game.level.max(0) as usize * 0x10 + m.mission as usize;
+    if ctx.game.missions.get(k).is_some_and(|b| b & 0x80 != 0) {
+        if let Ok(o) = usize::try_from(m.pv_i(0)) { if o < w.mobys.len() { w.delete(o); } }
+        w.delete(id);
     }
 }

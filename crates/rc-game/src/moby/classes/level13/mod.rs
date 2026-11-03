@@ -4,6 +4,7 @@
 
 pub mod breakables;
 pub mod movers;
+pub mod powerline;
 pub mod props;
 
 use crate::hero::physics::V3;
@@ -12,6 +13,8 @@ use crate::moby::MobyWorld;
 /// This level's class updates.
 pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
     match o_class {
+        0x0ee7 => Some(powerline::update_0ee7),
+        0x1150 => Some(powerline::update_1150),
         0x130b => Some(breakables::update_130b),
         0x130a => Some(breakables::update_130a),
         0x130f => Some(breakables::update_130f),
@@ -25,6 +28,10 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         0x12ed => Some(props::update_12ed),
         0x0f20 => Some(props::update_0f20),
         0x040f => Some(props::update_040f),
+        0x0efa => Some(props::update_0efa),
+        0x0fec => Some(props::update_0fec),
+        0x11b0 => Some(props::update_11b0),
+        0x1225 => Some(props::update_1225),
         _ => None,
     }
 }
@@ -33,6 +40,8 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
 #[allow(clippy::too_many_arguments, unused_variables)]
 pub fn draw(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut crate::game::GameState, hero_state: i32, view: &crate::particles::BSphereView, cam: V3, id: usize, first: bool, out: &mut Vec<crate::fx::FxQuad>, frame: &mut Vec<crate::fx::FrameQuad>) -> bool {
     match w.mobys[id].o_class {
-        _ => false,
+        0x0ee7 => powerline::draw_0ee7(w, id, cam, out),
+        _ => return false,
     }
+    true
 }
