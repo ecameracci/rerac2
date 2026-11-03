@@ -7,6 +7,7 @@ pub mod level06;
 pub mod level11;
 pub mod level12;
 pub mod level13;
+pub mod level17;
 pub mod beam;
 pub mod area_switch;
 pub mod beast;
@@ -423,7 +424,7 @@ pub fn update_for(o_class: i16) -> Option<UpdateFn> {
         0x0972 => Some(endako_d::update_0972),
         endako_d::NETWORK => Some(endako_d::update_0f2d),
         // The levels' own (their modules' lists).
-        _ => level04::update_for(o_class).or_else(|| level06::update_for(o_class)).or_else(|| level11::update_for(o_class)).or_else(|| level13::update_for(o_class)).or_else(|| level12::update_for(o_class)),
+        _ => level04::update_for(o_class).or_else(|| level06::update_for(o_class)).or_else(|| level11::update_for(o_class)).or_else(|| level13::update_for(o_class)).or_else(|| level12::update_for(o_class)).or_else(|| level17::update_for(o_class)),
     }
 }
 
