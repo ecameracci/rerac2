@@ -40,6 +40,7 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         0x0c7a => Some(movers::update_0c7a),
         0x0c78 | 0x0b71 | 0x0b72 | 0x0b73 | 0x0b74 => Some(movers::update_slider),
         0x0a1f => Some(movers::update_0a1f),
+        0x0c7c => Some(movers::update_0c7c),
         0x117a => Some(props::update_117a),
         0x117e => Some(props::update_117e),
         0x123a => Some(props::update_123a),

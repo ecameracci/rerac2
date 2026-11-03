@@ -9,6 +9,7 @@
 //! * **0x0c78 / 0x0b71 / 0x0b72 / 0x0b73 / 0x0b74** (`0x3f9690`, 16): the blocks that slide out as the lift comes
 //!   ([`update_slider`]).
 //! * **0x0a1f** (`0x3d7778`, 1): a mover up and down its path ([`update_0a1f`]).
+//! * **0x0c7c** (`0x418150`, 2): the drawbridges the Swingshot pulls down ([`update_0c7c`]).
 //!
 //! Each eases by a half cosine: a phase from π on by the step its progress takes, the offset `(cos(phase) + 1)·k`
 //! along one of its rows from its place (kept at set-up). Their moving sounds are their class sound 0 looped
@@ -567,4 +568,62 @@ pub fn update_0a1f(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         _ => {}
     }
     ride(ctx, w, id, old);
+}
+
+/// 0x0c7c (`0x418150`, 2 placed): the drawbridge the Swingshot pulls down: its pull target (`+0x00`, a 0x099d) held at
+/// its end (5.7 up its third row, 0.35 along its second) every tick; `+0x04` the fall's speed. **1**: the target hooked
+/// (`0x33d5c8`) → its class sound 0, **2**; its mission (`+0xb0`) done: its pitch a quarter turn down at once, **6**.
+/// Then it falls to −90° and settles in two bounces, its pitch eased each time (`0x331348`, crate::hero::physics::ease;
+/// the speed 0 at each end): **2** down from rest (1/1876 a tick², no brake to speak of), its class sound 1, **3** up to
+/// −75°, **4** down to −90°, sound 1, **5** up to −85°, **6** down to −90°, sound 1, **7** (done).
+///
+/// The target's hook is the hero's: at the pull's transition 0x8a → 0x8b (L11 `0x2e0898`) he hooks his pull target
+/// (`0x33d5a8(target, 1)`), which crate::hero::swing does not; this update stands in for it (Ratchet in 0x8b with its
+/// target his pull target hooks it).
+pub fn update_0c7c(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    use crate::hero::physics::ease;
+    let child = linked(w, id, 0);
+    if let Some(c) = child {
+        if ctx.hero.state == 0x8b && ctx.hero.swing.pull.as_ref().is_some_and(|p| p.id == c) { w.mobys[c].once |= 4; }
+    }
+    let half = std::f32::consts::FRAC_PI_2;
+    // (target, accel, brake, most, the end's test, the next state, its sound 1).
+    let leg = |w: &mut MobyWorld, ctx: &mut Ctx, t: u32, a: u32, b: u32, max: u32, down: bool, next: u8| {
+        let m = &mut w.mobys[id];
+        let (mut x, mut v) = (m.rot[0], m.pv_f(4));
+        ease(f32::from_bits(t), f32::from_bits(a), f32::from_bits(b), f32::from_bits(max), &mut x, &mut v);
+        m.rot[0] = x;
+        m.set_pv_f(4, v);
+        let done = if down { x <= -half } else { f32::from_bits(t) <= x };
+        if done {
+            m.set_pv_f(4, 0.0);
+            m.set_state(next, -1);
+            if down { ctx.host.play_sound(&w.mobys[id], 1, 0); }
+        }
+    };
+    match w.mobys[id].state {
+        0 => w.mobys[id].set_state(1, -1),
+        1 => {
+            if child.is_some_and(|c| w.mobys[c].once & 4 != 0) {
+                ctx.host.play_sound(&w.mobys[id], 0, 0);
+                w.mobys[id].set_state(2, -1);
+            }
+            if super::mission_done(ctx, w.mobys[id].mission as i32) {
+                let m = &mut w.mobys[id];
+                m.rot[0] = crate::hero::physics::sub_rot(m.rot[0], f32::from_bits(0x3fc9_0fdc));
+                m.set_state(6, -1);
+            }
+        }
+        2 => leg(w, ctx, 0xbfc9_0fdc, 0x3a0b_ccd4, 0x432e_886f, 0x4391_71b3, true, 3),
+        3 => leg(w, ctx, 0xbfa7_8d37, 0x3c8e_fa36, 0x39e4_c38a, 0x3f5f_66f5, false, 4),
+        4 => leg(w, ctx, 0xbfc9_0fdc, 0x39e4_c38a, 0x3e32_b8c4, 0x403a_2b22, true, 5),
+        5 => leg(w, ctx, 0xbfbd_e450, 0x3c8e_fa36, 0x39e4_c38a, 0x3f5f_66f5, false, 6),
+        6 => leg(w, ctx, 0xbfc9_0fdc, 0x39e4_c38a, 0x3e32_b8c4, 0x403a_2b22, true, 7),
+        _ => {}
+    }
+    if let Some(c) = child {
+        let m = &w.mobys[id];
+        let p = add(add(m.pos, scale(m.rows[2], f32::from_bits(0x40b6_6666))), scale(m.rows[1], f32::from_bits(0x3eb3_3333)));
+        w.mobys[c].pos = p;
+    }
 }
