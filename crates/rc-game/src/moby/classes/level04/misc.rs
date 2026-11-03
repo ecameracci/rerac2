@@ -277,3 +277,131 @@ pub fn update_0f61(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         _ => {}
     }
 }
+
+/// Game flag byte `0x1395b8 + k` set (crate::game::GameState::flags).
+fn set_flag(ctx: &mut Ctx, k: usize) {
+    if let Some(b) = ctx.game.flags.get_mut(k) { *b = 1; }
+}
+
+/// 0x0e8b (`0x442890`, one placed) and level 6's **0x0e8f** / **0x0e90** (L06 `0x44c8d0` / `0x44c948`, the same code
+/// with their own flags): **0**, with a cuboid `+0x68`[0]: Ratchet in it sets its game flag (0x0e8b `0x1395c8`, "L4
+/// reached room frozen th…"; 0x0e8f `0x1395ce`; 0x0e90 `0x1395cf`; the game prints the flag's name) and → 1.
+pub fn update_0e8b(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    let m = &w.mobys[id];
+    let c = m.pv_i(0);
+    if m.state != 0 || c == -1 || !ctx.level.in_cuboid(c, ctx.hero.pos) { return; }
+    let k = match m.o_class { 0x0e8f => 0x16, 0x0e90 => 0x17, _ => 0x10 };
+    set_flag(ctx, k);
+    w.mobys[id].set_state(1, -1);
+}
+
+/// 0x0e8d (`0x442908`, one placed): **0**, hooked (its once bit 2, `0x34d798`): game flag `0x1395c7` ("L4 repair
+/// bike electrol…") and → 1.
+pub fn update_0e8d(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    if w.mobys[id].state != 0 || w.mobys[id].once & 4 == 0 { return; }
+    set_flag(ctx, 0xf);
+    w.mobys[id].set_state(1, -1);
+}
+
+/// 0x1157 (`0x456cd0`, one placed): **0**: its mission (`+0xb0`) done on this level: deleted; else 1. **1**: the moby
+/// `+0x68`[0] hooked (its once bit 2): the mission done (`0x3345f8` = L00 `0x3132a8`), scene 0x38 queued and the
+/// queue started (`0x315bd8` / `0x315d20`, crate::scene), in the level's first frames straight in (`0x395508`),
+/// deleted.
+pub fn update_1157(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    if w.mobys[id].state == 0 {
+        let k = ctx.game.level.max(0) as usize * 0x10 + w.mobys[id].mission as usize;
+        if ctx.game.missions.get(k).is_some_and(|b| b & 0x80 != 0) {
+            w.delete(id);
+            return;
+        }
+        w.mobys[id].state = 1;
+    }
+    let hooked = usize::try_from(w.mobys[id].pv_i(0)).ok().and_then(|i| w.mobys.get(i)).is_some_and(|m| m.once & 4 != 0);
+    if w.mobys[id].state != 1 || !hooked { return; }
+    let g = &mut *ctx.game;
+    g.mission_done(w.mobys[id].mission);
+    g.scenes.queue.push(0x38);
+    g.scenes.start_queue(ctx.hero.hp);
+    if g.frame < 5 { g.scenes.zoom = 1.2; }
+    w.delete(id);
+}
+
+/// 0x123f (`0x457dd8`, one placed): **0**: without item 0x27 (`0x1a7b27`) → 1; with it: game flag `0x1395ca` set
+/// (or past the level's fourth frame) → deleted when both, else 1; in the first four frames without the flag Ratchet
+/// is put at its cuboid `+0x68`[1] (its place and angles, `0x2dfe20` = L00 `0x2b9e68`); its update distance 0xff.
+/// **1**: Ratchet in its cuboid `+0x68`[0] with the item: the flag set, deleted.
+pub fn update_123f(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    let item = ctx.game.items.get(0x27).copied().unwrap_or(0) != 0;
+    let flag = ctx.game.flags.get(0x12).copied().unwrap_or(0) != 0;
+    if w.mobys[id].state == 0 {
+        if !item {
+            w.mobys[id].state = 1;
+        } else if flag || 4 < ctx.game.frame {
+            if flag {
+                w.delete(id);
+                return;
+            }
+            w.mobys[id].state = 1;
+        } else if let Some((p, r)) = ctx.level.cuboid_place(w.mobys[id].pv_i(4)) {
+            ctx.hero.teleport(p, r);
+        }
+        w.mobys[id].update_dist = 0xff;
+    }
+    if w.mobys[id].state == 1 && ctx.level.in_cuboid(w.mobys[id].pv_i(0), ctx.hero.pos) && item {
+        set_flag(ctx, 0x12);
+        w.delete(id);
+    }
+}
+
+/// Every member of group `g` (the list `0x1fb220[g]`, with two or more alive) hidden without collision (`hide`), or
+/// shown with its class's.
+fn group_shown(w: &mut MobyWorld, g: i32, hide: bool) {
+    let Some(list) = usize::try_from(g).ok().and_then(|g| w.groups.get(g)).cloned() else { return };
+    if super::super::props::group_alive(w, g) < 2 { return; }
+    for i in list {
+        let solid = w.class(w.mobys[i].o_class).is_some_and(|c| c.has_collision);
+        let m = &mut w.mobys[i];
+        if hide {
+            m.has_collision = false;
+            m.mode |= 0x43;
+        } else {
+            m.mode &= 0xffbc;
+            m.has_collision = solid;
+        }
+    }
+}
+
+/// 0x0d8f (`0x43a290`, one placed): **0**: Ratchet in its cuboid `+0x68`[4] → 1. **1**: its four groups
+/// (`+0x68`[0..4]) hidden without collision ([`group_shown`]; the game prints "they're all off") → 2. **2**: Ratchet
+/// out of the cuboid → 3. **3**: the groups shown, solid ("they're all on"), deleted.
+pub fn update_0d8f(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    let c = w.mobys[id].pv_i(0x10);
+    if w.mobys[id].state == 0 && ctx.level.in_cuboid(c, ctx.hero.pos) { w.mobys[id].state = 1; }
+    if w.mobys[id].state == 1 {
+        for k in 0..4 { let g = w.mobys[id].pv_i(4 * k); group_shown(w, g, true); }
+        w.mobys[id].state = 2;
+    }
+    if w.mobys[id].state == 2 && !ctx.level.in_cuboid(c, ctx.hero.pos) { w.mobys[id].state = 3; }
+    if w.mobys[id].state == 3 {
+        for k in 0..4 { let g = w.mobys[id].pv_i(4 * k); group_shown(w, g, false); }
+        w.delete(id);
+    }
+}
+
+/// 0x0f9c (`0x45d818`, one placed): a hit with the flags 0x10000 (`0x33f8d0`): its sound 0, from 0.75 above it two
+/// bursts of 15 debris chunks (`0x349c68` = L00 `0x327648`, crate::moby::shards::throw_chunks: reach 0.5, 3 a
+/// second, 0.75..1.25 of their size, pointed, grey `0x50404040`), each moving a random 1/15..0.1 a tick (up 1.5 times
+/// its height's size); the record let go, deleted.
+pub fn update_0f9c(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    if !w.hit_message(id).is_some_and(|h| h.tmpl.flags & 0x10000 != 0) { return; }
+    ctx.host.play_sound(&w.mobys[id], 0, 0);
+    let p = w.mobys[id].pos;
+    let at = [p[0], p[1], p[2] + 0.75];
+    for _ in 0..2 {
+        let mut v = ctx.game.rng.rand_vec(f32::from_bits(0x3d88_8889), f32::from_bits(0x3dcc_ccce));
+        v[2] = v[2].abs() * 1.5;
+        crate::moby::shards::throw_chunks(w, ctx, 0.5, 3.0, (0.75, 1.25), id, at, 0xf, true, v, 0x5040_4040, None);
+    }
+    w.clear_hit(id);
+    w.delete(id);
+}

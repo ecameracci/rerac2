@@ -79,8 +79,9 @@
 //! **The tail** (`0x4527c8`): the flash, the timers `+0x270` / `+0x272` / `+0x26` down, its ticks; a height change
 //! under 0.005 this tick undone.
 //!
-//! Not ported: the joint aims (`0x346548` / `0x349928` on `+0x2c0`: the head's look); the byte `0x139646` its first
-//! alarm sets; 0x0015's lead hand-off (it compares the same distance twice, so it never happens); the creates' out of
+//! Its first attack from calm sets the game flag byte `0x139646` (crate::game::GameState::flags `[0x8e]`).
+//!
+//! Not ported: the joint aims (`0x346548` / `0x349928` on `+0x2c0`: the head's look); state 0x15's lead hand-off (it compares the same distance twice, so it never happens); the creates' out of
 //! slots (the port's always succeed).
 
 use crate::hero::physics::{add, approach, atan2, dist2, ease, euler_rows, rot_dist, set_len, sub_rot, turn_ease, V3};
@@ -543,6 +544,8 @@ fn calm(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         let out = crate::moby::countdown(&mut t);
         w.mobys[id].set_pv_i(WAIT, t);
         if out {
+            // `0x139646` = 1: the game flag byte `0x1395b8 + 0x8e`.
+            if let Some(b) = ctx.game.flags.get_mut(0x8e) { *b = 1; }
             attack(w, id, ctx, true);
             return;
         }
