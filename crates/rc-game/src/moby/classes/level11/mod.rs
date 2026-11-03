@@ -7,6 +7,18 @@
 //! * [`critters`]: the birds 0x1105.
 //! * [`stalks`]: the sparked stalks 0x10ea / 0x118c.
 //! * [`props`]: the small objects (the Hacker's gate, the help texts, the sparks, ...).
+//!
+//! Not ported (2026-11-03):
+//! * **Joba's arena** (the level's chunk 1): its master 0x0d8a (`0x43f9e0`), spawners 0x0c7f (`0x4184e0`), fighters
+//!   0x0d37 / 0x0df7 / 0x0dcf / 0x0d98 / 0x0df4 / 0x0df9 / 0x0e20 / 0x0d4b / 0x0d4a / 0x0b3a and the crowd 0x126e
+//!   (`0x4763d8`, idle until the master's state passes 1): a system of its own, docs/plan/gaps.md G-LVL-009.
+//! * The level's enemies 0x0cf5 (`0x422488`, 34 placed, 1,700 lines of decompile), 0x0cf6 (`0x427728`, 9), 0x0d07
+//!   (`0x430848`, 10, 2,600 instructions), with their partners 0x0b6d (`0x47bdd0`, 7; no Ghidra function) and the
+//!   carrier 0x0e86 (`0x462db0`, 3; it makes a 0x0cf6): big classes still to do (the wave floor wakes them,
+//!   movers::update_0b6b; their deaths make skill point 0x12, props::update_12c7).
+//! * The turret 0x0c20 (`0x4134b0`, 4): Ratchet mounted on it (its own camera and shots, `0x489c70..0x48a068`).
+//! * The sellers 0x0e95 (`0x463368`, item 8) and 0x0b7c (`0x3f9a50`, the Charge Boots): Oozla's 0x0ace again, but
+//!   their start reads flag words past the scene bits (`0x1397d0`, `0x1397d8`), G-TRI-006.
 
 pub mod beams;
 pub mod critters;
