@@ -29,6 +29,8 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         0x0fd9 => Some(lifts::update_0fd9),
         0x0fc6 | 0x0fc7 | 0x0fc8 => Some(tractor::update_0fc6),
         0x0f6a => Some(tractor::update_0f6a),
+        0x0fb8 => Some(tractor::update_0fb8),
+        0x0fb9 => Some(tractor::update_0fb9),
         0x0f00 => Some(field::update_0f00),
         0x086a => Some(head::update_086a),
         0x117b => Some(props::update_117b),

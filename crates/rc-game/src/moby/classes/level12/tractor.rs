@@ -10,6 +10,8 @@
 //! * **0x0fc6** / **0x0fc7** / **0x0fc8** ([`update_0fc6`], `0x41f850`, 3, 2 and 1 placed): dragged within 1 of its
 //!   cuboid `[0xe0]`'s centre it slides into it and stays.
 //! * **0x0f6a** ([`update_0f6a`], `0x417840`, one): once its 0x0fc6 is in place it charges it, then both blow apart.
+//! * **0x0fb8** / **0x0fb9** ([`update_0fb8`] / [`update_0fb9`], `0x41e378` / `0x41e818`, one each): the same for up
+//!   to three 0x0fc6.
 //!
 //! The engine functions: `0x322ec8` = L00 `0x31f4b0` (crate::hero::physics::ease_speed), `0x325270` = L00 `0x321858`
 //! (crate::level::LevelData::in_cuboid), `0x2f2718` = L00 `0x2ef050` the xy distance, `0x365f80` = L00 `0x360698`
@@ -293,4 +295,124 @@ fn break_away(w: &mut MobyWorld, p: usize, ctx: &mut Ctx) {
     let uid = w.mobys[p].uid;
     ctx.game.count_uid(uid);
     ctx.host.play_sound(&w.mobys[p], 1, 0);
+}
+
+/// The three mobys of 0x0fb8 / 0x0fb9 (`+0x68`[0..3], −1 none).
+fn links(w: &MobyWorld, id: usize) -> Vec<usize> {
+    (0..3).filter_map(|k| usize::try_from(w.mobys[id].pv_i(4 * k)).ok()).filter(|&p| p < w.mobys.len()).collect()
+}
+
+/// The shared states of 0x0fb8 / 0x0fb9: **1** all its mobys in place (state 3) → 2; **2** the timer `t`, 3; **4**
+/// rising 1/720 a tick more each tick with its mobys, 8 over its home → 5; **5** its mobys no longer targets and
+/// deleted, its uid counted, deleted. True when the state was one of these.
+fn charger_common(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, t: i32) -> bool {
+    let ps = links(w, id);
+    match w.mobys[id].state {
+        1 => if ps.iter().all(|&p| w.mobys[p].state == 3) { w.mobys[id].state = 2 },
+        2 => {
+            w.mobys[id].set_state(3, -1);
+            w.mobys[id].set_pv_i(0x14, t);
+        }
+        4 => {
+            let m = &mut w.mobys[id];
+            let v = m.pv_f(0xc) + 0.001_388_888_9;
+            m.set_pv_f(0xc, v);
+            m.pos[2] += v;
+            if m.pv_f(0x10) + 8.0 < m.pos[2] { m.state = 5; }
+            for &p in &ps { w.mobys[p].pos[2] += v; }
+        }
+        5 => {
+            for &p in &ps {
+                w.mobys[p].mode &= !mode::TARGET;
+                w.delete(p);
+            }
+            let uid = w.mobys[id].uid;
+            ctx.game.count_uid(uid);
+            w.delete(id);
+        }
+        _ => return false,
+    }
+    true
+}
+
+/// 0x0fb8 (`0x41e378`, one): 0x0f6a's charge for up to three 0x0fc6 ([`charger_common`]). **0**: its home height, 1;
+/// its uid marked: gone. **3**: the timer (180, `$gp+0x2d60`) down; at half its mobys to state 4 (charging); out: it
+/// hidden without collision, its pieces thrown (`0x32a940`: 3..6 a second across and up, 0.1 a tick back along its
+/// first row), each moby broken ([`break_away`]) under a blast (`0x3fb0a0`: size 2, sprites 0xe / 10 / 0xf, 10 puffs,
+/// 0x14 streaks, its flash ball, the shake) and deleted, its uid counted, deleted.
+pub fn update_0fb8(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    match w.mobys[id].state {
+        0 => {
+            let m = &mut w.mobys[id];
+            m.state = 1;
+            let z = m.pos[2];
+            m.set_pv_f(0x10, z);
+            if uid_done(w, id, ctx) { w.delete(id); }
+        }
+        3 => {
+            let mut t = w.mobys[id].pv_i(0x14);
+            let out = countdown(&mut t);
+            w.mobys[id].set_pv_i(0x14, t);
+            let ps = links(w, id);
+            if !out {
+                if t == 0xb4 / 2 { for &p in &ps { w.mobys[p].state = 4; } }
+                return;
+            }
+            let m = &mut w.mobys[id];
+            m.has_collision = false;
+            m.mode = (m.mode & !mode::TARGET) | 0x41;
+            let v = set_len(m.rows[0], -0.1);
+            crate::moby::shards::break_into(w, id, ctx, (3.0, 6.0), (3.0, 6.0), 0x3f, v, 0xff);
+            for p in ps {
+                break_away(w, p, ctx);
+                let at = w.mobys[p].pos;
+                crate::moby::blast::burst(w, ctx, at, &crate::moby::blast::Blast { size: 2.0, bursts: [0xe, 10, 0xf], puffs: 10, streaks: 0x14, light: true, shake: true });
+                w.delete(p);
+            }
+            let uid = w.mobys[id].uid;
+            ctx.game.count_uid(uid);
+            w.delete(id);
+        }
+        _ => { charger_common(w, id, ctx, 0xb4); }
+    }
+}
+
+/// 0x0fb9 (`0x41e818`, one): as 0x0fb8 with the timer 200 (`$gp+0x2d80`); out: the blast at `$gp+0x2d90` (353, 340.45,
+/// 149.5), it hidden without collision, its pieces 0..11 thrown 0.1 a tick away from Ratchet (flattened into its own
+/// xy plane, `0x3290b0`), 5, its mobys to state 4 and broken ([`break_away`]); at half its mobys to state 4.
+pub fn update_0fb9(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    match w.mobys[id].state {
+        0 => {
+            let m = &mut w.mobys[id];
+            m.state = 1;
+            let z = m.pos[2];
+            m.set_pv_f(0x10, z);
+            if uid_done(w, id, ctx) { w.delete(id); }
+        }
+        3 => {
+            let mut t = w.mobys[id].pv_i(0x14);
+            let out = countdown(&mut t);
+            w.mobys[id].set_pv_i(0x14, t);
+            let ps = links(w, id);
+            if out {
+                let at = [353.0, f32::from_bits(0x43aa_399a), 149.5];
+                crate::moby::blast::burst(w, ctx, at, &crate::moby::blast::Blast { size: 2.0, bursts: [0xe, 10, 0xf], puffs: 10, streaks: 0x14, light: true, shake: true });
+                let m = &mut w.mobys[id];
+                m.has_collision = false;
+                m.mode = (m.mode & !mode::TARGET) | 0x41;
+                let d = sub(m.pos, ctx.hero.pos);
+                let r = m.rows;
+                let local = [dot(d, r[0]), dot(d, r[1])];
+                let flat: V3 = std::array::from_fn(|k| local[0] * r[0][k] + local[1] * r[1][k]);
+                crate::moby::shards::break_into(w, id, ctx, (3.0, 6.0), (3.0, 6.0), 0xfff, set_len(flat, 0.1), 0xff);
+                w.mobys[id].set_state(5, -1);
+                for &p in &ps {
+                    w.mobys[p].state = 4;
+                    break_away(w, p, ctx);
+                }
+            }
+            if w.mobys[id].pv_i(0x14) == 0xc8 / 2 { for &p in &ps { w.mobys[p].state = 4; } }
+        }
+        _ => { charger_common(w, id, ctx, 0xc8); }
+    }
 }
