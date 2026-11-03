@@ -20,8 +20,13 @@ pub struct Globals {
     pub wave: i32,
     /// `$gp+0x1d78`: cleared by the sinking floor's set-up (nothing here reads it).
     pub g1d78: i32,
-    /// `$gp−0x334` (`0x1aecbc`): the birds 0x1105 killed (nothing here reads it).
+    /// `$gp−0x334` (`0x1aecbc`): the birds 0x1105 killed (the skill point 0x14, props::update_12c7).
     pub bird_kills: i32,
+    /// `0x1a904c` (read by props::update_12c7: its enemy count runs while it is set; no writer in the port),
+    /// `0x1a9050` and `$gp−0x338` (written by it, nothing here reads them).
+    pub g904c: i32,
+    pub g9050: i32,
+    pub g338: i32,
 }
 
 /// The level's mission `mission` done (`0x19b2e8 + level·16`, bit 7).
@@ -47,6 +52,8 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         0x0c2d => Some(props::update_0c2d),
         0x0dfd => Some(props::update_0dfd),
         0x1105 => Some(critters::update_1105),
+        0x12c7 => Some(props::update_12c7),
+        0x08e2 => Some(props::update_08e2),
         _ => None,
     }
 }

@@ -5,6 +5,8 @@
 //! * **0x123a** (`0x476340`, 1): the updraft's drain ([`update_123a`]).
 //! * **0x0c2d** (`0x414290`, 1): the level's help texts ([`update_0c2d`]).
 //! * **0x0dfd** (`0x458678`, 23): the drifting sparks ([`update_0dfd`] / [`draw_0dfd`]).
+//! * **0x12c7** (`0x399768`, 1): the level's skill points ([`update_12c7`]).
+//! * **0x08e2** (`0x3d0750`, 1): the updraft pad ([`update_08e2`]).
 
 use crate::hero::physics::{add, atan2, dist, dist2, sub_rot, V3};
 use crate::moby::{countdown, Ctx, MobyWorld};
@@ -179,4 +181,98 @@ pub fn draw_0dfd(w: &MobyWorld, id: usize, rng: &mut crate::rng::Rng, cam: V3, o
         crate::fx::sprite(out, 0.2, push, rng.rand_angle(), p, cam, 0x31, 0x3f10_6060, true);
         crate::fx::sprite(out, 0.2 * 0.4, push, rng.rand_angle(), p, cam, 0x31, 0x8080_8080, true);
     }
+}
+
+/// Skill point 0x12 (`0x1a7a7a`): the level's enemies (0x0cf5 / 0x0cf6 / 0x0d07) all dead; 0x14 (`0x1a7a7c`): twelve
+/// birds 0x1105 killed (crate::skill_points).
+const POINT_ENEMIES: usize = 0x12;
+const POINT_BIRDS: usize = 0x14;
+
+/// 0x12c7 (`0x399768`, 1 placed): the level's two skill points. Its pvars: `+0x00` the live enemies counted in this
+/// round, `+0x04` the moby the count has got to. **0**: update distance 0xff, the birds' kill count (`$gp−0x334`)
+/// 0, **1**. **1** each tick: Ratchet in the death fall (0x74) or out of health, `0x1a9050` and `$gp−0x338` 0; after
+/// the fifth frame, Ratchet idle (state 0) with no health, `0x1a9050` 1. With `0x1a904c` set and point 0x12 not had,
+/// the next 40 mobys of the table are looked at (`0x1b361c..0x1b3620`) and the live 0x0cf5 / 0x0cf6 / 0x0d07 among
+/// them counted; at the table's end a round with none awards it, and the count starts again. More than 11 birds
+/// killed: point 0x14 (`0x1a7a68[k] = 1`, the level's sound 1, the message 0x1233, `0x1a903c`: GameState::
+/// award_skill_point).
+///
+/// Not ported: who sets `0x1a904c` (nothing in the port does; kept as [`super::Globals::g904c`], so the enemies'
+/// point does not come yet — their classes have no port either).
+pub fn update_12c7(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    match w.mobys[id].state {
+        0 => {
+            let m = &mut w.mobys[id];
+            m.update_dist = 0xff;
+            w.level11.bird_kills = 0;
+            w.mobys[id].set_state(1, -1);
+            return;
+        }
+        1 => {}
+        _ => return,
+    }
+    let health = ctx.hero.hp;
+    if ctx.hero.state == 0x74 || health <= 0 {
+        w.level11.g9050 = 0;
+        w.level11.g338 = 0;
+    }
+    if 5 < ctx.game.frame && ctx.hero.state == 0 && health < 1 { w.level11.g9050 = 1; }
+    if w.level11.g904c != 0 && ctx.game.skill_points.get(POINT_ENEMIES).copied() == Some(0) {
+        for _ in 0..0x28 {
+            let k = w.mobys[id].pv_i(4).max(0) as usize;
+            if let Some(m) = w.mobys.get(k) {
+                if matches!(m.o_class, 0x0cf5 | 0x0cf6 | 0x0d07) && m.state < 0x80 {
+                    let n = w.mobys[id].pv_i(0) + 1;
+                    w.mobys[id].set_pv_i(0, n);
+                }
+            }
+            let next = k + 1;
+            w.mobys[id].set_pv_i(4, next as i32);
+            if w.mobys.len() <= next {
+                if w.mobys[id].pv_i(0) == 0 { ctx.game.award_skill_point(POINT_ENEMIES); }
+                w.mobys[id].set_pv_i(4, 0);
+                w.mobys[id].set_pv_i(0, 0);
+            }
+        }
+    }
+    if 0xb < w.level11.bird_kills { ctx.game.award_skill_point(POINT_BIRDS); }
+}
+
+/// 0x08e2 (`0x3d0750`, 1 placed): the updraft pad. Its pvars: `+0x00` a moby (−1 none), `+0x04` the glow's phase,
+/// `+0x08` a cuboid (−1 none), `+0x0c` the lift it gives (0: Ratchet's own). **0**: mode | 0x10 (the glow list), **1**.
+/// **1**: Ratchet standing on it with item 8: the prompt 0x1349 (owner 0xc, `0x339e80`, crate::prompt), the updraft's
+/// 10 ticks (`0x18a012`), so a jump floats (state 0x82), with its lift (`0x18a3d8`) when it has one. Ratchet floating
+/// (0x82) in its cuboid: the fall (`0x2d9208(6, 1)`). Drawn, its glow word pulses 6° a tick between 0x20 and 0x80 of
+/// red (green with item 8).
+///
+/// Not ported: its moby `+0x00` let go on the first tick (`0x48bd00()`, no twin found; −1 on the disc).
+pub fn update_08e2(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    let has = ctx.game.items.get(8).is_some_and(|&b| b != 0);
+    match w.mobys[id].state {
+        0 => {
+            let m = &mut w.mobys[id];
+            m.mode |= 0x10;
+            m.set_state(1, -1);
+        }
+        1 => {
+            if w.mobys[id].first() && w.mobys[id].pv_i(0) != -1 { w.mobys[id].set_pv_i(0, -1); }
+            if ctx.hero.ground_moby == Some(id) && ctx.hero.grounded_ticks != 0 {
+                if has {
+                    ctx.game.prompt.force(0xc, 0x1349, 1);
+                    ctx.hero.gear.updraft = 10;
+                    let lift = w.mobys[id].pv_f(0xc);
+                    if lift != 0.0 { ctx.hero.gear.lift_store = lift; }
+                }
+            } else if ctx.hero.state == 0x82 && 0 <= w.mobys[id].pv_i(8) && ctx.level.in_cuboid(w.mobys[id].pv_i(8), ctx.hero.pos) {
+                ctx.hero.request_state(6, true);
+            }
+        }
+        _ => {}
+    }
+    let m = &mut w.mobys[id];
+    if m.drawn == 0 { return; }
+    let a = crate::hero::physics::add_rot(m.pv_f(4), f32::from_bits(0x3dd6_7752));
+    m.set_pv_f(4, a);
+    let v = ((a.sin() * 128.0) as i32).clamp(0x20, 0x80) as u32;
+    m.glow = if has { v << 8 } else { v } | 0x8000_0000;
 }
