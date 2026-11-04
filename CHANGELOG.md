@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.1.5-alpha
+
+Maktar and Endako can now be played through, and most of the arsenal is in Ratchet's hands.
+
+- Maktar: the arena with its challenges, crowd, announcer, bosses and prizes, the slot machines, the power nodes and
+  the bomb catapult, and the Jamming Array.
+- Endako: the remote crane, the sentries and flame turrets, the arena locks, playing as Clank, and the boss fight.
+- Oozla's Swamp Monster II and its arena.
+- The Swingshot, the Spiderbot Glove, the Chopper, the Electrolyzer and the Hacker's puzzles.
+- Nearly every weapon from the vendors, with their upgrades, mods and experience bar, and Clank's packs.
+- First person, gravity ramps, the Specials menu with Skill Points and Cheats.
+- Shadows under characters, dust at Ratchet's feet, footprints in the snow, and sliding on ice.
+- The first creatures and machines of Barlow, Notak, Siberius, Joba, Todano and Boldan.
+
 ## v0.1.2-alpha
 
 Ratchet can now leave Aranos. The flight to Oozla plays out with its story scenes, and Oozla, the Wupash Nebula space
