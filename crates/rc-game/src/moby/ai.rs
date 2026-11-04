@@ -489,6 +489,76 @@ pub fn move_toward(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, offset: f32, goa
     move_step(w, id, ctx, yaw, goal)
 }
 
+/// `0x324150(speed, gravity, m, to)` (L07): a jump to `to` — the movement block's gravity `+0x2c`, its velocity
+/// `speed` across toward it and up as `0x314420` solves it (the time the distance across over `speed`; the rise
+/// that lands it there under the gravity). [`jump_step`] flies it.
+pub fn jump_start(m: &mut Moby, speed: f32, gravity: f32, to: V3) {
+    if m.pv_i(0x18) == 0 { return; }
+    let o = mv(m);
+    m.set_pv_f(o + 0x2c, gravity);
+    let d = sub(to, m.pos);
+    let across = set_len([d[0], d[1], 0.0], speed);
+    let t = len2(d) / speed;
+    let vz = if t != 0.0 { -((m.pos[2] - to[2]) + -gravity * t * t * 0.5) / t } else { 0.0 };
+    m.set_pv_v(o + 0xa0, [across[0], across[1], vz]);
+}
+
+/// `0x324208(f0, f1, f2, m)` (L07): a tick of the jump [`jump_start`] began. Moved this frame (`+0xbc`); facing along
+/// its velocity (unless option 0x10); the floor from 64 below. Between the frame times `f0` and `f2` of a sequence
+/// not blending, it falls by the gravity and moves by its velocity ([`move_by`]), the sequence's speed set to reach
+/// `f1` at the top of the rise, then `f2` on the floor (`0x312fc0`: the fall's time to it, 600 past a second) — at
+/// most 5; outside them, or on the floor, the speed 1. At the sequence's end it stands on the floor, still: true.
+pub fn jump_step(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, f0: f32, f1: f32, f2: f32) -> bool {
+    let m = &mut w.mobys[id];
+    if m.pv_i(0x18) == 0 { return false; }
+    let o = mv(m);
+    m.set_pv_i(o + 0xbc, ctx.game.frame);
+    if m.pv_i(o + 0x38) & 0x10 == 0 {
+        let v = m.pv_v(o + 0xa0);
+        let (a, b, c) = (m.pv_f(o + 0x14), m.pv_f(o + 0x18), m.pv_f(o + 0x1c));
+        let (mut r, mut s) = (m.rot[2], m.pv_f(o + 0xb4));
+        turn_ease(atan2(v[0], v[1]), a, b, c, &mut r, &mut s, 0);
+        m.rot[2] = r;
+        m.set_pv_f(o + 0xb4, s);
+    }
+    floor(w, id, ctx, 64.0);
+    let f = ctx.host.frame_time(&w.mobys[id]);
+    let blending = ctx.host.anim(&w.mobys[id]).is_some_and(|a| a.seq_a != a.seq_b);
+    let mut speed = 1.0;
+    if !blending && f0 <= f && f <= f2 {
+        let m = &mut w.mobys[id];
+        let g = m.pv_f(o + 0x2c);
+        m.set_pv_f(o + 0xa8, m.pv_f(o + 0xa8) - g);
+        let v = m.pv_v(o + 0xa0);
+        move_by(w, id, ctx, v);
+        let m = &mut w.mobys[id];
+        let vz = m.pv_f(o + 0xa8);
+        let fl = m.pv_f(o + 0x90);
+        if 0.0 < vz {
+            speed = (f1 - f) * 2.0 / (vz / g);
+        } else if fl < m.pos[2] {
+            let (a, b, c) = (g * -0.5, vz - g * -0.5, m.pos[2] - fl);
+            let disc = b * b - a * c * 4.0;
+            let (n, hi) = if disc == 0.0 { (1, -b / (a + a)) } else {
+                let r = disc.abs().sqrt();
+                (if 0.0 < disc { 2 } else { 0 }, ((-b + r) / (a + a)).max((-b - r) / (a + a)))
+            };
+            let t = if 0 < n && 0.0 < hi && hi < 60.0 { hi } else { 600.0 };
+            speed = (f2 - f) * 2.0 / t;
+        } else {
+            m.pos[2] = fl;
+        }
+        speed = speed.clamp(0.0, 5.0);
+    }
+    ctx.host.set_anim_speed(&w.mobys[id], speed);
+    if !super::classes::props::wrapped(w, id, ctx) { return false; }
+    let m = &mut w.mobys[id];
+    m.pos[2] = m.pv_f(o + 0x90);
+    m.set_pv_v(o + 0xa0, [0.0; 3]);
+    w.changed = true;
+    true
+}
+
 /// The enemies' scene rule (`0x1a8f00` = 2, after their checks): no collision, hidden and not a target
 /// (`+0x98` = 0, mode `& 0xefff | 0x41`), and nothing more this tick. Outside a scene their update shows them again.
 /// Returns whether a scene plays.

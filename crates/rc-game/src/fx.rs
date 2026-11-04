@@ -7,6 +7,7 @@
 //! |---|---|---|
 //! | `0x3d8340` | 0x0b0a | its three glows ([`glow`]: the pilot light at `+0x3a0`, the nozzle `+0x3b0` and the mouth `+0x3c0`); climbing, its wire (`0x3d8498`) |
 //! | `0x3dc220` | 0x0b0b (and Maktar's 0x0b22, level 7's 0x0d29: L07 `0x3eb968`) | its three glows ([`glow`]: the visor at joint 4, the chest at joint 5, below it joint 6 at (0.25, 0, 0)) |
+//! | `0x3cbcc8` (L07) | the gunner's fireball 0x0b7f | its two glows ([`crate::moby::classes::level07::gunner::draw_0b7f`]) |
 //! | `0x3f4998` | 0x0ce9 in glow mode | a glow at each tie of its group ([`crate::moby::classes::tie_lights::draw`]) |
 //! | `0x3e4050` | the Lancer's shot | its trail's newest point and the trail ([`crate::moby::classes::shot::draw_trail`]) |
 //! | `0x3a17f0` | the nanotech cluster 0x326 (the first list) | its sphere, halo and crate glass ([`crate::moby::classes::nanotech::draw`]) |
@@ -347,6 +348,7 @@ fn one(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut crate::ga
         0x0944 => crate::moby::classes::endako_c::draw_0944(w, id, out),
         0x0b0a => draw_0b0a(w, id, &mut game.rng, cam, out),
         0x0b0b | 0x0b22 | crate::moby::classes::level07::prowler::CLASS => draw_0b0b(w, host, id, &mut game.rng, cam, out),
+        crate::moby::classes::level07::gunner::SHOT => crate::moby::classes::level07::gunner::draw_0b7f(w, id, &mut game.rng, cam, out),
         crate::moby::classes::shot::SHOT_CLASS => crate::moby::classes::shot::draw_trail(&mut w.mobys[id], cam, &mut game.trail_phase, out),
         crate::moby::classes::nanotech::CLASS => crate::moby::classes::nanotech::draw(w, id, cam, out),
         crate::moby::classes::gravity_bomb::HAND_CLASS => crate::moby::classes::gravity_bomb::draw_marker(w, id, hero_state, game.frame, out),
