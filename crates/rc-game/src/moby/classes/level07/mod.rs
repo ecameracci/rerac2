@@ -3,11 +3,13 @@
 //! after its own.
 
 pub mod icicle;
+pub mod prowler;
 
 /// This level's class updates.
 pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
     match o_class {
         icicle::CLASS => Some(icicle::update_12a8),
+        prowler::CLASS => Some(prowler::update_0d29),
         _ => None,
     }
 }

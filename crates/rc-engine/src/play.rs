@@ -1092,6 +1092,8 @@ fn tick(
     };
     // `0x2d9f38`'s tail `0x2d7b70`: the field of view's blend (rc_game::camera::FovBlend: the Pulse Rifle's zoom).
     p.game.cam_tweaks.fov_step();
+    // The mobys' asks of the follow camera last one tick (taken by its update; dropped while it does not run).
+    (p.game.cam_tweaks.follow_dist, p.game.cam_tweaks.follow_pivot) = (None, None);
     // The first-person camera's view lock (`0x18c0d5`: Ratchet hides and faces the view, rc_game::hero).
     if cam.view_lock && p.hero.view_lock == 0 { p.hero.view_lock = 1; }
     // The ship's camera (class 0x19, rc_game::ship): its update flies the ship and is the view.

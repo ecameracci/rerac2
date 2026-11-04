@@ -260,10 +260,14 @@ pub struct CamTweaks {
     pub off: V3,
     /// The field of view's blend toward [`CamTweaks::fov`] ([`FovBlend`]).
     pub blend: FovBlend,
+    /// A moby's ask this tick for the follow camera's distance and pivot height (`0x422648(d, rate, 0)` /
+    /// `0x422690(h, rate)`: [`FollowCamera::set_dist`] / [`FollowCamera::set_pivot_h`] as its update starts).
+    pub follow_dist: Option<(f32, f32)>,
+    pub follow_pivot: Option<(f32, f32)>,
 }
 
 impl Default for CamTweaks {
-    fn default() -> Self { CamTweaks { slots: [CamTweak::default(); 32], last: -1, fov: 1.124_3, turn: None, off: [0.0; 3], blend: FovBlend::default() } }
+    fn default() -> Self { CamTweaks { slots: [CamTweak::default(); 32], last: -1, fov: 1.124_3, turn: None, off: [0.0; 3], blend: FovBlend::default(), follow_dist: None, follow_pivot: None } }
 }
 
 /// `0x3f8fea69`: the play's field of view (the level start's `0x32c858` and the weapons put away blend back to it).
@@ -736,6 +740,8 @@ impl FollowCamera {
             self.script |= t.script;
             (self.script_yaw, self.yaw_rate) = (t.yaw, t.rate);
         }
+        if let Some((d, rate)) = tweaks.follow_dist.take() { self.set_dist(d, rate, false); }
+        if let Some((h, rate)) = tweaks.follow_pivot.take() { self.set_pivot_h(h, rate); }
         self.step(inp, tweaks);
         tweaks.off = self.off;
     }
